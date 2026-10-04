@@ -435,7 +435,9 @@ export async function getDatabase(): Promise<{
       if (process.env.NODE_ENV === 'development' && g._mongoClientPromise) {
         clientPromise = g._mongoClientPromise;
       } else {
-        const { MongoClient } = await import('mongodb');
+        // Server-safe dynamic import that avoids webpack bundling mongodb in client
+        const mongodbPkg = 'mongodb';
+        const { MongoClient } = await (Function('pkg', 'return import(pkg)')(mongodbPkg));
         const client = new MongoClient(MONGODB_URI, {
           serverSelectionTimeoutMS: 30000,
           connectTimeoutMS: 15000,
