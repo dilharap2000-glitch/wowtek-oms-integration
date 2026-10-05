@@ -16,8 +16,16 @@ import {
   ZoomIn,
   Cpu,
   Sparkles,
+  Sliders,
 } from 'lucide-react';
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+import {
+  BrowserMultiFormatReader,
+  BarcodeFormat,
+  DecodeHintType,
+  BinaryBitmap,
+  RGBLuminanceSource,
+  HybridBinarizer,
+} from '@zxing/library';
 import { Product } from '@/types';
 
 export interface BarcodeScannerModalProps {
@@ -89,11 +97,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const processingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isScanningRef = useRef(false);
   const activeTrackRef = useRef<MediaStreamTrack | null>(null);
 
-  // Debounce & throttle refs
+  // Debounce & buffer reset (800ms for continuous lightning-fast multi-item scanning)
   const scanThrottleRef = useRef<number>(0);
   const lastScannedCodeRef = useRef<string>('');
 
@@ -106,7 +115,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       if (!AudioCtxClass) return;
       const ctx = new AudioCtxClass();
 
-      // High-pitched 2400Hz retail register chime
+      // High-pitched 2400Hz retail register chime (instant playback)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -114,7 +123,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       osc.frequency.setValueAtTime(2400, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1800, ctx.currentTime + 0.08);
 
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.setValueAtTime(0.28, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
 
       osc.connect(gain);
@@ -162,12 +171,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       if (!code) return;
 
       const now = Date.now();
-      // Debounce: 1.5s throttle on identical barcode to prevent double-scanning
-      if (!isManual && code === lastScannedCodeRef.current && now - scanThrottleRef.current < 1500) {
+
+      // Zero-lag debounce: 800ms buffer reset for identical barcode
+      if (!isManual && code === lastScannedCodeRef.current && now - scanThrottleRef.current < 800) {
         return;
       }
-      // Minimum 500ms grace period between any scans
-      if (!isManual && now - scanThrottleRef.current < 500) {
+      // 350ms grace period between any different barcodes for rapid sequential multi-item scans
+      if (!isManual && now - scanThrottleRef.current < 350) {
         return;
       }
 
@@ -236,18 +246,16 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const stopAllEngines = useCallback(async () => {
     isScanningRef.current = false;
 
+    // Clear 50ms scan interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+
     // Cancel animation frame
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
-    }
-
-    // Reset ZXing Reader
-    if (zxingReaderRef.current) {
-      try {
-        zxingReaderRef.current.reset();
-      } catch {}
-      zxingReaderRef.current = null;
     }
 
     // Stop Native MediaStream tracks
@@ -288,21 +296,40 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   };
 
   // -------------------------------------------------------------------------
-  // Start High-Res Stream & Dual Parallel Decoding Engines
+  // Start High-Res Stream, Auto-Zoom 1.5x, & Contrast-Enhanced Dual Engines
   // -------------------------------------------------------------------------
   const startDualParallelEngines = useCallback(async () => {
     await stopAllEngines();
-
     setCameraError(null);
 
     try {
-      // 1. Full-frame maximum resolution & high FPS camera constraints
+      // Check available devices to prioritize Macro/Wide/Back camera
+      let preferredDeviceId: string | undefined = undefined;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        // Prioritize camera labeled with macro, wide, or environment
+        const macroCamera = videoInputs.find((d) =>
+          /macro|ultra|wide|0\.5|1\.5/i.test(d.label)
+        );
+        if (macroCamera?.deviceId) {
+          preferredDeviceId = macroCamera.deviceId;
+        }
+      } catch {}
+
+      // Full-frame 1080p stream with default 1.5x zoom and continuous autofocus
       const constraints: MediaStreamConstraints = {
         video: {
+          deviceId: preferredDeviceId ? { ideal: preferredDeviceId } : undefined,
           facingMode: { ideal: 'environment' },
           width: { ideal: 1920, min: 1280 },
           height: { ideal: 1080, min: 720 },
           frameRate: { ideal: 30, min: 20 },
+          // Request 1.5x zoom directly in initial constraints
+          advanced: [
+            { zoom: 1.5 },
+            { focusMode: 'continuous' },
+          ] as any,
         },
         audio: false,
       };
@@ -314,7 +341,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       if (track) {
         activeTrackRef.current = track;
 
-        // Inspect hardware capabilities (Zoom & Torch & Continuous Focus)
+        // Auto-configure hardware capabilities
         try {
           const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
 
@@ -323,7 +350,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             setTorchSupported(true);
           }
 
-          // Hardware auto-zoom & zoom range
+          // Auto-apply 1.5x zoom immediately without requiring user interaction
           if (capabilities && 'zoom' in capabilities) {
             setZoomSupported(true);
             const minZ = capabilities.zoom.min || 1;
@@ -331,22 +358,25 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             setZoomMin(minZ);
             setZoomMax(maxZ);
 
-            // Auto-apply 1.5x zoom as requested for small 1D barcodes
             const autoZoom = Math.min(Math.max(1.5, minZ), maxZ);
             setZoomLevel(autoZoom);
-            await (track as any).applyConstraints({
-              advanced: [{ zoom: autoZoom }],
-            }).catch(() => {});
+            await (track as any)
+              .applyConstraints({
+                advanced: [{ zoom: autoZoom }],
+              })
+              .catch(() => {});
           }
 
-          // Continuous auto-focus mode
+          // Continuous auto-focus actuator
           if (capabilities && capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-            await (track as any).applyConstraints({
-              advanced: [{ focusMode: 'continuous' }],
-            }).catch(() => {});
+            await (track as any)
+              .applyConstraints({
+                advanced: [{ focusMode: 'continuous' }],
+              })
+              .catch(() => {});
           }
         } catch {
-          // Non-critical capability inspection error
+          // Capability query fallback
         }
       }
 
@@ -379,10 +409,10 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       }
 
       // ---------------------------------------------------------------------
-      // Parallel Engine 2: ZXing Library with TRY_HARDER (Small/Degraded 1D)
+      // Parallel Engine 2: ZXing with TRY_HARDER (Small/Degraded 1D Barcodes)
       // ---------------------------------------------------------------------
       const hints = new Map<DecodeHintType, any>();
-      hints.set(DecodeHintType.TRY_HARDER, true); // Crucial for low-contrast & small codes
+      hints.set(DecodeHintType.TRY_HARDER, true);
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
         BarcodeFormat.EAN_8,
@@ -393,24 +423,49 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         BarcodeFormat.QR_CODE,
       ]);
 
-      // Scan every 80ms in parallel
-      const zxingReader = new BrowserMultiFormatReader(hints, 80);
-      zxingReaderRef.current = zxingReader;
+      const zxingReader = new BrowserMultiFormatReader(hints);
 
-      if (videoRef.current) {
-        try {
-          zxingReader.decodeFromVideoElementContinuously(videoRef.current, (result) => {
-            if (result && isScanningRef.current) {
-              const text = result.getText();
-              if (text) {
-                handleDecodedBarcode(text, false, '🔬 ZXing TryHarder');
-              }
-            }
-          });
-        } catch (e) {
-          console.warn('ZXing continuous start error', e);
+      // ---------------------------------------------------------------------
+      // Ultra-Fast 50ms (20 Checks/sec) Contrast-Enhanced Processing Cycle
+      // ---------------------------------------------------------------------
+      scanIntervalRef.current = setInterval(() => {
+        if (!isScanningRef.current || !videoRef.current) return;
+        const video = videoRef.current;
+        if (video.readyState < 2 || video.paused) return;
+
+        if (!processingCanvasRef.current) {
+          processingCanvasRef.current = document.createElement('canvas');
         }
-      }
+        const canvas = processingCanvasRef.current;
+        const w = video.videoWidth || 1280;
+        const h = video.videoHeight || 720;
+
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+
+        // Dynamic Focus Contrast Enhancement:
+        // Hardware contrast(1.2) brightness(1.1) makes dark lines pop on curved/glossy surfaces
+        ctx.filter = 'contrast(1.2) brightness(1.1)';
+        ctx.drawImage(video, 0, 0, w, h);
+
+        // Feed contrast-enhanced frame to ZXing TryHarder
+        try {
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const luminanceSource = new RGBLuminanceSource(imageData.data, w, h);
+          const binaryBitmap = new BinaryBitmap(new HybridBinarizer(luminanceSource));
+          const result = zxingReader.decodeBitmap(binaryBitmap);
+          if (result && result.getText()) {
+            handleDecodedBarcode(result.getText(), false, '🔬 ZXing TryHarder (Contrast-Enhanced)');
+          }
+        } catch {
+          // NotFoundException is normal when no barcode is in frame
+        }
+      }, 50);
 
       // Native GPU loop on requestAnimationFrame
       if (nativeDetector) {
@@ -418,10 +473,11 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           if (!isScanningRef.current || !videoRef.current) return;
           try {
             if (videoRef.current.readyState >= 2 && !videoRef.current.paused) {
-              // Full-frame native detection
-              const barcodes = await nativeDetector.detect(videoRef.current);
+              // Pass contrast-enhanced canvas or video element
+              const source = processingCanvasRef.current || videoRef.current;
+              const barcodes = await nativeDetector.detect(source);
               if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-                handleDecodedBarcode(barcodes[0].rawValue, false, '⚡ Native GPU');
+                handleDecodedBarcode(barcodes[0].rawValue, false, '⚡ Native GPU (Contrast-Enhanced)');
               }
             }
           } catch {
@@ -457,7 +513,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
     const timer = setTimeout(() => {
       startDualParallelEngines();
-    }, 150);
+    }, 120);
 
     return () => {
       clearTimeout(timer);
@@ -534,7 +590,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <h3 className="text-sm font-semibold text-white">{title}</h3>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/80 flex items-center gap-1">
                   <Cpu className="w-3 h-3 text-emerald-400" />
-                  Dual Engine Active (Native GPU + ZXing TryHarder)
+                  Dual Engine Active (50ms Cycle · Contrast Boost)
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400">{description}</p>
@@ -574,7 +630,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <div className="w-full flex items-center justify-between text-xs px-1">
             <div className="flex items-center gap-1.5 text-neutral-400">
               <ZoomIn className="w-3.5 h-3.5 text-purple-400" />
-              <span className="text-[11px] font-medium">Auto-Zoom:</span>
+              <span className="text-[11px] font-medium">Zoom (Auto 1.5x):</span>
               <div className="flex items-center gap-1">
                 {[1.0, 1.5, 2.0, 3.0].map((level) => (
                   <button
@@ -587,14 +643,19 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                         : 'bg-neutral-900 text-neutral-400 hover:text-white border border-neutral-800'
                     }`}
                   >
-                    {level === 1.5 ? '1.5x (Optimal)' : `${level.toFixed(1)}x`}
+                    {level === 1.5 ? '1.5x (Active)' : `${level.toFixed(1)}x`}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="text-[10px] font-mono text-neutral-400 hidden sm:block">
-              1080p Full-Frame Scanning
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-purple-300">
+                Contrast 1.2x Boost
+              </span>
+              <span className="text-[10px] font-mono text-neutral-400 hidden sm:inline">
+                50ms Scan Rate
+              </span>
             </div>
           </div>
 
@@ -606,12 +667,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 : 'border-neutral-800'
             }`}
           >
-            {/* Raw Full-Frame Video Stream (No Narrow Crop Boundaries) */}
+            {/* Full-Frame Video Stream (Styled with contrast filter preview) */}
             <video
               ref={videoRef}
               playsInline
               autoPlay
               muted
+              style={{ filter: 'contrast(1.1) brightness(1.05)' }}
               className="w-full h-full object-cover rounded-xl"
             />
 
@@ -646,7 +708,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   }`}
                 />
 
-                {/* Laser Sweep Line */}
+                {/* Sweeping Laser Line */}
                 <div
                   className={`w-full h-0.5 animate-pulse shadow-md ${
                     isFlashing
@@ -724,7 +786,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 onChange={(e) => setContinuousMode(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-neutral-700 bg-neutral-900 text-purple-600 focus:ring-purple-500"
               />
-              <span className="text-[11px]">Continuous Multi-Item Scanning</span>
+              <span className="text-[11px]">Continuous Multi-Item Scanning (800ms Reset)</span>
             </label>
 
             {cartItemCount > 0 && (
