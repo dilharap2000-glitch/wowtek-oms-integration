@@ -15,6 +15,7 @@ import {
   Trash2,
   Edit,
   Package,
+  Sparkles,
 } from 'lucide-react';
 import { Product } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
@@ -24,6 +25,7 @@ interface ProductsTabProps {
   onAddProduct: (product: Product) => void;
   onUpdateProduct?: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct?: (id: string) => void;
+  onLoadSampleProducts?: () => void;
 }
 
 export const ProductsTab: React.FC<ProductsTabProps> = ({
@@ -31,6 +33,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onLoadSampleProducts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null);
@@ -146,6 +149,16 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {products.length === 0 && onLoadSampleProducts && (
+            <button
+              onClick={() => onLoadSampleProducts()}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-300 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800 rounded-lg transition-colors shadow-sm"
+              title="Load 5 real stock products with standard barcodes"
+            >
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Add Test Sample Products</span>
+            </button>
+          )}
           <button
             onClick={() => setIsScannerOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg transition-colors shadow-sm"
@@ -273,14 +286,26 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                       <p className="text-xs text-neutral-400">
                         Your inventory database is currently empty. Record your first product GRN batch to calculate inventory valuation and profit margins.
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddModal(true)}
-                        className="mt-2 flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add New Product</span>
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddModal(true)}
+                          className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Add New Product</span>
+                        </button>
+                        {onLoadSampleProducts && (
+                          <button
+                            type="button"
+                            onClick={() => onLoadSampleProducts()}
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-purple-300 border border-neutral-700 rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <span>Add Test Sample Products</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

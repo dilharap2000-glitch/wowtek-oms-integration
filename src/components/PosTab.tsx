@@ -37,6 +37,8 @@ interface PosTabProps {
   onUpdateOrder: (id: string, updates: Partial<Order>) => void;
   onDeleteOrder: (id: string) => void;
   onProcessReturn: (orderId: string, itemSkus?: string[], reason?: string) => void;
+  onAddProduct?: (product: Product) => void;
+  onLoadSampleProducts?: () => void;
 }
 
 export const PosTab: React.FC<PosTabProps> = ({
@@ -48,6 +50,8 @@ export const PosTab: React.FC<PosTabProps> = ({
   onUpdateOrder,
   onDeleteOrder,
   onProcessReturn,
+  onAddProduct,
+  onLoadSampleProducts,
 }) => {
   // POS Cart State
   const [cart, setCart] = useState<OrderItem[]>([]);
@@ -131,6 +135,59 @@ export const PosTab: React.FC<PosTabProps> = ({
       return true;
     }
     return false;
+  };
+
+  // Add custom uncataloged item directly to cart on the fly
+  const handleAddCustomItem = (item: {
+    sku: string;
+    barcode: string;
+    name: string;
+    sellingPrice: number;
+    costPrice?: number;
+    saveToInventory?: boolean;
+  }) => {
+    // 1. Add to POS cart
+    setCart((prev) => {
+      const existing = prev.find(
+        (i) => i.sku === item.sku || (item.barcode && i.barcode === item.barcode)
+      );
+      if (existing) {
+        return prev.map((i) =>
+          i.sku === item.sku ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [
+        ...prev,
+        {
+          sku: item.sku,
+          barcode: item.barcode,
+          name: item.name,
+          quantity: 1,
+          unitPrice: item.sellingPrice,
+          costPrice: item.costPrice || Math.round(item.sellingPrice * 0.7),
+        },
+      ];
+    });
+
+    // 2. If user requested to save to Inventory, persist as a new Product
+    if (item.saveToInventory && onAddProduct) {
+      const newProd: Product = {
+        id: `prod-${Date.now().toString().slice(-4)}`,
+        sku: item.sku,
+        barcode: item.barcode,
+        name: item.name,
+        category: 'Scanned Items',
+        costPrice: item.costPrice || Math.round(item.sellingPrice * 0.7),
+        sellingPrice: item.sellingPrice,
+        stockWarehouse: 10,
+        stockStore: 5,
+        stockReserved: 1,
+        grnBatch: `GRN-${new Date().getFullYear()}-POS`,
+        supplier: 'Direct Scanner Entry',
+        warrantyPeriodMonths: 12,
+      };
+      onAddProduct(newProd);
+    }
   };
 
   const handleUpdateQuantity = (sku: string, delta: number) => {
@@ -749,10 +806,12 @@ export const PosTab: React.FC<PosTabProps> = ({
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScan={handleBarcodeScanned}
+        onAddCustomItem={handleAddCustomItem}
         products={products}
         title="POS Camera Barcode Scanner"
         description="Scan any product barcode or SKU to continuously add to cart"
         cartItemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+        onLoadSampleProducts={onLoadSampleProducts}
       />
 
       {/* Return & Stock Restoration Modal */}

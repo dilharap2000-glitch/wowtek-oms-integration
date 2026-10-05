@@ -14,6 +14,9 @@ import {
   Plus,
   ShoppingCart,
   Check,
+  Sparkles,
+  ArrowRight,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Product } from '@/types';
@@ -22,59 +25,85 @@ export interface BarcodeScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScan: (barcode: string) => boolean | void;
+  onAddCustomItem?: (item: {
+    sku: string;
+    barcode: string;
+    name: string;
+    sellingPrice: number;
+    costPrice?: number;
+    saveToInventory?: boolean;
+  }) => void;
   products: Product[];
   title?: string;
   description?: string;
   singleScanMode?: boolean;
   cartItemCount?: number;
+  onLoadSampleProducts?: () => void;
 }
 
 interface ScanFeedback {
-  type: 'success' | 'error';
+  type: 'success' | 'alert' | 'error';
   title: string;
   message: string;
   code: string;
   timestamp: number;
 }
 
+interface UnknownBarcodePrompt {
+  code: string;
+  name: string;
+  price: number;
+  costPrice: number;
+  saveToInventory: boolean;
+}
+
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   isOpen,
   onClose,
   onScan,
+  onAddCustomItem,
   products,
   title = 'POS Camera Barcode Scanner',
   description = 'Point camera at product barcode to continuously add items to cart',
   singleScanMode = false,
   cartItemCount = 0,
+  onLoadSampleProducts,
 }) => {
+  // State
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
   const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
+  const [isFlashing, setIsFlashing] = useState(false);
   const [continuousMode, setContinuousMode] = useState(!singleScanMode);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-  const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
-  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
+  const [engineType, setEngineType] = useState<'native' | 'html5qrcode'>('native');
+  const [unknownItemPrompt, setUnknownItemPrompt] = useState<UnknownBarcodePrompt | null>(null);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  // Refs for camera and detection lifecycle
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const html5QrcodeRef = useRef<Html5Qrcode | null>(null);
   const isScanningRef = useRef(false);
-  const isStartingRef = useRef(false);
   const activeTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  // Debounce & throttle refs
   const scanThrottleRef = useRef<number>(0);
   const lastScannedCodeRef = useRef<string>('');
-  const scannerContainerId = 'wowtek-barcode-scanner-viewport';
+  const scannerContainerId = 'wowtek-html5-qr-reader';
 
   // -------------------------------------------------------------------------
-  // Web Audio API: Success and Error Beeps
+  // Web Audio API Synths: High-Pitched Scan Beep & Alert Tones
   // -------------------------------------------------------------------------
-  const playScanBeep = useCallback(() => {
+  const playScanSuccessBeep = useCallback(() => {
     try {
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtxClass) return;
       const ctx = new AudioCtxClass();
 
-      // Pleasant high-register retail barcode chime (2400Hz)
+      // High-pitched crystal-clear POS retail chime (2400Hz)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
@@ -82,7 +111,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       osc.frequency.setValueAtTime(2400, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(1800, ctx.currentTime + 0.08);
 
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
 
       osc.connect(gain);
@@ -91,50 +120,51 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.12);
     } catch {
-      // AudioContext unavailable or permission not yet granted
+      // Audio playback blocked or unpermitted
     }
   }, []);
 
-  const playErrorBeep = useCallback(() => {
+  const playAlertTone = useCallback(() => {
     try {
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtxClass) return;
       const ctx = new AudioCtxClass();
 
+      // Two-tone warning alert chime (480Hz -> 360Hz)
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(320, ctx.currentTime);
-      osc.frequency.linearRampToValueAtTime(220, ctx.currentTime + 0.2);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(480, ctx.currentTime);
+      osc.frequency.setValueAtTime(360, ctx.currentTime + 0.1);
 
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
 
       osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.22);
+      osc.stop(ctx.currentTime + 0.28);
     } catch {
-      // Ignore audio error
+      // Ignore
     }
   }, []);
 
   // -------------------------------------------------------------------------
-  // Product Lookup & Scan Dispatcher with 2-Second Throttle
+  // Process Decoded Barcode (Lookup or Fallback Prompt)
   // -------------------------------------------------------------------------
-  const processBarcode = useCallback(
+  const handleDecodedBarcode = useCallback(
     (rawCode: string, isManual = false) => {
       const code = rawCode.trim();
       if (!code) return;
 
       const now = Date.now();
-      // Throttle double-scanning the exact same code within 2 seconds
-      if (!isManual && code === lastScannedCodeRef.current && now - scanThrottleRef.current < 2000) {
+      // Debounce: 1.5s throttle on identical barcode to prevent double-scanning
+      if (!isManual && code === lastScannedCodeRef.current && now - scanThrottleRef.current < 1500) {
         return;
       }
-      // Minimum 600ms grace period between any consecutive scans
+      // Minimum 600ms grace period between any scans
       if (!isManual && now - scanThrottleRef.current < 600) {
         return;
       }
@@ -142,7 +172,11 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       scanThrottleRef.current = now;
       lastScannedCodeRef.current = code;
 
-      // Exact search against products array (matching barcode or sku)
+      // 1.5s visual green flash feedback
+      setIsFlashing(true);
+      setTimeout(() => setIsFlashing(false), 1500);
+
+      // Search catalog
       const foundProduct = products.find(
         (p) =>
           (p.barcode && p.barcode.trim().toLowerCase() === code.toLowerCase()) ||
@@ -150,7 +184,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       );
 
       if (foundProduct) {
-        playScanBeep();
+        // MATCH FOUND: Add immediately & play high-pitch beep
+        playScanSuccessBeep();
         setFeedback({
           type: 'success',
           title: foundProduct.name,
@@ -159,66 +194,275 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           timestamp: now,
         });
 
-        // Trigger parent cart addition
         onScan(foundProduct.barcode || code);
 
         if (singleScanMode || !continuousMode) {
           setTimeout(() => {
             onClose();
-          }, 650);
+          }, 600);
         }
       } else {
-        playErrorBeep();
+        // MATCH NOT FOUND (Catalog Empty or Unregistered SKU):
+        playAlertTone();
         setFeedback({
-          type: 'error',
-          title: `Item with Barcode [${code}] not found in Inventory`,
-          message:
-            products.length === 0
-              ? 'Catalog has 0 products. Add products in Products & Barcode GRN tab.'
-              : 'Verify barcode number or register new SKU in inventory.',
+          type: 'alert',
+          title: `Item not found in stock: [${code}]`,
+          message: `Prompting quick-add custom item to cart...`,
           code,
           timestamp: now,
         });
 
-        // Still pass to parent in case parent handles ad-hoc items
-        onScan(code);
+        // Trigger on-the-fly custom item prompt modal
+        setUnknownItemPrompt({
+          code,
+          name: `Custom Scanned Item (${code.slice(-6)})`,
+          price: 1500,
+          costPrice: 1050,
+          saveToInventory: true,
+        });
       }
     },
-    [products, onScan, onClose, singleScanMode, continuousMode, playScanBeep, playErrorBeep]
+    [products, onScan, onClose, singleScanMode, continuousMode, playScanSuccessBeep, playAlertTone]
   );
 
   // -------------------------------------------------------------------------
-  // Safe Stop and Clear Scanner
+  // Stop All Camera Engines and Release Media Streams
   // -------------------------------------------------------------------------
-  const safeStopScanner = useCallback(async () => {
-    isStartingRef.current = false;
-    const instance = scannerRef.current;
-    if (!instance) return;
+  const stopAllEngines = useCallback(async () => {
+    isScanningRef.current = false;
 
-    scannerRef.current = null;
+    // Cancel animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    // Stop Native MediaStream tracks
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {}
+      });
+      mediaStreamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      try {
+        videoRef.current.srcObject = null;
+      } catch {}
+    }
+
+    // Stop Html5Qrcode instance
+    if (html5QrcodeRef.current) {
+      const scanner = html5QrcodeRef.current;
+      html5QrcodeRef.current = null;
+      try {
+        if ((scanner as any).isScanning) {
+          await scanner.stop().catch(() => {});
+        }
+      } catch {}
+      try {
+        scanner.clear();
+      } catch {}
+    }
+
     activeTrackRef.current = null;
     setTorchOn(false);
     setTorchSupported(false);
-
-    try {
-      if (isScanningRef.current) {
-        isScanningRef.current = false;
-        await instance.stop().catch(() => {});
-      }
-    } catch {
-      // Ignore stop errors
-    }
-
-    try {
-      instance.clear();
-    } catch {
-      // Ignore clear errors
-    }
   }, []);
 
   // -------------------------------------------------------------------------
-  // Toggle Torch / Flashlight
+  // Native BarcodeDetector Engine
   // -------------------------------------------------------------------------
+  const startNativeBarcodeDetector = useCallback(async () => {
+    await stopAllEngines();
+
+    if (!('BarcodeDetector' in window)) {
+      throw new Error('Native BarcodeDetector API not available in this browser.');
+    }
+
+    // Explicit standard retail 1D + 2D formats
+    const standardFormats = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'];
+    let supportedFormats = standardFormats;
+
+    if (typeof (window as any).BarcodeDetector?.getSupportedFormats === 'function') {
+      try {
+        const available = await (window as any).BarcodeDetector.getSupportedFormats();
+        supportedFormats = standardFormats.filter((fmt) => available.includes(fmt));
+      } catch {}
+    }
+
+    const detector = new (window as any).BarcodeDetector({
+      formats: supportedFormats.length > 0 ? supportedFormats : ['ean_13', 'code_128', 'qr_code'],
+    });
+
+    // Request high-resolution back camera stream with continuous focus
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        // @ts-ignore
+        advanced: [{ focusMode: 'continuous' }],
+      },
+      audio: false,
+    });
+
+    mediaStreamRef.current = stream;
+    const track = stream.getVideoTracks()[0];
+    if (track) {
+      activeTrackRef.current = track;
+      try {
+        const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+        if (capabilities && 'torch' in capabilities) {
+          setTorchSupported(true);
+        }
+      } catch {}
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+    }
+
+    isScanningRef.current = true;
+    setCameraActive(true);
+    setCameraError(null);
+    setEngineType('native');
+
+    // Continuous Native Detection Loop
+    const detectFrame = async () => {
+      if (!isScanningRef.current || !videoRef.current) return;
+      try {
+        if (videoRef.current.readyState >= 2 && !videoRef.current.paused) {
+          const barcodes = await detector.detect(videoRef.current);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            handleDecodedBarcode(barcodes[0].rawValue, false);
+          }
+        }
+      } catch {
+        // Non-critical frame dropped
+      }
+
+      if (isScanningRef.current) {
+        animationFrameRef.current = requestAnimationFrame(detectFrame);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(detectFrame);
+  }, [handleDecodedBarcode, stopAllEngines]);
+
+  // -------------------------------------------------------------------------
+  // Fallback Html5Qrcode / ZXing Engine
+  // -------------------------------------------------------------------------
+  const startHtml5QrcodeFallback = useCallback(async () => {
+    await stopAllEngines();
+
+    const container = document.getElementById(scannerContainerId);
+    if (!container) return;
+
+    const scanner = new Html5Qrcode(scannerContainerId, {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.QR_CODE,
+      ],
+      verbose: false,
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true,
+      },
+    });
+
+    html5QrcodeRef.current = scanner;
+
+    await scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 20,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.777778,
+        videoConstraints: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          focusMode: { ideal: 'continuous' } as any,
+        } as MediaTrackConstraints,
+      },
+      (decodedText) => {
+        handleDecodedBarcode(decodedText, false);
+      },
+      () => {}
+    );
+
+    isScanningRef.current = true;
+    setCameraActive(true);
+    setCameraError(null);
+    setEngineType('html5qrcode');
+
+    try {
+      const stream = (scanner as any).localMediaStream as MediaStream | undefined;
+      const track = stream?.getVideoTracks?.()[0];
+      if (track) {
+        activeTrackRef.current = track;
+        const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
+        if (capabilities && 'torch' in capabilities) {
+          setTorchSupported(true);
+        }
+      }
+    } catch {}
+  }, [handleDecodedBarcode, stopAllEngines]);
+
+  // -------------------------------------------------------------------------
+  // Orchestrated Scanner Initialization
+  // -------------------------------------------------------------------------
+  const initScanner = useCallback(async () => {
+    try {
+      if ('BarcodeDetector' in window) {
+        await startNativeBarcodeDetector();
+      } else {
+        await startHtml5QrcodeFallback();
+      }
+    } catch (err: any) {
+      // If Native failed, attempt Html5Qrcode fallback
+      try {
+        await startHtml5QrcodeFallback();
+      } catch (fallbackErr: any) {
+        setCameraActive(false);
+        setCameraError(
+          fallbackErr?.message ||
+            err?.message ||
+            'Camera permission denied or camera device unavailable. You can use manual entry or quick-add buttons below.'
+        );
+      }
+    }
+  }, [startNativeBarcodeDetector, startHtml5QrcodeFallback]);
+
+  // Lifecycle hook
+  useEffect(() => {
+    if (!isOpen) {
+      stopAllEngines();
+      setCameraActive(false);
+      setFeedback(null);
+      setUnknownItemPrompt(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      initScanner();
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      stopAllEngines();
+    };
+  }, [isOpen, initScanner, stopAllEngines]);
+
+  // Toggle Torch
   const handleToggleTorch = async () => {
     if (!activeTrackRef.current) return;
     try {
@@ -232,156 +476,50 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     }
   };
 
-  // -------------------------------------------------------------------------
-  // Start Camera Feed & Html5Qrcode Scanner Engine
-  // -------------------------------------------------------------------------
-  const startCameraEngine = useCallback(
-    async (cameraId?: string) => {
-      await safeStopScanner();
+  // Submit Unknown Scanned Item to POS Cart
+  const handleConfirmAddUnknownItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unknownItemPrompt) return;
 
-      const container = document.getElementById(scannerContainerId);
-      if (!container) return;
+    const { code, name, price, costPrice, saveToInventory } = unknownItemPrompt;
 
-      setCameraError(null);
-      isStartingRef.current = true;
-
-      try {
-        // Enumerate video devices to find high-resolution back cameras
-        let cameras: Array<{ id: string; label: string }> = [];
-        try {
-          const devices = await Html5Qrcode.getCameras();
-          if (devices && devices.length > 0) {
-            cameras = devices.map((d) => ({ id: d.id, label: d.label || 'Camera' }));
-            setAvailableCameras(cameras);
-          }
-        } catch {
-          // Camera query not permitted yet
-        }
-
-        // Determine camera target
-        let targetCamera: any = { facingMode: 'environment' };
-        if (cameraId) {
-          targetCamera = { deviceId: { exact: cameraId } };
-        } else if (cameras.length > 0) {
-          // Prefer back/rear camera if labeled
-          const rearCam = cameras.find(
-            (c) =>
-              c.label.toLowerCase().includes('back') ||
-              c.label.toLowerCase().includes('rear') ||
-              c.label.toLowerCase().includes('environment')
-          );
-          if (rearCam) {
-            targetCamera = { deviceId: { exact: rearCam.id } };
-            setSelectedCameraId(rearCam.id);
-          }
-        }
-
-        // Configure Html5Qrcode with all standard retail 1D + 2D formats
-        const scanner = new Html5Qrcode(scannerContainerId, {
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
-          verbose: false,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true, // Native C++ BarcodeDetector API for 60fps hardware decoding
-          },
-        });
-
-        scannerRef.current = scanner;
-
-        // Optimal scanning configuration (fps: 20, qrbox: { width: 250, height: 150 })
-        const config = {
-          fps: 20,
-          qrbox: { width: 250, height: 150 },
-          aspectRatio: 1.777778, // 16:9 widescreen
-          videoConstraints: {
-            facingMode: { ideal: 'environment' },
-            focusMode: { ideal: 'continuous' } as any,
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 },
-          } as MediaTrackConstraints,
-        };
-
-        await scanner.start(
-          targetCamera,
-          config,
-          (decodedText) => {
-            processBarcode(decodedText, false);
-          },
-          () => {
-            // Non-critical scan miss per frame
-          }
-        );
-
-        if (!isStartingRef.current) {
-          // If aborted while starting
-          await safeStopScanner();
-          return;
-        }
-
-        isScanningRef.current = true;
-        isStartingRef.current = false;
-        setCameraActive(true);
-
-        // Check torch capabilities on the active video track
-        try {
-          const stream = (scanner as any).localMediaStream as MediaStream | undefined;
-          const track = stream?.getVideoTracks?.()[0];
-          if (track) {
-            activeTrackRef.current = track;
-            const capabilities = (track.getCapabilities ? track.getCapabilities() : {}) as any;
-            if (capabilities && 'torch' in capabilities) {
-              setTorchSupported(true);
-            }
-          }
-        } catch {
-          // Torch inspection error ignored
-        }
-      } catch (err: any) {
-        isStartingRef.current = false;
-        isScanningRef.current = false;
-        setCameraActive(false);
-        setCameraError(
-          err?.message ||
-            'Camera permission denied or camera feed unavailable. You can use manual barcode entry or select quick-test codes below.'
-        );
-      }
-    },
-    [processBarcode, safeStopScanner]
-  );
-
-  // -------------------------------------------------------------------------
-  // Lifecycle Management: Start on open, stop cleanly on close
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (!isOpen) {
-      safeStopScanner();
-      setCameraActive(false);
-      setFeedback(null);
-      return;
+    if (onAddCustomItem) {
+      onAddCustomItem({
+        sku: `WT-SCAN-${code.slice(-6)}`,
+        barcode: code,
+        name: name.trim() || `Custom Scanned Item (${code})`,
+        sellingPrice: Math.max(1, price),
+        costPrice: Math.max(0, costPrice),
+        saveToInventory,
+      });
+    } else {
+      // Fallback: trigger standard onScan with the code
+      onScan(code);
     }
 
-    const timer = setTimeout(() => {
-      startCameraEngine(selectedCameraId || undefined);
-    }, 200);
+    playScanSuccessBeep();
+    setFeedback({
+      type: 'success',
+      title: name,
+      message: `Added to cart as custom item · Rs. ${price.toLocaleString()}`,
+      code,
+      timestamp: Date.now(),
+    });
 
-    return () => {
-      clearTimeout(timer);
-      safeStopScanner();
-    };
-  }, [isOpen, selectedCameraId, startCameraEngine, safeStopScanner]);
+    setUnknownItemPrompt(null);
+
+    if (singleScanMode || !continuousMode) {
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
           <div className="flex items-center gap-2.5">
@@ -389,13 +527,18 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               <Camera className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">{title}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-white">{title}</h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/80">
+                  {engineType === 'native' ? '⚡ Native BarcodeDetector' : 'ZXing Fallback'}
+                </span>
+              </div>
               <p className="text-[11px] text-neutral-400">{description}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Torch Toggle Button */}
+            {/* Torch Toggle */}
             {torchSupported && cameraActive && (
               <button
                 type="button"
@@ -411,23 +554,21 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               </button>
             )}
 
-            {/* Switch Camera if multiple available */}
-            {availableCameras.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const currentIndex = availableCameras.findIndex((c) => c.id === selectedCameraId);
-                  const nextCam = availableCameras[(currentIndex + 1) % availableCameras.length];
-                  if (nextCam) {
-                    setSelectedCameraId(nextCam.id);
-                  }
-                }}
-                className="p-1.5 bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                title="Switch Camera Sensor"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-            )}
+            {/* Switch Engine */}
+            <button
+              type="button"
+              onClick={() => {
+                if (engineType === 'native') {
+                  startHtml5QrcodeFallback();
+                } else {
+                  startNativeBarcodeDetector().catch(() => {});
+                }
+              }}
+              className="p-1.5 bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white rounded-lg transition-colors"
+              title="Toggle Scanner Engine (Native vs Fallback)"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
 
             <button
               type="button"
@@ -439,27 +580,85 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
         </div>
 
-        {/* Viewfinder Section */}
+        {/* Viewfinder Viewport */}
         <div className="p-4 flex flex-col items-center justify-center bg-neutral-950 space-y-3">
-          <div className="relative w-full max-w-sm h-64 bg-black rounded-xl overflow-hidden border border-neutral-800 flex items-center justify-center">
-            {/* Target DOM container for Html5Qrcode */}
-            <div id={scannerContainerId} className="w-full h-full flex items-center justify-center" />
+          <div
+            className={`relative w-full max-w-sm h-64 bg-black rounded-xl overflow-hidden border transition-all duration-300 flex items-center justify-center ${
+              isFlashing
+                ? 'border-emerald-400 ring-4 ring-emerald-500/50 shadow-[0_0_35px_#10b981]'
+                : 'border-neutral-800'
+            }`}
+          >
+            {/* Native Video Feed Element */}
+            <video
+              ref={videoRef}
+              playsInline
+              autoPlay
+              muted
+              className={`w-full h-full object-cover rounded-xl ${
+                engineType === 'native' ? 'block' : 'hidden'
+              }`}
+            />
 
-            {/* Simulated Laser Reticle (250x150 Box) */}
+            {/* Html5Qrcode Fallback Viewport */}
+            <div
+              id={scannerContainerId}
+              className={`w-full h-full flex items-center justify-center ${
+                engineType === 'html5qrcode' ? 'block' : 'hidden'
+              }`}
+            />
+
+            {/* Simulated Rectangular Reticle (250x150 Box) with Dynamic Flash Feedback */}
             <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-              <div className="w-[250px] h-[150px] border-2 border-dashed border-purple-500/70 rounded-lg relative flex items-center justify-center shadow-[0_0_15px_rgba(168,85,247,0.25)]">
-                {/* 4 Corner Accents */}
-                <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-purple-400" />
-                <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-purple-400" />
-                <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-purple-400" />
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-purple-400" />
+              <div
+                className={`w-[250px] h-[150px] border-2 border-dashed rounded-lg relative flex items-center justify-center transition-all duration-300 ${
+                  isFlashing
+                    ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_20px_#10b981]'
+                    : 'border-purple-500/70 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+                }`}
+              >
+                {/* 4 Corner Indicators */}
+                <div
+                  className={`absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
 
-                {/* Sweeping Laser Line */}
-                <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_10px_#ef4444] animate-pulse" />
+                {/* Laser Sweep Line */}
+                <div
+                  className={`w-full h-0.5 animate-pulse shadow-md ${
+                    isFlashing
+                      ? 'bg-emerald-400 shadow-emerald-400'
+                      : 'bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-red-500'
+                  }`}
+                />
 
-                <span className="absolute bottom-1.5 text-[10px] font-mono text-purple-200 bg-neutral-950/85 px-2 py-0.5 rounded border border-purple-500/30">
-                  Align Barcode Inside Box (250×150)
-                </span>
+                {/* Flash Badge Indicator */}
+                {isFlashing ? (
+                  <span className="absolute bottom-2 text-[10px] font-mono font-bold text-emerald-200 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-500 flex items-center gap-1 shadow-lg">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    BARCODE DECODED
+                  </span>
+                ) : (
+                  <span className="absolute bottom-2 text-[10px] font-mono text-purple-200 bg-neutral-950/85 px-2 py-0.5 rounded border border-purple-500/30">
+                    Align Barcode Inside Box (250×150)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -471,7 +670,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <p className="text-[11px] text-neutral-400 max-w-xs">{cameraError}</p>
                 <button
                   type="button"
-                  onClick={() => startCameraEngine(selectedCameraId || undefined)}
+                  onClick={() => initScanner()}
                   className="mt-1 px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-medium"
                 >
                   Retry Camera
@@ -481,7 +680,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
 
           {/* Feedback Toast Notification */}
-          {feedback && (
+          {feedback && !unknownItemPrompt && (
             <div
               className={`w-full max-w-sm p-3 rounded-xl border text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
                 feedback.type === 'success'
@@ -506,7 +705,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </div>
           )}
 
-          {/* Scanner Controls / Continuous Toggle */}
+          {/* Controls Bar */}
           <div className="w-full max-w-sm flex items-center justify-between text-xs pt-1 px-1">
             <label className="flex items-center gap-2 cursor-pointer select-none text-neutral-300">
               <input
@@ -527,13 +726,110 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
         </div>
 
+        {/* ------------------------------------------------------------------- */}
+        {/* UNKNOWN BARCODE MODAL / PROMPT (AUTO-CREATE ITEM ON THE FLY)       */}
+        {/* ------------------------------------------------------------------- */}
+        {unknownItemPrompt && (
+          <div className="p-4 bg-amber-950/40 border-t border-b border-amber-800/80">
+            <form onSubmit={handleConfirmAddUnknownItem} className="space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <div className="text-xs font-semibold text-white">
+                    Uncataloged Barcode: <span className="font-mono text-amber-300">{unknownItemPrompt.code}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUnknownItemPrompt(null)}
+                  className="text-neutral-400 hover:text-white text-xs"
+                >
+                  ✕ Dismiss
+                </button>
+              </div>
+
+              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                Item not found in stock. Quick-add this SKU to POS Cart as &apos;Custom Scanned Item&apos;?
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[10px] text-neutral-400 mb-0.5">Item Name</label>
+                  <input
+                    type="text"
+                    value={unknownItemPrompt.name}
+                    onChange={(e) =>
+                      setUnknownItemPrompt({ ...unknownItemPrompt, name: e.target.value })
+                    }
+                    className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white text-xs focus:outline-none focus:border-amber-400"
+                    placeholder="e.g. Scanned USB Cable"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-neutral-400 mb-0.5">Selling Price (Rs.)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={unknownItemPrompt.price}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      setUnknownItemPrompt({
+                        ...unknownItemPrompt,
+                        price: val,
+                        costPrice: Math.round(val * 0.7),
+                      });
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={unknownItemPrompt.saveToInventory}
+                    onChange={(e) =>
+                      setUnknownItemPrompt({
+                        ...unknownItemPrompt,
+                        saveToInventory: e.target.checked,
+                      })
+                    }
+                    className="w-3.5 h-3.5 rounded border-neutral-700 bg-neutral-950 text-amber-500 focus:ring-amber-400"
+                  />
+                  <span>Save to Inventory catalog as new SKU</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUnknownItemPrompt(null)}
+                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded text-xs shadow-md transition-colors"
+                  >
+                    Add to Cart Now →
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Manual Barcode Entry Fallback */}
         <div className="p-4 border-t border-neutral-800 bg-neutral-900/60 space-y-3">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (manualCode.trim()) {
-                processBarcode(manualCode.trim(), true);
+                handleDecodedBarcode(manualCode.trim(), true);
                 setManualCode('');
               }
             }}
@@ -559,42 +855,51 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             </button>
           </form>
 
-          {/* Quick Test Barcode Buttons (if products exist) */}
+          {/* Quick Test Barcode Buttons / Load Test Sample Products Button */}
           {products.length > 0 ? (
             <div>
               <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                <span>Quick-Simulate Barcode Scan (From Catalog):</span>
+                <span>Quick-Simulate Barcode Scan (From Stock):</span>
                 <Volume2 className="w-3 h-3 text-purple-400" />
               </div>
-              <div className="grid grid-cols-2 gap-1.5 max-h-28 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto pr-1">
                 {products.slice(0, 6).map((prod) => (
                   <button
                     key={prod.id}
                     type="button"
-                    onClick={() => processBarcode(prod.barcode, true)}
-                    className="p-2 text-left bg-neutral-950 hover:bg-purple-950/40 border border-neutral-800 hover:border-purple-500/50 rounded-lg transition-all text-xs"
+                    onClick={() => handleDecodedBarcode(prod.barcode, true)}
+                    className="p-1.5 text-left bg-neutral-950 hover:bg-purple-950/40 border border-neutral-800 hover:border-purple-500/50 rounded-lg transition-all text-xs"
                   >
                     <div className="font-mono text-[11px] text-purple-300 font-medium truncate">
                       {prod.barcode}
                     </div>
-                    <div className="text-[11px] text-neutral-300 truncate mt-0.5">{prod.name}</div>
+                    <div className="text-[10px] text-neutral-300 truncate">{prod.name}</div>
                     <div className="text-[10px] text-neutral-500 font-mono">
-                      Rs. {prod.sellingPrice.toLocaleString()} · {prod.stockStore} in store
+                      Rs. {prod.sellingPrice.toLocaleString()}
                     </div>
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-400 flex items-center gap-2">
-              <Barcode className="w-4 h-4 text-purple-400 flex-shrink-0" />
-              <span>
-                Store catalog is currently empty. You can type any barcode or SKU above to test.
-              </span>
+            <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Barcode className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <span>Catalog currently empty. Scan any item to trigger Quick-Add fallback!</span>
+              </div>
+              {onLoadSampleProducts && (
+                <button
+                  type="button"
+                  onClick={() => onLoadSampleProducts()}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold whitespace-nowrap shadow-sm"
+                >
+                  Load 5 Test Products
+                </button>
+              )}
             </div>
           )}
 
-          {/* Close / Done Action */}
+          {/* Close Action */}
           <div className="pt-1 flex justify-end">
             <button
               type="button"

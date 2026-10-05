@@ -29,6 +29,8 @@ import {
   DatabaseHealthStatus,
 } from '@/types';
 
+import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
+
 import {
   getOrders,
   saveOrder,
@@ -210,6 +212,14 @@ export default function WowtekProApp() {
   const handleDeleteProduct = async (id: string) => {
     await deleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleLoadSampleProducts = async () => {
+    for (const p of SAMPLE_PRODUCTS) {
+      await saveProduct(p);
+    }
+    const refreshed = await getProducts();
+    setProducts(refreshed);
   };
 
   // Handlers for Logistics & Waybills
@@ -432,6 +442,8 @@ export default function WowtekProApp() {
                 onUpdateOrder={handleUpdateOrder}
                 onDeleteOrder={handleDeleteOrder}
                 onProcessReturn={handleProcessReturn}
+                onAddProduct={handleAddProduct}
+                onLoadSampleProducts={handleLoadSampleProducts}
               />
             )}
 
@@ -441,6 +453,7 @@ export default function WowtekProApp() {
                 onAddProduct={handleAddProduct}
                 onUpdateProduct={handleUpdateProduct}
                 onDeleteProduct={handleDeleteProduct}
+                onLoadSampleProducts={handleLoadSampleProducts}
               />
             )}
 
