@@ -14,6 +14,7 @@ import {
   Camera,
   Trash2,
   Edit,
+  Package,
 } from 'lucide-react';
 import { Product } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
@@ -263,7 +264,28 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/80">
-              {filteredProducts.map((p) => {
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <Package className="w-10 h-10 text-neutral-600 mb-1" />
+                      <p className="font-semibold text-white text-sm">No Products in Inventory</p>
+                      <p className="text-xs text-neutral-400">
+                        Your inventory database is currently empty. Record your first product GRN batch to calculate inventory valuation and profit margins.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddModal(true)}
+                        className="mt-2 flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add New Product</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) :
+                filteredProducts.map((p) => {
                 const marginPercent =
                   p.sellingPrice > 0
                     ? Math.round(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100)

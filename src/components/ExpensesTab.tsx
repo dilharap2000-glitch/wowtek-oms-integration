@@ -225,7 +225,28 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/80">
-              {filteredExpenses.map((exp) => (
+              {filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <DollarSign className="w-10 h-10 text-neutral-600 mb-1" />
+                      <p className="font-semibold text-white text-sm">No Ledger Expenses Logged</p>
+                      <p className="text-xs text-neutral-400">
+                        Track inventory imports, utility bills, courier costs, and operational payouts to maintain accurate business ledger balances.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddModal(true)}
+                        className="mt-2 flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Log First Expense</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) :
+                filteredExpenses.map((exp) => (
                 <tr key={exp.id} className="hover:bg-neutral-850/40 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-mono text-white font-medium">{exp.reference}</div>

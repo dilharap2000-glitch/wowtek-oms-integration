@@ -111,7 +111,20 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/80">
-              {filteredWaybills.map((wb) => (
+              {filteredWaybills.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <Truck className="w-10 h-10 text-neutral-600 mb-1" />
+                      <p className="font-semibold text-white text-sm">No Waybills in Courier Queue</p>
+                      <p className="text-xs text-neutral-400">
+                        Inbound e-commerce orders and store courier bookings will appear here automatically for Trans Express barcode waybill generation.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) :
+                filteredWaybills.map((wb) => (
                 <tr key={wb.id} className="hover:bg-neutral-850/40 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</div>

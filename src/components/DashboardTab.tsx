@@ -306,37 +306,57 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-850">
-                {orders.slice(0, 5).map((order) => (
-                  <tr key={order.id} className="hover:bg-neutral-850/50 transition-colors">
-                    <td className="py-3 font-mono font-medium text-white">{order.invoiceNumber}</td>
-                    <td className="py-3">
-                      <div className="text-white font-medium">{order.channelName}</div>
-                      <div className="text-[10px] text-purple-300 font-mono">
-                        {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-neutral-400">
+                      <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                        <ShoppingCart className="w-8 h-8 text-neutral-600" />
+                        <p className="font-semibold text-white text-xs">No Recent Invoices or Orders</p>
+                        <p className="text-[11px] text-neutral-400">
+                          Create sales orders in the POS terminal or connect external store webhooks to populate real-time analytics.
+                        </p>
+                        <button
+                          onClick={() => onNavigateTab('pos')}
+                          className="mt-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Open POS Terminal
+                        </button>
                       </div>
                     </td>
-                    <td className="py-3">
-                      <div className="text-white font-medium">{order.customerName}</div>
-                      <div className="text-neutral-400 text-[11px]">{order.city}</div>
-                    </td>
-                    <td className="py-3">
-                      <span
-                        className={`text-[11px] font-medium ${
-                          order.status === 'Completed' || order.status === 'Delivered'
-                            ? 'text-emerald-400'
-                            : order.status === 'Returned'
-                            ? 'text-red-400'
-                            : 'text-amber-400'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
-                      Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </td>
                   </tr>
-                ))}
+                ) : (
+                  orders.slice(0, 5).map((order) => (
+                    <tr key={order.id} className="hover:bg-neutral-850/50 transition-colors">
+                      <td className="py-3 font-mono font-medium text-white">{order.invoiceNumber}</td>
+                      <td className="py-3">
+                        <div className="text-white font-medium">{order.channelName}</div>
+                        <div className="text-[10px] text-purple-300 font-mono">
+                          {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <div className="text-white font-medium">{order.customerName}</div>
+                        <div className="text-neutral-400 text-[11px]">{order.city}</div>
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`text-[11px] font-medium ${
+                            order.status === 'Completed' || order.status === 'Delivered'
+                              ? 'text-emerald-400'
+                              : order.status === 'Returned'
+                              ? 'text-red-400'
+                              : 'text-amber-400'
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
+                        Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

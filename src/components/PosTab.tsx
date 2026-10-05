@@ -17,6 +17,7 @@ import {
   DollarSign,
   TrendingUp,
   FileText,
+  Package,
 } from 'lucide-react';
 import {
   Order,
@@ -308,7 +309,16 @@ export const PosTab: React.FC<PosTabProps> = ({
 
             {/* Product Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[640px] overflow-y-auto pr-1">
-              {filteredProducts.map((prod) => {
+              {filteredProducts.length === 0 ? (
+                <div className="col-span-full py-16 px-4 text-center bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center justify-center gap-2">
+                  <Package className="w-10 h-10 text-neutral-600 mb-1" />
+                  <h4 className="text-sm font-semibold text-white">No Products in Inventory</h4>
+                  <p className="text-xs text-neutral-400 max-w-sm">
+                    Your store inventory is empty. Add products in the Products & Barcode GRN tab or scan barcodes to begin invoicing.
+                  </p>
+                </div>
+              ) :
+                filteredProducts.map((prod) => {
                 const profitMargin =
                   prod.sellingPrice > 0
                     ? Math.round(((prod.sellingPrice - prod.costPrice) / prod.sellingPrice) * 100)
@@ -603,11 +613,24 @@ export const PosTab: React.FC<PosTabProps> = ({
                 <tbody className="divide-y divide-neutral-800/80">
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-neutral-500">
-                        No invoices found matching criteria.
+                      <td colSpan={8} className="py-16 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                          <ShoppingCart className="w-10 h-10 text-neutral-600 mb-1" />
+                          <p className="font-semibold text-white text-sm">No Invoices Found</p>
+                          <p className="text-xs text-neutral-400">
+                            No sales invoices have been created yet. Process an order through the POS terminal to generate your first invoice.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveSubTab('terminal')}
+                            className="mt-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                          >
+                            Open POS Terminal
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
+                  ) :
                     filteredOrders.map((order) => (
                       <tr key={order.id} className="hover:bg-neutral-850/40 transition-colors">
                         <td className="py-3 px-4">
@@ -711,7 +734,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                         </td>
                       </tr>
                     ))
-                  )}
+                  }
                 </tbody>
               </table>
             </div>

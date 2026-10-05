@@ -210,7 +210,28 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/80">
-              {filteredWarranties.map((w) => (
+              {filteredWarranties.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <ShieldCheck className="w-10 h-10 text-neutral-600 mb-1" />
+                      <p className="font-semibold text-white text-sm">No Active Warranties</p>
+                      <p className="text-xs text-neutral-400">
+                        No warranty records registered yet. Register serial numbers to track customer/supplier warranties and auto-dispatch SMS alerts.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddModal(true)}
+                        className="mt-2 flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Register First Serial</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) :
+                filteredWarranties.map((w) => (
                 <tr key={w.id} className="hover:bg-neutral-850/40 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-mono font-bold text-white">{w.serialNumber}</div>
