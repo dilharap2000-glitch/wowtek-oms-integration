@@ -5,6 +5,7 @@
     "": {
       "name": "wowtek-pro",
       "dependencies": {
+        "@zxing/browser": "^0.2.1",
         "@zxing/library": "^0.23.0",
         "html5-qrcode": "^2.3.8",
         "lucide-react": "^0.469.0",
@@ -78,6 +79,8 @@
     "@types/webidl-conversions": ["@types/webidl-conversions@7.0.3", "", {}, "sha512-CiJJvcRtIgzadHCYXw7dqEnMNRjhGZlYK05Mj9OyktqV8uVT8fD2BFOB7S1uwBE3Kj2Z+4UyPmFw/Ixgw/LAlA=="],
 
     "@types/whatwg-url": ["@types/whatwg-url@11.0.5", "", { "dependencies": { "@types/webidl-conversions": "*" } }, "sha512-coYR071JRaHa+xoEvvYqvnIHaVqaYrLPbsufM9BF63HkwI5Lgmy2QR8Q5K/lYDYo5AK82wOvSOS0UsLTpTG7uQ=="],
+
+    "@zxing/browser": ["@zxing/browser@0.2.1", "", { "optionalDependencies": { "@zxing/text-encoding": "^0.9.0" }, "peerDependencies": { "@zxing/library": "^0.23.0" } }, "sha512-92pVfVDUXbc15xu9vIEmhNyqIEASMEkDF92CwT6T+7sg2EHXJRktH9CQKoQSXe51UtbNsj+Fm09H/JBWHMs/Sw=="],
 
     "@zxing/library": ["@zxing/library@0.23.0", "", { "dependencies": { "ts-custom-error": "^3.3.1" }, "optionalDependencies": { "@zxing/text-encoding": "~0.9.0" } }, "sha512-6fkkoFwP8CHxl6ugnPsj74PLJgX2iRv5zczGAyt5OBzQgxFhuhF0NCEc4t4OvSr8xAv2MRLlI0Iu9ZGDZQ2urA=="],
 
