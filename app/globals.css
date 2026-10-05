@@ -29,3 +29,31 @@
     background: transparent !important;
   }
 }
+
+/* HTML5 Barcode Scanner Viewport Styling */
+#wowtek-barcode-scanner-viewport {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #000000 !important;
+}
+
+#wowtek-barcode-scanner-viewport video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 0.75rem !important;
+}
+
+#wowtek-barcode-scanner-viewport canvas {
+  display: none !important;
+}
+
+#wowtek-barcode-scanner-viewport img {
+  display: none !important;
+}
+

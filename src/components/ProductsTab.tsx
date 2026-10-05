@@ -399,6 +399,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
         products={products}
         title="Find Product by Barcode"
         description="Scan any barcode to highlight and filter the product in your inventory"
+        singleScanMode={true}
       />
 
       {/* Barcode Print Modal */}

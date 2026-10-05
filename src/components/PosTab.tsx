@@ -118,17 +118,19 @@ export const PosTab: React.FC<PosTabProps> = ({
     });
   };
 
-  // Scanned Barcode Handler
+  // Scanned Barcode Handler (Continuous Cart Addition)
   const handleBarcodeScanned = (barcode: string) => {
+    const clean = barcode.trim();
     const foundProduct = products.find(
-      (p) => p.barcode === barcode || p.sku.toLowerCase() === barcode.toLowerCase()
+      (p) =>
+        (p.barcode && p.barcode.trim().toLowerCase() === clean.toLowerCase()) ||
+        (p.sku && p.sku.trim().toLowerCase() === clean.toLowerCase())
     );
     if (foundProduct) {
       handleAddProductToCart(foundProduct);
-      setIsScannerOpen(false);
-    } else {
-      alert(`Barcode ${barcode} not found in product catalog.`);
+      return true;
     }
+    return false;
   };
 
   const handleUpdateQuantity = (sku: string, delta: number) => {
@@ -749,7 +751,8 @@ export const PosTab: React.FC<PosTabProps> = ({
         onScan={handleBarcodeScanned}
         products={products}
         title="POS Camera Barcode Scanner"
-        description="Scan any product barcode to automatically add it to your POS cart"
+        description="Scan any product barcode or SKU to continuously add to cart"
+        cartItemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
       />
 
       {/* Return & Stock Restoration Modal */}
