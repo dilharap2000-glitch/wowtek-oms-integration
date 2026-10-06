@@ -14,12 +14,19 @@ import {
   Sparkles,
   Focus,
   Check,
+  ZoomIn,
+  Sparkle,
+  Zap,
+  ZapOff,
 } from 'lucide-react';
 import {
-  Html5Qrcode,
-  Html5QrcodeSupportedFormats,
-  Html5QrcodeScannerState,
-} from 'html5-qrcode';
+  MultiFormatReader,
+  BarcodeFormat,
+  DecodeHintType,
+  BinaryBitmap,
+  GlobalHistogramBinarizer,
+  RGBLuminanceSource,
+} from '@zxing/library';
 import { Product } from '@/types';
 
 export interface BarcodeScannerModalProps {
@@ -47,6 +54,7 @@ interface ScanFeedback {
   title: string;
   message: string;
   code: string;
+  engine?: string;
   timestamp: number;
 }
 
@@ -61,6 +69,45 @@ interface UnknownBarcodePrompt {
 interface FocusRingCoord {
   x: number;
   y: number;
+}
+
+// ---------------------------------------------------------------------------
+// Fast Otsu Binarization Thresholding: Maximizes inter-class variance
+// ---------------------------------------------------------------------------
+function calculateOtsuThreshold(gray: Uint8Array, totalPixels: number): number {
+  const hist = new Int32Array(256);
+  for (let i = 0; i < totalPixels; i++) {
+    hist[gray[i]]++;
+  }
+
+  let sum = 0;
+  for (let i = 0; i < 256; i++) {
+    sum += i * hist[i];
+  }
+
+  let sumB = 0;
+  let wB = 0;
+  let varMax = 0;
+  let threshold = 128;
+
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (wB === 0) continue;
+    const wF = totalPixels - wB;
+    if (wF === 0) break;
+
+    sumB += t * hist[t];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const varBetween = wB * wF * (mB - mF) * (mB - mF);
+
+    if (varBetween > varMax) {
+      varMax = varBetween;
+      threshold = t;
+    }
+  }
+
+  return threshold;
 }
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
@@ -83,16 +130,27 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [feedback, setFeedback] = useState<ScanFeedback | null>(null);
   const [isFlashing, setIsFlashing] = useState(false);
   // Continuous scanning enabled by default
-  const [continuousMode, setContinuousMode] = useState(true);
+  const [continuousMode, setContinuousMode] = useState(!singleScanMode);
+  // 2x Digital Macro Zoom enabled by default for small barcodes
+  const [macroZoomEnabled, setMacroZoomEnabled] = useState(true);
   const [unknownItemPrompt, setUnknownItemPrompt] = useState<UnknownBarcodePrompt | null>(null);
   const [focusRing, setFocusRing] = useState<FocusRingCoord | null>(null);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   // References
-  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const activeTrackRef = useRef<MediaStreamTrack | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isScanningRef = useRef<boolean>(false);
+  const isProcessingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const lastScannedCodeRef = useRef<string>('');
   const lastScanTimestampRef = useRef<number>(0);
-  const containerId = 'pos-html5-qrcode-viewport';
+  const zxingReaderRef = useRef<MultiFormatReader | null>(null);
+  const nativeDetectorRef = useRef<any>(null);
 
   // -------------------------------------------------------------------------
   // Web Audio API: High-Pitched Instant Success Beep & Alert Tones
@@ -151,21 +209,55 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   }, []);
 
   // -------------------------------------------------------------------------
+  // Initialize Decoders with Format Focus (EAN-13, EAN-8, Code-128, etc.)
+  // -------------------------------------------------------------------------
+  const initDecoders = useCallback(() => {
+    // 1. ZXing Engine configured specifically for 1D retail barcodes
+    const hints = new Map<DecodeHintType, any>();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.QR_CODE,
+    ]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+
+    const reader = new MultiFormatReader();
+    reader.setHints(hints);
+    zxingReaderRef.current = reader;
+
+    // 2. Native Hardware BarcodeDetector (if available on browser)
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        nativeDetectorRef.current = new (window as any).BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'code_39', 'qr_code'],
+        });
+      } catch {
+        nativeDetectorRef.current = null;
+      }
+    }
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Process Decoded Barcode (Lookup or Fallback Prompt)
+  // Requirement 2: Auto-dismisses/updates open modal on new direct input
   // -------------------------------------------------------------------------
   const handleDecodedBarcode = useCallback(
-    (rawCode: string, isManual = false) => {
+    (rawCode: string, isManual = false, engineName = '2x Macro Engine') => {
       const code = rawCode.trim();
       if (!code) return;
 
       const now = Date.now();
 
-      // Debounce duplicate reads of the exact same barcode within 1000ms
-      if (!isManual && code === lastScannedCodeRef.current && now - lastScanTimestampRef.current < 1000) {
+      // Debounce duplicate reads of the exact same barcode within 900ms
+      if (!isManual && code === lastScannedCodeRef.current && now - lastScanTimestampRef.current < 900) {
         return;
       }
-      // Debounce rapid sequential reads of distinct codes to 400ms
-      if (!isManual && now - lastScanTimestampRef.current < 400) {
+      // Debounce rapid sequential reads of distinct codes to 350ms
+      if (!isManual && now - lastScanTimestampRef.current < 350) {
         return;
       }
 
@@ -189,13 +281,17 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       );
 
       if (foundProduct) {
-        // MATCH FOUND: Add immediately & play high-pitch beep
+        // MATCH FOUND:
+        // Requirement 2: Auto-dismiss uncataloged prompt if one was open!
+        setUnknownItemPrompt(null);
+
         playScanSuccessBeep();
         setFeedback({
           type: 'success',
           title: foundProduct.name,
           message: `Added to cart · Rs. ${foundProduct.sellingPrice.toLocaleString()}`,
           code: foundProduct.barcode || foundProduct.sku,
+          engine: engineName,
           timestamp: now,
         });
 
@@ -207,17 +303,18 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           }, 600);
         }
       } else {
-        // MATCH NOT FOUND (Catalog Empty or Unregistered SKU)
+        // MATCH NOT FOUND (Uncataloged Barcode):
         playAlertTone();
         setFeedback({
           type: 'alert',
           title: `Item not found in stock: [${code}]`,
           message: `Prompting quick-add custom item to cart...`,
           code,
+          engine: engineName,
           timestamp: now,
         });
 
-        // Trigger on-the-fly custom item prompt modal
+        // Requirement 2: Instantly update / auto-refresh the open modal with the new code
         setUnknownItemPrompt({
           code,
           name: `Custom Scanned Item (${code.slice(-6)})`,
@@ -231,23 +328,155 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   );
 
   // -------------------------------------------------------------------------
+  // 2x Digital Macro Crop + Dynamic Otsu Binarization Loop
+  // -------------------------------------------------------------------------
+  const processFrame = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || video.paused || video.ended) {
+      return;
+    }
+
+    const vWidth = video.videoWidth;
+    const vHeight = video.videoHeight;
+    if (vWidth <= 0 || vHeight <= 0) return;
+
+    if (!offscreenCanvasRef.current) {
+      offscreenCanvasRef.current = document.createElement('canvas');
+    }
+    const canvas = offscreenCanvasRef.current;
+
+    // Requirement 1: Digital Crop & Macro Zoom (2x digital scale on center frame buffer)
+    // Center 50% width and height is extracted so user can hold phone 15-20cm away where focus is sharp
+    const scaleFactor = macroZoomEnabled ? 0.5 : 0.85;
+    const cropW = Math.floor(vWidth * scaleFactor);
+    const cropH = Math.floor(Math.min(vHeight * scaleFactor, cropW * 0.6));
+    const cropX = Math.floor((vWidth - cropW) / 2);
+    const cropY = Math.floor((vHeight - cropH) / 2);
+
+    if (canvas.width !== cropW || canvas.height !== cropH) {
+      canvas.width = cropW;
+      canvas.height = cropH;
+    }
+
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+
+    // Draw sharp center pixels to offscreen canvas
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // 1. Try Hardware GPU BarcodeDetector first on the sharp macro crop
+    if (nativeDetectorRef.current) {
+      try {
+        const barcodes = await nativeDetectorRef.current.detect(canvas);
+        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+          handleDecodedBarcode(barcodes[0].rawValue, false, 'Native GPU Macro');
+          return;
+        }
+      } catch {
+        // Fallback to ZXing Otsu
+      }
+    }
+
+    // 2. Requirement 3: Dynamic Otsu Contrast Thresholding for Small/Low-Contrast Prints
+    if (zxingReaderRef.current) {
+      try {
+        const imgData = ctx.getImageData(0, 0, cropW, cropH);
+        const data = imgData.data;
+        const total = cropW * cropH;
+        const gray = new Uint8Array(total);
+
+        // Fast integer grayscale extraction
+        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+          gray[j] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+        }
+
+        // Calculate Otsu threshold in ~2ms
+        const threshold = calculateOtsuThreshold(gray, total);
+
+        // Apply binary sharpening: bars become crisp solid black, background becomes pure white
+        for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+          const val = gray[j] < threshold ? 0 : 255;
+          data[i] = val;
+          data[i + 1] = val;
+          data[i + 2] = val;
+        }
+
+        // Feed sharpened binary buffer into ZXing GlobalHistogramBinarizer
+        const luminanceSource = new RGBLuminanceSource(data, cropW, cropH);
+        const binaryBitmap = new BinaryBitmap(new GlobalHistogramBinarizer(luminanceSource));
+        const result = zxingReaderRef.current.decode(binaryBitmap);
+
+        if (result && result.getText()) {
+          const formatName = result.getBarcodeFormat
+            ? BarcodeFormat[result.getBarcodeFormat()]
+            : 'Otsu-Sharp';
+          handleDecodedBarcode(result.getText(), false, `2x Macro ${formatName}`);
+        }
+      } catch {
+        // NotFoundException is normal when no barcode is in view
+      }
+    }
+  }, [handleDecodedBarcode, macroZoomEnabled]);
+
+  // -------------------------------------------------------------------------
+  // Non-Blocking High-FPS Scan Loop (80ms lightweight interval)
+  // -------------------------------------------------------------------------
+  const startScanLoop = useCallback(() => {
+    const scanLoop = (timestamp: number) => {
+      if (!isScanningRef.current) return;
+
+      if (
+        !isProcessingRef.current &&
+        timestamp - lastScanTimestampRef.current >= 80
+      ) {
+        lastScanTimestampRef.current = timestamp;
+        isProcessingRef.current = true;
+
+        processFrame()
+          .catch(() => {})
+          .finally(() => {
+            isProcessingRef.current = false;
+          });
+      }
+
+      animationFrameRef.current = requestAnimationFrame(scanLoop);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(scanLoop);
+  }, [processFrame]);
+
+  // -------------------------------------------------------------------------
   // Stop Scanner Safely
   // -------------------------------------------------------------------------
-  const stopScanner = useCallback(async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        const state = html5QrCodeRef.current.getState();
-        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-          await html5QrCodeRef.current.stop();
-        }
-        html5QrCodeRef.current.clear();
-      } catch (err) {
-        console.warn('Error clearing Html5Qrcode instance', err);
-      }
-      html5QrCodeRef.current = null;
+  const stopScanner = useCallback(() => {
+    isScanningRef.current = false;
+    isProcessingRef.current = false;
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch {}
+      });
+      mediaStreamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      try {
+        videoRef.current.srcObject = null;
+      } catch {}
+    }
+
+    activeTrackRef.current = null;
     setCameraActive(false);
     setCameraLoading(false);
+    setTorchOn(false);
+    setTorchSupported(false);
   }, []);
 
   // -------------------------------------------------------------------------
@@ -262,27 +491,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       setTimeout(() => setFocusRing(null), 800);
     }
 
-    if (html5QrCodeRef.current) {
-      try {
-        await html5QrCodeRef.current.applyVideoConstraints({
-          // @ts-ignore
-          advanced: [{ focusMode: 'continuous' }],
-        });
-      } catch {
-        // Direct media track fallback
-        try {
-          const videoEl = document.querySelector(`#${containerId} video`) as HTMLVideoElement;
-          const stream = videoEl?.srcObject as MediaStream;
-          const track = stream?.getVideoTracks?.()[0];
-          if (track && track.applyConstraints) {
-            await (track as any).applyConstraints({
-              advanced: [{ focusMode: 'continuous' }],
-            });
-          }
-        } catch {}
+    const track = activeTrackRef.current as any;
+    if (!track) return;
+
+    try {
+      const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+      if (capabilities && capabilities.focusMode) {
+        await track
+          .applyConstraints({
+            advanced: [{ focusMode: 'continuous' }],
+          })
+          .catch(() => {});
       }
+    } catch {
+      // Re-focus unsupported on sensor
     }
-  }, [containerId]);
+  }, []);
 
   const handleTapVideo = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -291,85 +515,90 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     triggerRefocus({ x, y });
   };
 
+  // Toggle Flashlight
+  const handleToggleTorch = async () => {
+    if (!activeTrackRef.current) return;
+    try {
+      const nextState = !torchOn;
+      await (activeTrackRef.current as any).applyConstraints({
+        advanced: [{ torch: nextState }],
+      });
+      setTorchOn(nextState);
+    } catch (err) {
+      console.warn('Torch toggle failed', err);
+    }
+  };
+
   // -------------------------------------------------------------------------
-  // Initialize Lightweight Html5Qrcode (1280x720, 100ms interval, no canvas overhead)
+  // Initialize Camera Stream (Standard 720p, Continuous Focus)
   // -------------------------------------------------------------------------
-  const initScanner = useCallback(async () => {
-    await stopScanner();
+  const startScanner = useCallback(async () => {
+    stopScanner();
     setCameraError(null);
     setCameraLoading(true);
 
     try {
-      const containerEl = document.getElementById(containerId);
-      if (!containerEl) {
+      initDecoders();
+
+      // Standard 720p stream constraint (lightweight, zero freeze on mobile)
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          // @ts-ignore
+          focusMode: 'continuous',
+        },
+        audio: false,
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      mediaStreamRef.current = stream;
+
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        activeTrackRef.current = track;
+
+        // Check capabilities for continuous focus and torch
+        try {
+          const capabilities = track.getCapabilities ? (track.getCapabilities() as any) : {};
+          if (capabilities && 'torch' in capabilities) {
+            setTorchSupported(true);
+          }
+          if (capabilities && capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            await (track as any)
+              .applyConstraints({
+                advanced: [{ focusMode: 'continuous' }],
+              })
+              .catch(() => {});
+          }
+        } catch {}
+      }
+
+      const videoElement = videoRef.current;
+      if (!videoElement) {
         setCameraLoading(false);
         return;
       }
 
-      // Initialize standard lightweight Html5Qrcode with hardware BarcodeDetector if available
-      const html5QrCode = new Html5Qrcode(containerId, {
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.QR_CODE,
-        ],
-        verbose: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true,
-        },
-      });
+      videoElement.srcObject = stream;
+      await videoElement.play().catch(() => {});
 
-      html5QrCodeRef.current = html5QrCode;
+      isScanningRef.current = true;
+      setCameraActive(true);
+      setCameraLoading(false);
 
-      // Standard 720p constraints: lightweight for iOS Safari and mobile browser threads
-      const cameraConfig = {
-        facingMode: 'environment',
-      };
-
-      const qrConfig = {
-        fps: 10, // Lightweight 100ms scan interval (prevents iOS thread stalling)
-        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
-          width: Math.floor(viewfinderWidth * 0.85),
-          height: Math.min(Math.floor(viewfinderHeight * 0.65), Math.floor(viewfinderWidth * 0.55)),
-        }),
-        videoConstraints: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      };
-
-      await html5QrCode.start(
-        cameraConfig,
-        qrConfig,
-        (decodedText: string) => {
-          handleDecodedBarcode(decodedText);
-        },
-        () => {
-          // Standard frame skipped when no barcode in view
-        }
-      );
-
-      if (isMountedRef.current) {
-        setCameraActive(true);
-        setCameraLoading(false);
-      }
+      // Start non-blocking requestAnimationFrame loop
+      startScanLoop();
     } catch (err: any) {
       console.warn('Camera initialization error', err);
-      if (isMountedRef.current) {
-        setCameraLoading(false);
-        setCameraActive(false);
-        setCameraError(
-          err?.message ||
-            'Camera permission denied or camera device unavailable. You can use manual entry or tap Restart Camera.'
-        );
-      }
+      stopScanner();
+      setCameraError(
+        err?.message ||
+          'Camera permission denied or camera device unavailable. You can use manual entry or tap Restart Camera.'
+      );
     }
-  }, [containerId, handleDecodedBarcode, stopScanner]);
+  }, [initDecoders, startScanLoop, stopScanner]);
 
   // Lifecycle
   useEffect(() => {
@@ -383,7 +612,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     }
 
     const timer = setTimeout(() => {
-      initScanner();
+      startScanner();
     }, 120);
 
     return () => {
@@ -391,7 +620,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       clearTimeout(timer);
       stopScanner();
     };
-  }, [isOpen, initScanner, stopScanner]);
+  }, [isOpen, startScanner, stopScanner]);
 
   // Submit Unknown Scanned Item to POS Cart
   const handleConfirmAddUnknownItem = (e: React.FormEvent) => {
@@ -419,6 +648,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       title: name,
       message: `Added to cart as custom item · Rs. ${price.toLocaleString()}`,
       code,
+      engine: 'Manual Custom Item',
       timestamp: Date.now(),
     });
 
@@ -435,7 +665,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (manualCode.trim()) {
-      handleDecodedBarcode(manualCode.trim(), true);
+      handleDecodedBarcode(manualCode.trim(), true, 'Manual Keypad');
     }
   };
 
@@ -455,7 +685,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <h3 className="text-sm font-semibold text-white">{title}</h3>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/80 flex items-center gap-1">
                   <Check className="w-3 h-3 text-emerald-400" />
-                  Direct Video Stream · 720p 100ms
+                  {macroZoomEnabled ? '2x Macro Zoom · Otsu Sharp' : '1x Wide · Otsu Sharp'}
                 </span>
               </div>
               <p className="text-[11px] text-neutral-400">{description}</p>
@@ -463,10 +693,26 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Flashlight Button */}
+            {torchSupported && cameraActive && (
+              <button
+                type="button"
+                onClick={handleToggleTorch}
+                className={`p-1.5 rounded-lg border text-xs transition-colors ${
+                  torchOn
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                }`}
+                title={torchOn ? 'Turn Off Flashlight' : 'Turn On Flashlight'}
+              >
+                {torchOn ? <Zap className="w-4 h-4" /> : <ZapOff className="w-4 h-4" />}
+              </button>
+            )}
+
             {/* Restart Camera */}
             <button
               type="button"
-              onClick={() => initScanner()}
+              onClick={() => startScanner()}
               className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
               title="Restart Camera"
             >
@@ -484,25 +730,42 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
         </div>
 
-        {/* Viewfinder Viewport with Explicit Re-focus Action */}
+        {/* Viewfinder Viewport with Macro Zoom & Re-Focus Controls */}
         <div className="p-4 flex flex-col items-center justify-center bg-neutral-950 space-y-3">
-          {/* Top Bar with Explicit Re-Focus Button */}
+          {/* Top Bar with Macro Zoom Toggle & Explicit Re-Focus Button */}
           <div className="w-full flex items-center justify-between text-xs px-1 text-neutral-400">
-            <button
-              type="button"
-              onClick={() => triggerRefocus()}
-              className="flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200 bg-purple-950/60 hover:bg-purple-900/60 px-2.5 py-1 rounded-lg border border-purple-800/60 transition-colors"
-            >
-              <Focus className="w-3.5 h-3.5 text-purple-400" />
-              <span>Tap Video to Re-Focus</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => triggerRefocus()}
+                className="flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200 bg-purple-950/60 hover:bg-purple-900/60 px-2.5 py-1 rounded-lg border border-purple-800/60 transition-colors"
+              >
+                <Focus className="w-3.5 h-3.5 text-purple-400" />
+                <span>Tap to Re-Focus</span>
+              </button>
+
+              {/* Requirement 1: Macro Zoom Toggle (2x Digital Scale) */}
+              <button
+                type="button"
+                onClick={() => setMacroZoomEnabled(!macroZoomEnabled)}
+                className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
+                  macroZoomEnabled
+                    ? 'bg-amber-950/70 border-amber-600/70 text-amber-300 font-medium'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                }`}
+                title="Hold phone 15-20cm away where lens focuses sharply while 2x Macro zooms center"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+                <span>{macroZoomEnabled ? '2x Macro Zoom (Active)' : '1x Wide'}</span>
+              </button>
+            </div>
 
             <span className="text-[10px] font-mono text-neutral-500">
-              EAN·13 / 128 / 39 / UPC / EAN·8
+              EAN·13 / 8 / 128 / UPC
             </span>
           </div>
 
-          {/* Video Container (No heavy canvas filters, direct video element) */}
+          {/* Video Container with Tap-to-Refocus */}
           <div
             onClick={handleTapVideo}
             className={`relative w-full h-72 sm:h-80 bg-black rounded-xl overflow-hidden border cursor-crosshair transition-all duration-300 flex items-center justify-center select-none ${
@@ -511,10 +774,15 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 : 'border-neutral-800'
             }`}
           >
-            {/* Native HTML5-QRCode Viewport */}
-            <div
-              id={containerId}
-              className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover [&_video]:rounded-xl"
+            {/* Native Video Element */}
+            <video
+              ref={videoRef}
+              playsInline
+              autoPlay
+              muted
+              className={`w-full h-full object-cover rounded-xl transition-transform duration-300 ${
+                macroZoomEnabled ? 'scale-125' : 'scale-100'
+              }`}
             />
 
             {/* Tap-to-Refocus Animated Ring */}
@@ -527,6 +795,63 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 className="absolute w-12 h-12 border-2 border-amber-400 rounded-full animate-ping pointer-events-none z-20 shadow-[0_0_15px_#f59e0b]"
               />
             )}
+
+            {/* Viewfinder Overlay with Macro Sweet-Spot Framing */}
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-3">
+              <div
+                className={`w-[82%] max-w-[420px] h-[170px] sm:h-[195px] border-2 border-dashed rounded-xl relative flex items-center justify-center transition-all duration-300 ${
+                  isFlashing
+                    ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_25px_#10b981]'
+                    : 'border-purple-500/80 shadow-[0_0_15px_rgba(168,85,247,0.3)]'
+                }`}
+              >
+                {/* 4 Corner Accents */}
+                <div
+                  className={`absolute -top-1 -left-1 w-6 h-6 border-t-2 border-l-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -top-1 -right-1 w-6 h-6 border-t-2 border-r-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -bottom-1 -left-1 w-6 h-6 border-b-2 border-l-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+                <div
+                  className={`absolute -bottom-1 -right-1 w-6 h-6 border-b-2 border-r-2 ${
+                    isFlashing ? 'border-emerald-300' : 'border-purple-400'
+                  }`}
+                />
+
+                {/* Laser Sweep Guide */}
+                <div
+                  className={`w-full h-0.5 animate-pulse shadow-md ${
+                    isFlashing
+                      ? 'bg-emerald-400 shadow-emerald-400'
+                      : 'bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-red-500'
+                  }`}
+                />
+
+                {/* Dynamic Status Tag */}
+                {isFlashing ? (
+                  <span className="absolute bottom-2 text-[10px] font-mono font-bold text-emerald-200 bg-emerald-950/90 px-3 py-0.5 rounded border border-emerald-500 flex items-center gap-1.5 shadow-lg">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    BARCODE DECODED
+                  </span>
+                ) : (
+                  <span className="absolute bottom-2 text-[10px] font-mono text-neutral-200 bg-black/80 px-2.5 py-0.5 rounded border border-white/20 flex items-center gap-1">
+                    <Sparkle className="w-3 h-3 text-amber-400" />
+                    {macroZoomEnabled
+                      ? 'Hold 15-20cm away · 2x Macro Sharp'
+                      : 'Standard View · Tap to Re-Focus'}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Camera Loading Overlay */}
             {cameraLoading && (
@@ -544,7 +869,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <p className="text-[11px] text-neutral-400 max-w-xs">{cameraError}</p>
                 <button
                   type="button"
-                  onClick={() => initScanner()}
+                  onClick={() => startScanner()}
                   className="mt-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -574,9 +899,14 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   <div className="text-[11px] opacity-90 truncate">{feedback.message}</div>
                 </div>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/60 border border-white/10 text-white flex-shrink-0">
-                {feedback.code}
-              </span>
+              <div className="flex flex-col items-end flex-shrink-0 gap-0.5">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/60 border border-white/10 text-white">
+                  {feedback.code}
+                </span>
+                {feedback.engine && (
+                  <span className="text-[9px] font-mono text-neutral-400">{feedback.engine}</span>
+                )}
+              </div>
             </div>
           )}
 
@@ -589,7 +919,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 onChange={(e) => setContinuousMode(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-neutral-700 bg-neutral-900 text-purple-600 focus:ring-purple-500"
               />
-              <span className="text-[11px]">Continuous Auto-Scanning (100ms Interval)</span>
+              <span className="text-[11px]">Continuous Scanning (Non-Blocking)</span>
             </label>
 
             {cartItemCount > 0 && (
@@ -602,10 +932,11 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         </div>
 
         {/* ------------------------------------------------------------------- */}
-        {/* UNKNOWN BARCODE PROMPT (AUTO-CREATE ITEM ON THE FLY)                */}
+        {/* UNKNOWN BARCODE PROMPT (AUTO-UPDATE ON NEW SCANNED CODES)           */}
+        {/* Requirement 2: Never blocks scanning; updates on new input          */}
         {/* ------------------------------------------------------------------- */}
         {unknownItemPrompt && (
-          <div className="p-4 bg-amber-950/40 border-t border-b border-amber-800/80">
+          <div className="p-4 bg-amber-950/40 border-t border-b border-amber-800/80 animate-in fade-in duration-150">
             <form onSubmit={handleConfirmAddUnknownItem} className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -624,7 +955,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               </div>
 
               <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                Item not found in stock. Quick-add this SKU to POS Cart as &apos;Custom Scanned Item&apos;?
+                Item not in stock. Quick-add this SKU to POS Cart? (Scanner is still live: scanning another code updates this immediately)
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -733,7 +1064,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   <button
                     key={prod.id}
                     type="button"
-                    onClick={() => handleDecodedBarcode(prod.barcode, true)}
+                    onClick={() => handleDecodedBarcode(prod.barcode, true, 'Catalog Click')}
                     className="p-1.5 text-left bg-neutral-950 hover:bg-purple-950/40 border border-neutral-800 hover:border-purple-500/50 rounded-lg transition-all text-xs"
                   >
                     <div className="font-mono text-[11px] text-purple-300 font-medium truncate">
