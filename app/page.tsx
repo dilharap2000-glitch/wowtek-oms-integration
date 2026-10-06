@@ -15,6 +15,7 @@ import {
   CreditCard,
   Camera,
   KeyRound,
+  Building2,
 } from 'lucide-react';
 
 import {
@@ -27,6 +28,8 @@ import {
   PlatformConfig,
   PaymentGatewayConfig,
   DatabaseHealthStatus,
+  Supplier,
+  SupplierRmaClaim,
 } from '@/types';
 
 import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
@@ -46,6 +49,7 @@ import {
   updateWaybill,
   getWarranties,
   saveWarranty,
+  updateWarranty,
   getExpenses,
   saveExpense,
   getApiConfig,
@@ -54,6 +58,14 @@ import {
   savePlatforms,
   getPaymentGateways,
   savePaymentGateways,
+  getSuppliers,
+  saveSupplier,
+  updateSupplier,
+  deleteSupplier,
+  getSupplierRmaClaims,
+  saveSupplierRmaClaim,
+  updateSupplierRmaClaim,
+  deleteSupplierRmaClaim,
   checkDatabaseHealth,
 } from '@/lib/db';
 
@@ -65,6 +77,7 @@ import { WarrantyTab } from '@/src/components/WarrantyTab';
 import { ExpensesTab } from '@/src/components/ExpensesTab';
 import { SettingsTab } from '@/src/components/SettingsTab';
 import { IntegrationsTab } from '@/src/components/IntegrationsTab';
+import { SuppliersTab } from '@/src/components/SuppliersTab';
 
 export default function WowtekProApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -79,6 +92,8 @@ export default function WowtekProApp() {
   const [platforms, setPlatforms] = useState<PlatformConfig[]>([]);
   const [gateways, setGateways] = useState<PaymentGatewayConfig[]>([]);
   const [apiConfig, setApiConfig] = useState<ApiIntegrationConfig | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [rmaClaims, setRmaClaims] = useState<SupplierRmaClaim[]>([]);
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -103,6 +118,8 @@ export default function WowtekProApp() {
           loadedPlatforms,
           loadedGateways,
           loadedConfig,
+          loadedSuppliers,
+          loadedRmaClaims,
           health,
         ] = await Promise.all([
           getOrders(),
@@ -113,6 +130,8 @@ export default function WowtekProApp() {
           getPlatforms(),
           getPaymentGateways(),
           getApiConfig(),
+          getSuppliers(),
+          getSupplierRmaClaims(),
           checkDatabaseHealth(),
         ]);
 
@@ -124,6 +143,8 @@ export default function WowtekProApp() {
         setPlatforms(loadedPlatforms);
         setGateways(loadedGateways);
         setApiConfig(loadedConfig);
+        setSuppliers(loadedSuppliers);
+        setRmaClaims(loadedRmaClaims);
         setDbHealth({
           status: health.status,
           latencyMs: health.latencyMs,
@@ -242,6 +263,13 @@ export default function WowtekProApp() {
     await saveWarranty(record);
   };
 
+  const handleUpdateWarranty = async (id: string, updates: Partial<WarrantyRecord>) => {
+    const updated = await updateWarranty(id, updates);
+    if (updated) {
+      setWarranties((prev) => prev.map((w) => (w.id === id ? { ...w, ...updates } : w)));
+    }
+  };
+
   const handleDispatchSms = (id: string, gateway: 'SMSlenz' | 'Dialog' | 'Mobitel') => {
     const timeStr = `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
       [],
@@ -254,6 +282,42 @@ export default function WowtekProApp() {
           : w
       )
     );
+  };
+
+  // Handlers for Suppliers & Purchasing
+  const handleAddSupplier = async (supplier: Supplier) => {
+    setSuppliers((prev) => [supplier, ...prev]);
+    await saveSupplier(supplier);
+  };
+
+  const handleUpdateSupplier = async (id: string, updates: Partial<Supplier>) => {
+    const updated = await updateSupplier(id, updates);
+    if (updated) {
+      setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+    }
+  };
+
+  const handleDeleteSupplier = async (id: string) => {
+    await deleteSupplier(id);
+    setSuppliers((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  // Handlers for Supplier RMA Claims
+  const handleAddRmaClaim = async (claim: SupplierRmaClaim) => {
+    setRmaClaims((prev) => [claim, ...prev]);
+    await saveSupplierRmaClaim(claim);
+  };
+
+  const handleUpdateRmaClaim = async (id: string, updates: Partial<SupplierRmaClaim>) => {
+    const updated = await updateSupplierRmaClaim(id, updates);
+    if (updated) {
+      setRmaClaims((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    }
+  };
+
+  const handleDeleteRmaClaim = async (id: string) => {
+    await deleteSupplierRmaClaim(id);
+    setRmaClaims((prev) => prev.filter((r) => r.id !== id));
   };
 
   // Expenses
@@ -289,12 +353,23 @@ export default function WowtekProApp() {
     },
     { id: 'products', label: 'Inventory & Valuation', icon: Barcode },
     {
+      id: 'suppliers',
+      label: 'Suppliers & Purchasing',
+      icon: Building2,
+      badge: suppliers.length || undefined,
+    },
+    {
       id: 'waybills',
       label: 'Trans Express Logistics',
       icon: Truck,
       badge: waybills.filter((w) => w.status === 'Queued').length || undefined,
     },
-    { id: 'warranty', label: 'Warranty & SMSlenz', icon: ShieldCheck },
+    {
+      id: 'warranty',
+      label: 'Warranty & RMA Claims',
+      icon: ShieldCheck,
+      badge: rmaClaims.filter((r) => r.status === 'Pending with Supplier').length || undefined,
+    },
     { id: 'expenses', label: 'Financials Ledger', icon: DollarSign },
     { id: 'integrations', label: 'API & Courier Integrations', icon: KeyRound },
     { id: 'settings', label: 'Dynamic Fee Engine', icon: Settings },
@@ -450,10 +525,23 @@ export default function WowtekProApp() {
             {activeTab === 'products' && (
               <ProductsTab
                 products={products}
+                suppliers={suppliers}
                 onAddProduct={handleAddProduct}
                 onUpdateProduct={handleUpdateProduct}
                 onDeleteProduct={handleDeleteProduct}
                 onLoadSampleProducts={handleLoadSampleProducts}
+              />
+            )}
+
+            {activeTab === 'suppliers' && (
+              <SuppliersTab
+                suppliers={suppliers}
+                products={products}
+                rmaClaims={rmaClaims}
+                onAddSupplier={handleAddSupplier}
+                onUpdateSupplier={handleUpdateSupplier}
+                onDeleteSupplier={handleDeleteSupplier}
+                onNavigateTab={(tab) => setActiveTab(tab)}
               />
             )}
 
@@ -469,8 +557,14 @@ export default function WowtekProApp() {
               <WarrantyTab
                 warranties={warranties}
                 products={products}
+                suppliers={suppliers}
+                rmaClaims={rmaClaims}
                 onAddWarranty={handleAddWarranty}
+                onUpdateWarranty={handleUpdateWarranty}
                 onDispatchSms={handleDispatchSms}
+                onAddRmaClaim={handleAddRmaClaim}
+                onUpdateRmaClaim={handleUpdateRmaClaim}
+                onDeleteRmaClaim={handleDeleteRmaClaim}
               />
             )}
 

@@ -16,12 +16,14 @@ import {
   Edit,
   Package,
   Sparkles,
+  Building2,
 } from 'lucide-react';
-import { Product } from '@/types';
+import { Product, Supplier } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 
 interface ProductsTabProps {
   products: Product[];
+  suppliers?: Supplier[];
   onAddProduct: (product: Product) => void;
   onUpdateProduct?: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct?: (id: string) => void;
@@ -30,12 +32,14 @@ interface ProductsTabProps {
 
 export const ProductsTab: React.FC<ProductsTabProps> = ({
   products,
+  suppliers = [],
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
   onLoadSampleProducts,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('all');
   const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null);
   const [barcodePrintCount, setBarcodePrintCount] = useState(12);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -50,7 +54,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [sellingPrice, setSellingPrice] = useState(21000);
   const [stockWarehouse, setStockWarehouse] = useState(20);
   const [stockStore, setStockStore] = useState(5);
-  const [supplier, setSupplier] = useState('');
+  const [supplier, setSupplier] = useState(suppliers[0]?.name || 'Chama Computers (Pvt) Ltd');
+  const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
   const [grnBatch, setGrnBatch] = useState('GRN-2026-OCT-020');
   const [warrantyMonths, setWarrantyMonths] = useState(24);
 
@@ -67,16 +72,25 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const overallMarginPercent =
     totalRetailValue > 0 ? ((potentialProfit / totalRetailValue) * 100).toFixed(1) : '0';
 
-  const filteredProducts = products.filter(
-    (p) =>
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.barcode.includes(searchQuery)
-  );
+      p.barcode.includes(searchQuery) ||
+      (p.supplier && p.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesSupplier =
+      supplierFilter === 'all' ||
+      p.supplier?.toLowerCase().trim() === supplierFilter.toLowerCase().trim() ||
+      p.supplierId === supplierFilter;
+
+    return matchesSearch && matchesSupplier;
+  });
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
+    const matchedSup = suppliers.find((s) => s.name === supplier);
     const newProd: Product = {
       id: `prod-${Date.now().toString().slice(-4)}`,
       sku: sku.toUpperCase() || `WT-${Date.now().toString().slice(-5)}`,
@@ -89,7 +103,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
       stockStore,
       stockReserved: 0,
       grnBatch,
-      supplier: supplier || 'WOWTEK Direct Import',
+      supplier: supplier || matchedSup?.name || 'WOWTEK Direct Import',
+      supplierId: supplierId || matchedSup?.id,
       warrantyPeriodMonths: warrantyMonths,
     };
 
@@ -234,15 +249,34 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-neutral-900 border border-neutral-800">
-        <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search SKU, name, category, barcode..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
-          />
+        <div className="flex items-center gap-2.5 w-full md:w-auto flex-1">
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search SKU, name, category, barcode, supplier..."
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          {suppliers.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={supplierFilter}
+                onChange={(e) => setSupplierFilter(e.target.value)}
+                className="px-2.5 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-purple-500"
+              >
+                <option value="all">All Suppliers ({suppliers.length})</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 text-xs text-neutral-400">
@@ -268,7 +302,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             <thead>
               <tr className="border-b border-neutral-800 bg-neutral-950/60 text-neutral-400">
                 <th className="py-3 px-4 font-medium">SKU / Barcode</th>
-                <th className="py-3 px-4 font-medium">Product Details</th>
+                <th className="py-3 px-4 font-medium">Product Details & Primary Supplier</th>
                 <th className="py-3 px-4 font-medium text-right">Cost Price</th>
                 <th className="py-3 px-4 font-medium text-right">Selling Price</th>
                 <th className="py-3 px-4 font-medium w-48">Profit Margin Bar</th>
@@ -282,9 +316,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <td colSpan={7} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                       <Package className="w-10 h-10 text-neutral-600 mb-1" />
-                      <p className="font-semibold text-white text-sm">No Products in Inventory</p>
+                      <p className="font-semibold text-white text-sm">No Products Found</p>
                       <p className="text-xs text-neutral-400">
-                        Your inventory database is currently empty. Record your first product GRN batch to calculate inventory valuation and profit margins.
+                        No items matched your search query or supplier filter. Record your first product GRN batch to calculate valuation.
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                         <button
@@ -335,6 +369,12 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     <td className="py-3 px-4">
                       <div className="font-medium text-white max-w-xs">{p.name}</div>
                       <div className="text-[11px] text-neutral-400">{p.category}</div>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-purple-300 flex items-center gap-1">
+                          <Building2 className="w-3 h-3 text-purple-400" />
+                          <span className="truncate max-w-[170px]">{p.supplier || 'WOWTEK Direct Import'}</span>
+                        </span>
+                      </div>
                     </td>
 
                     <td className="py-3 px-4 text-right font-mono tabular-nums text-neutral-400">
@@ -603,6 +643,43 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">Primary Supplier</label>
+                {suppliers.length > 0 ? (
+                  <select
+                    value={editingProduct.supplier || ''}
+                    onChange={(e) => {
+                      const sel = suppliers.find((s) => s.name === e.target.value);
+                      setEditingProduct({
+                        ...editingProduct,
+                        supplier: e.target.value,
+                        supplierId: sel?.id,
+                      });
+                    }}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  >
+                    <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name} ({s.paymentTerms})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={editingProduct.supplier || ''}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        supplier: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  />
+                )}
+              </div>
+
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
@@ -744,14 +821,33 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Supplier / Distributor</label>
-                <input
-                  type="text"
-                  value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
-                  placeholder="e.g. Singer Digital / Chama Computers"
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                />
+                <label className="block text-neutral-300 font-medium mb-1">Primary Supplier / Distributor</label>
+                {suppliers.length > 0 ? (
+                  <select
+                    value={supplier}
+                    onChange={(e) => {
+                      setSupplier(e.target.value);
+                      const sel = suppliers.find((s) => s.name === e.target.value);
+                      setSupplierId(sel?.id || '');
+                    }}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  >
+                    <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name} ({s.paymentTerms})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    placeholder="e.g. Singer Digital / Chama Computers"
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  />
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-3">

@@ -68,6 +68,49 @@ export interface Order {
   smsConfirmationSent?: boolean;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  address: string;
+  categories: string; // Provided Brands / Categories e.g. 'ASUS, MSI, Motherboards'
+  paymentTerms: string; // e.g. 'Net 30 Days', 'Cash on Delivery', 'Credit 14 Days'
+  notes?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type SupplierRmaStatus =
+  | 'Pending with Supplier'
+  | 'Repaired'
+  | 'Replaced'
+  | 'Rejected/Returned';
+
+export interface SupplierRmaClaim {
+  id: string;
+  warrantyId?: string;
+  serialNumber: string;
+  productSku: string;
+  productName: string;
+  customerName: string;
+  customerPhone: string;
+  supplierId: string;
+  supplierName: string;
+  rmaNumber: string; // RMA Reference Number / Supplier Invoice Ref
+  dateSent: string; // Date Sent to Supplier
+  status: SupplierRmaStatus;
+  expectedReturnDate: string; // Expected Return Date
+  actualReturnDate?: string;
+  issueDescription?: string;
+  notes?: string;
+  replacementSerial?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -81,6 +124,7 @@ export interface Product {
   stockReserved: number;
   grnBatch: string;
   supplier: string;
+  supplierId?: string;
   warrantyPeriodMonths: number;
 }
 
@@ -189,5 +233,7 @@ export interface DatabaseHealthStatus {
     waybills: number;
     warranties: number;
     expenses: number;
+    suppliers?: number;
+    rmaClaims?: number;
   };
 }

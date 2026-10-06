@@ -9,6 +9,8 @@ import {
   DatabaseHealthStatus,
   PlatformConfig,
   PaymentGatewayConfig,
+  Supplier,
+  SupplierRmaClaim,
 } from '@/types';
 
 // Environment variables
@@ -31,6 +33,114 @@ export const DEFAULT_GATEWAYS: PaymentGatewayConfig[] = [
   { id: 'gw-koko', name: 'Koko Pay (3x Installments)', code: 'koko', feePercent: 12, isCustom: false, active: true },
   { id: 'gw-mintpay', name: 'Mintpay (Pay in 3)', code: 'mintpay', feePercent: 12, isCustom: false, active: true },
   { id: 'gw-card', name: 'Card / Online Bank Gateway', code: 'card_online', feePercent: 3, isCustom: false, active: true },
+];
+
+export const DEFAULT_SUPPLIERS: Supplier[] = [
+  {
+    id: 'sup-001',
+    name: 'Chama Computers (Pvt) Ltd',
+    contactPerson: 'Nuwan Jayasinghe',
+    phone: '+94 11 258 4400',
+    email: 'warranty@chamacomputers.lk',
+    address: '142 Galle Road, Bambalapitiya, Colombo 04',
+    categories: 'Kingston, ASUS, Storage & SSDs, Motherboards',
+    paymentTerms: 'Net 30 Days',
+    notes: 'Authorized Kingston & ASUS distributor. 7-day turnaround for RMA replacements.',
+    active: true,
+    createdAt: '2026-01-15T08:00:00Z',
+  },
+  {
+    id: 'sup-002',
+    name: 'Trident Technologies Colombo',
+    contactPerson: 'Dhammika Fernando',
+    phone: '+94 11 472 8899',
+    email: 'rma@tridenttech.lk',
+    address: '45/2 Nawala Road, Nugegoda',
+    categories: 'Logitech, Corsair, Keyboards & Mice, Gaming Gear',
+    paymentTerms: 'Credit 14 Days',
+    notes: 'Official Logitech sub-distributor. Serial verification portal enabled.',
+    active: true,
+    createdAt: '2026-02-01T09:30:00Z',
+  },
+  {
+    id: 'sup-003',
+    name: 'Future World Distributors',
+    contactPerson: 'Kavinda Senanayake',
+    phone: '+94 77 340 1122',
+    email: 'orders@futureworld.lk',
+    address: '88 Duplication Road, Kollupitiya, Colombo 03',
+    categories: 'Anker, Baseus, GaN Chargers, Power Banks, Cables',
+    paymentTerms: 'Cash on Delivery',
+    notes: 'Exclusive Anker importer. One-to-one replacement on defective chargers.',
+    active: true,
+    createdAt: '2026-02-10T11:15:00Z',
+  },
+  {
+    id: 'sup-004',
+    name: 'Singer Sri Lanka IT Hub',
+    contactPerson: 'Shanika Gunawardena',
+    phone: '+94 11 540 0400',
+    email: 'itcorporate@singersl.com',
+    address: 'Singer Mega Complex, No 80 Nawam Mawatha, Colombo 02',
+    categories: 'Dell, HP, Monitors, Laptops, Commercial Displays',
+    paymentTerms: 'Net 60 Days',
+    notes: 'Dell Official Corporate Partner. On-site warranty support available.',
+    active: true,
+    createdAt: '2026-03-05T14:20:00Z',
+  },
+  {
+    id: 'sup-005',
+    name: 'Redline Technologies Imports',
+    contactPerson: 'Hasitha Gamage',
+    phone: '+94 71 889 0011',
+    email: 'support@redlinetech.lk',
+    address: 'Majestic City Level 3, Station Road, Colombo 04',
+    categories: 'HyperX, SteelSeries, Audiophile Headsets, Microphones',
+    paymentTerms: 'Advance 50%',
+    notes: 'Specialist gaming peripheral distributor. RMA claims processed weekly.',
+    active: true,
+    createdAt: '2026-03-12T16:00:00Z',
+  },
+];
+
+export const DEFAULT_RMA_CLAIMS: SupplierRmaClaim[] = [
+  {
+    id: 'rma-001',
+    serialNumber: 'SN-481920',
+    productSku: 'WT-SSD-1TB-NVME',
+    productName: 'Kingston NV2 1TB PCIe 4.0 NVMe SSD',
+    customerName: 'Roshan Wickramasinghe',
+    customerPhone: '+94 77 891 2345',
+    supplierId: 'sup-001',
+    supplierName: 'Chama Computers (Pvt) Ltd',
+    rmaNumber: 'RMA-CHAMA-2026-041',
+    dateSent: '2026-10-01',
+    status: 'Pending with Supplier',
+    expectedReturnDate: '2026-10-12',
+    issueDescription: 'Drive not detected in BIOS / I/O device error on cold boot',
+    notes: 'Dispatched via courier. Nuwan confirmed receipt at Chama service center.',
+    createdAt: '2026-10-01T10:30:00Z',
+    updatedAt: '2026-10-01T10:30:00Z',
+  },
+  {
+    id: 'rma-002',
+    serialNumber: 'SN-902184',
+    productSku: 'WT-MOUSE-MX3S',
+    productName: 'Logitech MX Master 3S Wireless Mouse - Graphite',
+    customerName: 'Dilshan Silva',
+    customerPhone: '+94 71 456 7890',
+    supplierId: 'sup-002',
+    supplierName: 'Trident Technologies Colombo',
+    rmaNumber: 'RMA-TRIDENT-2026-019',
+    dateSent: '2026-09-24',
+    status: 'Repaired',
+    expectedReturnDate: '2026-10-05',
+    actualReturnDate: '2026-10-05',
+    issueDescription: 'Scroll wheel ratchet motor stuck in free-spin mode',
+    notes: 'Optical switch replaced and recalibrated by Trident. Tested OK. Ready for customer handover.',
+    createdAt: '2026-09-24T14:15:00Z',
+    updatedAt: '2026-10-05T16:20:00Z',
+  },
 ];
 
 // Clean Production State - Zero Mock Data
@@ -74,6 +184,8 @@ interface MockDatabaseStore {
   apiConfig: ApiIntegrationConfig;
   platforms: PlatformConfig[];
   gateways: PaymentGatewayConfig[];
+  suppliers: Supplier[];
+  rmaClaims: SupplierRmaClaim[];
 }
 
 const STORAGE_KEY = 'wowtek_pro_prod_v1';
@@ -89,7 +201,14 @@ function initMockDb(): MockDatabaseStore {
 
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          g._wowtekMockDb = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
+          if (!parsed.suppliers || parsed.suppliers.length === 0) {
+            parsed.suppliers = [...DEFAULT_SUPPLIERS];
+          }
+          if (!parsed.rmaClaims) {
+            parsed.rmaClaims = [...DEFAULT_RMA_CLAIMS];
+          }
+          g._wowtekMockDb = parsed;
           return g._wowtekMockDb;
         }
       } catch {
@@ -106,6 +225,8 @@ function initMockDb(): MockDatabaseStore {
       apiConfig: { ...INITIAL_API_CONFIG },
       platforms: [...DEFAULT_PLATFORMS],
       gateways: [...DEFAULT_GATEWAYS],
+      suppliers: [...DEFAULT_SUPPLIERS],
+      rmaClaims: [...DEFAULT_RMA_CLAIMS],
     };
   }
   return g._wowtekMockDb;
@@ -210,6 +331,8 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
         waybills: mockDb.waybills.length,
         warranties: mockDb.warranties.length,
         expenses: mockDb.expenses.length,
+        suppliers: mockDb.suppliers?.length || 0,
+        rmaClaims: mockDb.rmaClaims?.length || 0,
       },
     };
   } catch (err: any) {
@@ -225,6 +348,8 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
         waybills: mockDb.waybills.length,
         warranties: mockDb.warranties.length,
         expenses: mockDb.expenses.length,
+        suppliers: mockDb.suppliers?.length || 0,
+        rmaClaims: mockDb.rmaClaims?.length || 0,
       },
     };
   }
@@ -428,6 +553,20 @@ export async function saveWarranty(warranty: WarrantyRecord): Promise<WarrantyRe
   return warranty;
 }
 
+export async function updateWarranty(
+  id: string,
+  updates: Partial<WarrantyRecord>
+): Promise<WarrantyRecord | null> {
+  const mock = initMockDb();
+  const index = mock.warranties.findIndex((w) => w.id === id);
+  if (index !== -1) {
+    mock.warranties[index] = { ...mock.warranties[index], ...updates };
+    persistMockDb();
+    return mock.warranties[index];
+  }
+  return null;
+}
+
 export async function getExpenses(): Promise<ExpenseItem[]> {
   return initMockDb().expenses;
 }
@@ -448,6 +587,85 @@ export async function saveApiConfig(config: ApiIntegrationConfig): Promise<ApiIn
   mock.apiConfig = { ...config };
   persistMockDb();
   return mock.apiConfig;
+}
+
+// ---------------------------------------------------------------------------
+// Suppliers & Purchasing CRUD
+// ---------------------------------------------------------------------------
+export async function getSuppliers(): Promise<Supplier[]> {
+  return initMockDb().suppliers;
+}
+
+export async function saveSupplier(supplier: Supplier): Promise<Supplier> {
+  const mock = initMockDb();
+  const existingIdx = mock.suppliers.findIndex((s) => s.id === supplier.id);
+  if (existingIdx !== -1) {
+    mock.suppliers[existingIdx] = supplier;
+  } else {
+    mock.suppliers.unshift(supplier);
+  }
+  persistMockDb();
+  return supplier;
+}
+
+export async function updateSupplier(id: string, updates: Partial<Supplier>): Promise<Supplier | null> {
+  const mock = initMockDb();
+  const index = mock.suppliers.findIndex((s) => s.id === id);
+  if (index !== -1) {
+    mock.suppliers[index] = { ...mock.suppliers[index], ...updates, updatedAt: new Date().toISOString() };
+    persistMockDb();
+    return mock.suppliers[index];
+  }
+  return null;
+}
+
+export async function deleteSupplier(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const initialLength = mock.suppliers.length;
+  mock.suppliers = mock.suppliers.filter((s) => s.id !== id);
+  persistMockDb();
+  return mock.suppliers.length < initialLength;
+}
+
+// ---------------------------------------------------------------------------
+// Supplier Warranty Claims (RMA) CRUD
+// ---------------------------------------------------------------------------
+export async function getSupplierRmaClaims(): Promise<SupplierRmaClaim[]> {
+  return initMockDb().rmaClaims;
+}
+
+export async function saveSupplierRmaClaim(claim: SupplierRmaClaim): Promise<SupplierRmaClaim> {
+  const mock = initMockDb();
+  const existingIdx = mock.rmaClaims.findIndex((r) => r.id === claim.id);
+  if (existingIdx !== -1) {
+    mock.rmaClaims[existingIdx] = claim;
+  } else {
+    mock.rmaClaims.unshift(claim);
+  }
+  persistMockDb();
+  return claim;
+}
+
+export async function updateSupplierRmaClaim(
+  id: string,
+  updates: Partial<SupplierRmaClaim>
+): Promise<SupplierRmaClaim | null> {
+  const mock = initMockDb();
+  const index = mock.rmaClaims.findIndex((r) => r.id === id);
+  if (index !== -1) {
+    mock.rmaClaims[index] = { ...mock.rmaClaims[index], ...updates, updatedAt: new Date().toISOString() };
+    persistMockDb();
+    return mock.rmaClaims[index];
+  }
+  return null;
+}
+
+export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const initialLength = mock.rmaClaims.length;
+  mock.rmaClaims = mock.rmaClaims.filter((r) => r.id !== id);
+  persistMockDb();
+  return mock.rmaClaims.length < initialLength;
 }
 
 export default clientPromise;
