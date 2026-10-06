@@ -30,6 +30,7 @@ import {
   DatabaseHealthStatus,
   Supplier,
   SupplierRmaClaim,
+  WebhookEvent,
 } from '@/types';
 
 import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
@@ -66,6 +67,9 @@ import {
   saveSupplierRmaClaim,
   updateSupplierRmaClaim,
   deleteSupplierRmaClaim,
+  getWebhookEvents,
+  saveWebhookEvent,
+  clearWebhookEvents,
   checkDatabaseHealth,
 } from '@/lib/db';
 
@@ -94,6 +98,7 @@ export default function WowtekProApp() {
   const [apiConfig, setApiConfig] = useState<ApiIntegrationConfig | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [rmaClaims, setRmaClaims] = useState<SupplierRmaClaim[]>([]);
+  const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -120,6 +125,7 @@ export default function WowtekProApp() {
           loadedConfig,
           loadedSuppliers,
           loadedRmaClaims,
+          loadedEvents,
           health,
         ] = await Promise.all([
           getOrders(),
@@ -132,6 +138,7 @@ export default function WowtekProApp() {
           getApiConfig(),
           getSuppliers(),
           getSupplierRmaClaims(),
+          getWebhookEvents(),
           checkDatabaseHealth(),
         ]);
 
@@ -145,6 +152,7 @@ export default function WowtekProApp() {
         setApiConfig(loadedConfig);
         setSuppliers(loadedSuppliers);
         setRmaClaims(loadedRmaClaims);
+        setWebhookEvents(loadedEvents);
         setDbHealth({
           status: health.status,
           latencyMs: health.latencyMs,
@@ -156,6 +164,26 @@ export default function WowtekProApp() {
     }
 
     initData();
+  }, []);
+
+  // Periodic Live Polling for Webhook Events and Auto-Synced Orders (every 4s)
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      try {
+        const [latestEvents, latestOrders, latestWaybills] = await Promise.all([
+          getWebhookEvents(),
+          getOrders(),
+          getWaybills(),
+        ]);
+        setWebhookEvents(latestEvents);
+        setOrders(latestOrders);
+        setWaybills(latestWaybills);
+      } catch {
+        // Keep current state
+      }
+    }, 4000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   // Handlers for Orders & POS Invoicing
@@ -342,6 +370,46 @@ export default function WowtekProApp() {
     await saveApiConfig(newConfig);
   };
 
+  // Webhook Live Testing & Event Handlers
+  const handleTriggerTestOrder = async () => {
+    try {
+      const res = await fetch('/api/orders/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ simulate: true }),
+      });
+      if (res.ok) {
+        const [newOrders, newWaybills, newEvents] = await Promise.all([
+          getOrders(),
+          getWaybills(),
+          getWebhookEvents(),
+        ]);
+        setOrders(newOrders);
+        setWaybills(newWaybills);
+        setWebhookEvents(newEvents);
+      }
+    } catch {
+      // Graceful fallback
+    }
+  };
+
+  const handleRefreshWebhookEvents = async () => {
+    const [newEvents, newOrders, newWaybills] = await Promise.all([
+      getWebhookEvents(),
+      getOrders(),
+      getWaybills(),
+    ]);
+    setWebhookEvents(newEvents);
+    setOrders(newOrders);
+    setWaybills(newWaybills);
+  };
+
+  const handleClearWebhookEvents = async () => {
+    await clearWebhookEvents();
+    const newEvents = await getWebhookEvents();
+    setWebhookEvents(newEvents);
+  };
+
   // Nav menu
   const navItems = [
     { id: 'dashboard', label: 'Sales & Analytics', icon: LayoutDashboard },
@@ -502,8 +570,12 @@ export default function WowtekProApp() {
                 waybills={waybills}
                 warranties={warranties}
                 expenses={expenses}
+                webhookEvents={webhookEvents}
                 dbStatus={dbHealth}
                 onNavigateTab={(tab) => setActiveTab(tab)}
+                onRefreshWebhookEvents={handleRefreshWebhookEvents}
+                onClearWebhookEvents={handleClearWebhookEvents}
+                onTriggerTestOrder={handleTriggerTestOrder}
               />
             )}
 
@@ -548,8 +620,12 @@ export default function WowtekProApp() {
             {activeTab === 'waybills' && (
               <WaybillsTab
                 waybills={waybills}
+                webhookEvents={webhookEvents}
                 onUpdateWaybillStatus={handleUpdateWaybillStatus}
                 onMarkLabelPrinted={handleMarkLabelPrinted}
+                onRefreshWebhookEvents={handleRefreshWebhookEvents}
+                onClearWebhookEvents={handleClearWebhookEvents}
+                onTriggerTestOrder={handleTriggerTestOrder}
               />
             )}
 

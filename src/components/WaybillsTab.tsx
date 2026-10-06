@@ -12,18 +12,27 @@ import {
   Phone,
   Barcode,
 } from 'lucide-react';
-import { TransExpressWaybill } from '@/lib/types';
+import { TransExpressWaybill, WebhookEvent } from '@/types';
+import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 
 interface WaybillsTabProps {
   waybills: TransExpressWaybill[];
+  webhookEvents?: WebhookEvent[];
   onUpdateWaybillStatus: (id: string, status: TransExpressWaybill['status']) => void;
   onMarkLabelPrinted: (id: string) => void;
+  onRefreshWebhookEvents?: () => void;
+  onClearWebhookEvents?: () => void;
+  onTriggerTestOrder?: () => Promise<void>;
 }
 
 export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   waybills,
+  webhookEvents = [],
   onUpdateWaybillStatus,
   onMarkLabelPrinted,
+  onRefreshWebhookEvents,
+  onClearWebhookEvents,
+  onTriggerTestOrder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedWaybillForPrint, setSelectedWaybillForPrint] = useState<TransExpressWaybill | null>(
@@ -193,6 +202,16 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Live WooCommerce Courier Webhook Pipeline Log */}
+      <WebhookAuditLogSection
+        events={webhookEvents}
+        onRefreshEvents={onRefreshWebhookEvents}
+        onClearEvents={onClearWebhookEvents}
+        onTriggerTestOrder={onTriggerTestOrder}
+        title="Live Courier Dispatch Webhook Pipeline"
+        subtitle="Real-time log of incoming WooCommerce orders auto-generating Trans Express tracking IDs and delivery manifests."
+      />
 
       {/* Print-Ready Trans Express Shipping Label Modal */}
       {selectedWaybillForPrint && (

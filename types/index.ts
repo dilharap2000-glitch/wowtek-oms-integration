@@ -237,3 +237,23 @@ export interface DatabaseHealthStatus {
     rmaClaims?: number;
   };
 }
+
+export interface WebhookEvent {
+  id: string;
+  source: 'woocommerce' | 'pickme' | 'ubereats' | 'manual_sync';
+  event: string; // e.g. 'order.created' | 'order.updated'
+  orderId?: string;
+  invoiceNumber?: string;
+  customerName?: string;
+  customerPhone?: string;
+  amount?: number;
+  status: 'success' | 'failed' | 'processing';
+  waybillId?: string;
+  waybillNumber?: string;
+  smsSent?: boolean;
+  smsMessageId?: string;
+  smsGateway?: string;
+  rawPayload: any;
+  receivedAt: string;
+  errorMessage?: string;
+}

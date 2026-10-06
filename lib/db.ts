@@ -11,6 +11,7 @@ import {
   PaymentGatewayConfig,
   Supplier,
   SupplierRmaClaim,
+  WebhookEvent,
 } from '@/types';
 
 // Environment variables
@@ -172,6 +173,30 @@ const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   smsExpiryReminderDays: 30,
 };
 
+export const DEFAULT_WEBHOOK_EVENTS: WebhookEvent[] = [
+  {
+    id: 'evt-listener-active',
+    source: 'woocommerce',
+    event: 'system.listener_active',
+    status: 'success',
+    rawPayload: {
+      status: 'active',
+      message: 'WooCommerce Webhook Listener Active. Ready for live order testing.',
+      routes: {
+        webhook: '/api/webhooks/woocommerce',
+        sync: '/api/orders/sync',
+      },
+      supportedStatuses: ['processing', 'pending', 'completed', 'on-hold'],
+      autoActions: [
+        'Trans Express Waybill Auto-generation',
+        'SMSlenz Customer Confirmation Dispatch',
+        'POS Invoicing & Stock Sync',
+      ],
+    },
+    receivedAt: '2026-10-06T09:00:00.000Z',
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Cross-Environment Persistent State (Browser LocalStorage + Global Singleton)
 // ---------------------------------------------------------------------------
@@ -186,6 +211,7 @@ interface MockDatabaseStore {
   gateways: PaymentGatewayConfig[];
   suppliers: Supplier[];
   rmaClaims: SupplierRmaClaim[];
+  webhookEvents: WebhookEvent[];
 }
 
 const STORAGE_KEY = 'wowtek_pro_prod_v1';
@@ -208,6 +234,9 @@ function initMockDb(): MockDatabaseStore {
           if (!parsed.rmaClaims) {
             parsed.rmaClaims = [...DEFAULT_RMA_CLAIMS];
           }
+          if (!parsed.webhookEvents || parsed.webhookEvents.length === 0) {
+            parsed.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
+          }
           g._wowtekMockDb = parsed;
           return g._wowtekMockDb;
         }
@@ -227,6 +256,7 @@ function initMockDb(): MockDatabaseStore {
       gateways: [...DEFAULT_GATEWAYS],
       suppliers: [...DEFAULT_SUPPLIERS],
       rmaClaims: [...DEFAULT_RMA_CLAIMS],
+      webhookEvents: [...DEFAULT_WEBHOOK_EVENTS],
     };
   }
   return g._wowtekMockDb;
@@ -666,6 +696,36 @@ export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
   mock.rmaClaims = mock.rmaClaims.filter((r) => r.id !== id);
   persistMockDb();
   return mock.rmaClaims.length < initialLength;
+}
+
+// ---------------------------------------------------------------------------
+// Incoming Webhook Events & Transaction Audit Log
+// ---------------------------------------------------------------------------
+export async function getWebhookEvents(): Promise<WebhookEvent[]> {
+  return initMockDb().webhookEvents;
+}
+
+export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEvent> {
+  const mock = initMockDb();
+  const existingIdx = mock.webhookEvents.findIndex((e) => e.id === event.id);
+  if (existingIdx !== -1) {
+    mock.webhookEvents[existingIdx] = event;
+  } else {
+    mock.webhookEvents.unshift(event);
+    // Keep last 50 events in buffer
+    if (mock.webhookEvents.length > 50) {
+      mock.webhookEvents = mock.webhookEvents.slice(0, 50);
+    }
+  }
+  persistMockDb();
+  return event;
+}
+
+export async function clearWebhookEvents(): Promise<boolean> {
+  const mock = initMockDb();
+  mock.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
+  persistMockDb();
+  return true;
 }
 
 export default clientPromise;

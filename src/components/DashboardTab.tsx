@@ -13,15 +13,20 @@ import {
   Clock,
   RotateCcw,
 } from 'lucide-react';
-import { Order, TransExpressWaybill, WarrantyRecord, ExpenseItem } from '@/types';
+import { Order, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent } from '@/types';
+import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 
 interface DashboardTabProps {
   orders: Order[];
   waybills: TransExpressWaybill[];
   warranties: WarrantyRecord[];
   expenses: ExpenseItem[];
+  webhookEvents?: WebhookEvent[];
   dbStatus: { status: 'connected' | 'fallback'; latencyMs: number; database: string };
   onNavigateTab: (tab: string) => void;
+  onRefreshWebhookEvents?: () => void;
+  onClearWebhookEvents?: () => void;
+  onTriggerTestOrder?: () => Promise<void>;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -29,8 +34,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   waybills,
   warranties,
   expenses,
+  webhookEvents = [],
   dbStatus,
   onNavigateTab,
+  onRefreshWebhookEvents,
+  onClearWebhookEvents,
+  onTriggerTestOrder,
 }) => {
   // Financial computations
   const totalGrossRevenue = orders
@@ -362,6 +371,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Live WooCommerce Webhook Audit Stream */}
+      <WebhookAuditLogSection
+        events={webhookEvents}
+        onRefreshEvents={onRefreshWebhookEvents}
+        onClearEvents={onClearWebhookEvents}
+        onTriggerTestOrder={onTriggerTestOrder}
+        title="Live WooCommerce Webhook Events & Transaction Stream"
+        subtitle="Actively listening for live orders placed on the store. Auto-executes Trans Express waybills and SMSlenz confirmations."
+        onNavigateTab={onNavigateTab}
+      />
     </div>
   );
 };
