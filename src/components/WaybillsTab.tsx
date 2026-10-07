@@ -320,6 +320,16 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Live WooCommerce Webhook Audit Log & Logistics Dispatch Stream */}
+      <WebhookAuditLogSection
+        events={webhookEvents}
+        onRefreshEvents={onRefreshWebhookEvents}
+        onClearEvents={onClearWebhookEvents}
+        onTriggerTestOrder={onTriggerTestOrder}
+        title="Live WooCommerce Webhook Events & Logistics Stream"
+        subtitle="Real-time incoming orders from connected WooCommerce store with automatic Trans Express Waybill generation (TE-XXXX)."
+      />
     </div>
   );
 };

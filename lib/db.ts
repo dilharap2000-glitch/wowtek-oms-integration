@@ -1,4 +1,16 @@
 import type { MongoClient, Db } from 'mongodb';
+
+async function getServerMongoConn(): Promise<{ client: MongoClient; db: Db } | null> {
+  if (typeof window !== 'undefined') return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const req = eval('require');
+    const { connectToMongoDB } = req('./mongodb');
+    return await connectToMongoDB();
+  } catch {
+    return null;
+  }
+}
 import {
   Order,
   Product,
@@ -273,72 +285,45 @@ function persistMockDb() {
 }
 
 // ---------------------------------------------------------------------------
-// Native MongoClient Singleton with 30s Timeout (Server-Side Only)
+// Native MongoClient Singleton with Connection Pooling (Server-Side)
 // ---------------------------------------------------------------------------
-let clientPromise: Promise<MongoClient> | null = null;
-
 export async function getDatabase(): Promise<{
   db: Db | null;
   client: MongoClient | null;
   isFallback: boolean;
   message: string;
 }> {
-  // If running in browser or URI not provided, gracefully fallback to mock DB
-  if (typeof window !== 'undefined' || !MONGODB_URI) {
+  if (typeof window !== 'undefined') {
     return {
       db: null,
       client: null,
       isFallback: true,
-      message: 'Operating in resilient Mock DB mode with 30s timeout protection.',
+      message: 'Browser environment operating in resilient client-side mode.',
     };
   }
 
   try {
-    if (!clientPromise) {
-      const g = globalThis as any;
-      if (process.env.NODE_ENV === 'development' && g._mongoClientPromise) {
-        clientPromise = g._mongoClientPromise;
-      } else {
-        // Server-safe dynamic import that avoids webpack bundling mongodb in client
-        const mongodbPkg = 'mongodb';
-        const { MongoClient } = await (Function('pkg', 'return import(pkg)')(mongodbPkg));
-        const client = new MongoClient(MONGODB_URI, {
-          serverSelectionTimeoutMS: 30000,
-          connectTimeoutMS: 15000,
-        });
-        clientPromise = client.connect();
-        if (process.env.NODE_ENV === 'development') {
-          g._mongoClientPromise = clientPromise;
-        }
-      }
+    const conn = await getServerMongoConn();
+    if (conn) {
+      return {
+        db: conn.db,
+        client: conn.client,
+        isFallback: false,
+        message: `MongoDB Atlas Connected (Live): ${conn.db.databaseName}`,
+      };
     }
-
-    const connectedClient = await Promise.race([
-      clientPromise,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('MongoDB connection timed out (30s limit)')), 30000)
-      ),
-    ]);
-
-    if (!connectedClient) {
-      throw new Error('MongoClient returned null');
-    }
-
-    const db = connectedClient.db(MONGODB_DB_NAME);
-    await db.command({ ping: 1 });
-
     return {
-      db,
-      client: connectedClient,
-      isFallback: false,
-      message: `Connected to MongoDB Atlas: ${MONGODB_DB_NAME}`,
+      db: null,
+      client: null,
+      isFallback: true,
+      message: 'MONGODB_URI not configured. Operating in safe fallback mode.',
     };
   } catch (err: any) {
     return {
       db: null,
       client: null,
       isFallback: true,
-      message: `MongoDB connection unavailable (${err?.message || 'Timeout'}). Operating in safe fallback mode.`,
+      message: `MongoDB connection unavailable: ${err?.message || 'Error'}. Operating in safe fallback mode.`,
     };
   }
 }
@@ -348,41 +333,63 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
   const mockDb = initMockDb();
 
   try {
-    const { isFallback, message } = await getDatabase();
-    return {
-      status: isFallback ? 'fallback' : 'connected',
-      latencyMs: Date.now() - startTime,
-      database: isFallback ? 'Mock In-Memory DB (Safe Fallback)' : `MongoDB Atlas (${MONGODB_DB_NAME})`,
-      message,
-      timestamp: new Date().toISOString(),
-      recordCounts: {
-        orders: mockDb.orders.length,
-        products: mockDb.products.length,
-        waybills: mockDb.waybills.length,
-        warranties: mockDb.warranties.length,
-        expenses: mockDb.expenses.length,
-        suppliers: mockDb.suppliers?.length || 0,
-        rmaClaims: mockDb.rmaClaims?.length || 0,
-      },
-    };
-  } catch (err: any) {
-    return {
-      status: 'fallback',
-      latencyMs: Date.now() - startTime,
-      database: 'Mock In-Memory DB (Safe Fallback)',
-      message: `Database ping exception: ${err?.message || 'Error'}. Reverting to fallback.`,
-      timestamp: new Date().toISOString(),
-      recordCounts: {
-        orders: mockDb.orders.length,
-        products: mockDb.products.length,
-        waybills: mockDb.waybills.length,
-        warranties: mockDb.warranties.length,
-        expenses: mockDb.expenses.length,
-        suppliers: mockDb.suppliers?.length || 0,
-        rmaClaims: mockDb.rmaClaims?.length || 0,
-      },
-    };
+    const conn = await getServerMongoConn();
+    if (conn) {
+      const [
+        ordersCount,
+        productsCount,
+        waybillsCount,
+        warrantiesCount,
+        expensesCount,
+        suppliersCount,
+        rmaCount,
+      ] = await Promise.all([
+        conn.db.collection('orders').countDocuments().catch(() => mockDb.orders.length),
+        conn.db.collection('products').countDocuments().catch(() => mockDb.products.length),
+        conn.db.collection('waybills').countDocuments().catch(() => mockDb.waybills.length),
+        conn.db.collection('warranties').countDocuments().catch(() => mockDb.warranties.length),
+        conn.db.collection('expenses').countDocuments().catch(() => mockDb.expenses.length),
+        conn.db.collection('suppliers').countDocuments().catch(() => mockDb.suppliers?.length || 0),
+        conn.db.collection('rma_claims').countDocuments().catch(() => mockDb.rmaClaims?.length || 0),
+      ]);
+
+      return {
+        status: 'connected',
+        latencyMs: Math.max(1, Date.now() - startTime),
+        database: 'MongoDB Atlas Connected (Live)',
+        message: `Connected to MongoDB Atlas: ${conn.db.databaseName} (Live)`,
+        timestamp: new Date().toISOString(),
+        recordCounts: {
+          orders: ordersCount,
+          products: productsCount,
+          waybills: waybillsCount,
+          warranties: warrantiesCount,
+          expenses: expensesCount,
+          suppliers: suppliersCount,
+          rmaClaims: rmaCount,
+        },
+      };
+    }
+  } catch {
+    // Only falls back if explicitly offline or connection failed
   }
+
+  return {
+    status: 'fallback',
+    latencyMs: Math.max(1, Date.now() - startTime),
+    database: 'Mock DB Fallback (Offline)',
+    message: 'Operating in safe fallback mode.',
+    timestamp: new Date().toISOString(),
+    recordCounts: {
+      orders: mockDb.orders.length,
+      products: mockDb.products.length,
+      waybills: mockDb.waybills.length,
+      warranties: mockDb.warranties.length,
+      expenses: mockDb.expenses.length,
+      suppliers: mockDb.suppliers?.length || 0,
+      rmaClaims: mockDb.rmaClaims?.length || 0,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -414,12 +421,80 @@ export async function savePaymentGateways(gateways: PaymentGatewayConfig[]): Pro
 // Order & POS Invoicing CRUD with Returns & Stock Restoration
 // ---------------------------------------------------------------------------
 export async function getOrders(): Promise<Order[]> {
+  if (typeof window === 'undefined') {
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        const docs = await conn.db
+          .collection('orders')
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+        if (docs.length > 0) {
+          return docs.map(({ _id, ...rest }) => rest as Order);
+        }
+      }
+    } catch {
+      // Fall through to serverStore
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getServerStore } = require('./serverStore');
+      const store = getServerStore();
+      if (store.orders && store.orders.length > 0) {
+        return store.orders;
+      }
+    } catch {
+      // Fall through to mockDb
+    }
+  }
   return initMockDb().orders;
 }
 
 export async function saveOrder(order: Order): Promise<Order> {
+  if (typeof window === 'undefined') {
+    let mongoSaved = false;
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        await conn.db.collection('orders').updateOne(
+          { $or: [{ id: order.id }, { invoiceNumber: order.invoiceNumber }] },
+          { $set: order },
+          { upsert: true }
+        );
+        mongoSaved = true;
+      }
+    } catch {
+      // Continue to local sync
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { saveServerOrder } = require('./serverStore');
+      saveServerOrder(order);
+    } catch {
+      // Fall through
+    }
+
+    if (mongoSaved) {
+      return order;
+    }
+  }
+
   const mock = initMockDb();
-  mock.orders.unshift(order);
+  const existingIdx = mock.orders.findIndex(
+    (o) => o.id === order.id || o.invoiceNumber === order.invoiceNumber
+  );
+  if (existingIdx !== -1) {
+    mock.orders[existingIdx] = {
+      ...mock.orders[existingIdx],
+      ...order,
+      updatedAt: new Date().toISOString(),
+    };
+  } else {
+    mock.orders.unshift(order);
+  }
 
   // If new sale, deduct stock from store
   order.items.forEach((item) => {
@@ -548,12 +623,72 @@ export async function deleteProduct(id: string): Promise<boolean> {
 // Waybills, Warranties, Expenses, API Config
 // ---------------------------------------------------------------------------
 export async function getWaybills(): Promise<TransExpressWaybill[]> {
+  if (typeof window === 'undefined') {
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        const docs = await conn.db
+          .collection('waybills')
+          .find({})
+          .sort({ bookingDate: -1 })
+          .toArray();
+        if (docs.length > 0) {
+          return docs.map(({ _id, ...rest }) => rest as TransExpressWaybill);
+        }
+      }
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getServerStore } = require('./serverStore');
+      const store = getServerStore();
+      if (store.waybills && store.waybills.length > 0) {
+        return store.waybills;
+      }
+    } catch {
+      // Fall through
+    }
+  }
   return initMockDb().waybills;
 }
 
 export async function saveWaybill(waybill: TransExpressWaybill): Promise<TransExpressWaybill> {
+  if (typeof window === 'undefined') {
+    let mongoSaved = false;
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        await conn.db.collection('waybills').updateOne(
+          { $or: [{ id: waybill.id }, { trackingNumber: waybill.trackingNumber }] },
+          { $set: waybill },
+          { upsert: true }
+        );
+        mongoSaved = true;
+      }
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { saveServerWaybill } = require('./serverStore');
+      saveServerWaybill(waybill);
+    } catch {
+      // Fall through
+    }
+
+    if (mongoSaved) {
+      return waybill;
+    }
+  }
+
   const mock = initMockDb();
-  mock.waybills.unshift(waybill);
+  const existingIdx = mock.waybills.findIndex(
+    (w: TransExpressWaybill) => w.id === waybill.id || w.trackingNumber === waybill.trackingNumber
+  );
+  if (existingIdx !== -1) {
+    mock.waybills[existingIdx] = { ...mock.waybills[existingIdx], ...waybill };
+  } else {
+    mock.waybills.unshift(waybill);
+  }
   persistMockDb();
   return waybill;
 }
@@ -702,10 +837,64 @@ export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
 // Incoming Webhook Events & Transaction Audit Log
 // ---------------------------------------------------------------------------
 export async function getWebhookEvents(): Promise<WebhookEvent[]> {
+  if (typeof window === 'undefined') {
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        const docs = await conn.db
+          .collection('webhook_events')
+          .find({})
+          .sort({ receivedAt: -1 })
+          .limit(100)
+          .toArray();
+        if (docs.length > 0) {
+          return docs.map(({ _id, ...rest }) => rest as WebhookEvent);
+        }
+      }
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getServerStore } = require('./serverStore');
+      const store = getServerStore();
+      if (store.webhookEvents && store.webhookEvents.length > 0) {
+        return store.webhookEvents;
+      }
+    } catch {
+      // Fall through
+    }
+  }
   return initMockDb().webhookEvents;
 }
 
 export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEvent> {
+  if (typeof window === 'undefined') {
+    let mongoSaved = false;
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        await conn.db.collection('webhook_events').updateOne(
+          { id: event.id },
+          { $set: event },
+          { upsert: true }
+        );
+        mongoSaved = true;
+      }
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { saveServerWebhookEvent } = require('./serverStore');
+      saveServerWebhookEvent(event);
+    } catch {
+      // Fall through
+    }
+
+    if (mongoSaved) {
+      return event;
+    }
+  }
+
   const mock = initMockDb();
   const existingIdx = mock.webhookEvents.findIndex((e) => e.id === event.id);
   if (existingIdx !== -1) {
@@ -722,10 +911,25 @@ export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEven
 }
 
 export async function clearWebhookEvents(): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    try {
+      const conn = await getServerMongoConn();
+      if (conn) {
+        await conn.db.collection('webhook_events').deleteMany({});
+      }
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { clearServerWebhookEvents } = require('./serverStore');
+      clearServerWebhookEvents();
+    } catch {
+      // Fall through
+    }
+  }
+
   const mock = initMockDb();
   mock.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
   persistMockDb();
   return true;
 }
-
-export default clientPromise;

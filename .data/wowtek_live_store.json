@@ -1,0 +1,573 @@
+{
+  "orders": [
+    {
+      "id": "ord-wc-92104-4739",
+      "invoiceNumber": "WT-WC-92104",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Ruwan Dissanayake",
+      "customerPhone": "+94 77 555 9812",
+      "deliveryAddress": "No 25 Lake Drive",
+      "city": "Colombo 07",
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "barcode": "4797218218845",
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "quantity": 2,
+          "unitPrice": 22800,
+          "costPrice": 16416
+        },
+        {
+          "sku": "WT-MOUSE-MX3S",
+          "barcode": "4794547530084",
+          "name": "Logitech MX Master 3S Wireless Mouse",
+          "quantity": 1,
+          "unitPrice": 28900,
+          "costPrice": 20808
+        }
+      ],
+      "grossTotal": 74500,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 53640,
+      "netProfit": 20860,
+      "status": "Processing",
+      "createdAt": "2026-10-07T08:06:04.737Z",
+      "updatedAt": "2026-10-07T08:06:07.374Z",
+      "waybillGenerated": true,
+      "waybillNumber": "TE-1026",
+      "smsConfirmationSent": false,
+      "notes": "Live WooCommerce Order #92104. Event: order.created. Signature received (test-sig-len...) - processed in lenient mode so order is never dropped. "
+    },
+    {
+      "id": "ord-wc-88721-6345",
+      "invoiceNumber": "WT-WC-88721",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Chathura Bandara",
+      "customerPhone": "0773401122",
+      "deliveryAddress": "No. 204 Colombo Road",
+      "city": "Gampaha",
+      "items": [
+        {
+          "sku": "WT-ANKER-737",
+          "barcode": "4797581623125",
+          "name": "Anker 737 Power Bank (PowerCore 24K)",
+          "quantity": 1,
+          "unitPrice": 34900,
+          "costPrice": 25128
+        },
+        {
+          "sku": "WT-MOUSE-MX3S",
+          "barcode": "4798573147155",
+          "name": "Logitech MX Master 3S Wireless Mouse",
+          "quantity": 1,
+          "unitPrice": 24000,
+          "costPrice": 17280
+        }
+      ],
+      "grossTotal": 58900,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 42408,
+      "netProfit": 16492,
+      "status": "Processing",
+      "createdAt": "2026-10-07T07:46:16.344Z",
+      "updatedAt": "2026-10-07T07:46:16.824Z",
+      "waybillGenerated": true,
+      "waybillNumber": "TE-2479",
+      "smsConfirmationSent": false,
+      "notes": "Live WooCommerce Order #88721. Event: order.created. Signature received (gW0AxxVyqktq...) - processed in lenient mode so order is never dropped. Please deliver between 9 AM - 5 PM"
+    },
+    {
+      "id": "ord-wc-10088-1466",
+      "invoiceNumber": "WT-WC-10088",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Sanduni Jayawardena",
+      "customerPhone": "0714567890",
+      "deliveryAddress": "No 45 Havelock Road",
+      "city": "Colombo",
+      "items": [
+        {
+          "sku": "WT-MOUSE-MX3S",
+          "barcode": "4798332365253",
+          "name": "Logitech MX Master 3S",
+          "quantity": 1,
+          "unitPrice": 32500,
+          "costPrice": 23400
+        }
+      ],
+      "grossTotal": 32500,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 23400,
+      "netProfit": 9100,
+      "status": "Processing",
+      "createdAt": "2026-10-07T07:43:01.465Z",
+      "updatedAt": "2026-10-07T07:43:02.499Z",
+      "waybillGenerated": true,
+      "waybillNumber": "TE-1360",
+      "smsConfirmationSent": false,
+      "notes": "Live WooCommerce Order #10088. Event: order.created. Signature received (Z8lz24Ad60CY...) - processed in lenient mode so order is never dropped. "
+    },
+    {
+      "id": "ord-wc-9942-2388",
+      "invoiceNumber": "WT-WC-9942",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Duminda Ranasinghe",
+      "customerPhone": "+94 77 982 3456",
+      "deliveryAddress": "No. 88 Temple Road",
+      "city": "Kandy",
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "barcode": "4796938138588",
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "quantity": 2,
+          "unitPrice": 22800,
+          "costPrice": 16416
+        }
+      ],
+      "grossTotal": 45600,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 32832,
+      "netProfit": 12768,
+      "status": "Processing",
+      "createdAt": "2026-10-07T07:42:52.386Z",
+      "updatedAt": "2026-10-07T07:42:53.059Z",
+      "waybillGenerated": true,
+      "waybillNumber": "TE-2858",
+      "smsConfirmationSent": false,
+      "notes": "Live WooCommerce Order #9942. Event: order.created. No signature header present (Lenient test mode accepted - order processed). Please call before delivery"
+    },
+    {
+      "id": "ord-wc-12345-0500",
+      "invoiceNumber": "WT-WC-12345",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Kamal Perera",
+      "customerPhone": "0771234567",
+      "deliveryAddress": "No 12 Galle Rd",
+      "city": "Colombo",
+      "items": [
+        {
+          "sku": "WT-MOUSE",
+          "barcode": "4792333426694",
+          "name": "Test Mouse",
+          "quantity": 1,
+          "unitPrice": 15000,
+          "costPrice": 10800
+        }
+      ],
+      "grossTotal": 15000,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 10800,
+      "netProfit": 4200,
+      "status": "Processing",
+      "createdAt": "2026-10-07T07:34:50.498Z",
+      "updatedAt": "2026-10-07T07:34:50.498Z",
+      "waybillGenerated": true,
+      "notes": "Live WooCommerce Order #12345. Event: order.created. Signature mismatch (lenient mode active - order processed without dropping). ",
+      "waybillNumber": "TE-3345",
+      "smsConfirmationSent": false
+    }
+  ],
+  "waybills": [
+    {
+      "id": "wb-4739",
+      "orderId": "ord-wc-92104-4739",
+      "trackingNumber": "TE-1026",
+      "recipientName": "Ruwan Dissanayake",
+      "recipientPhone": "+94 77 555 9812",
+      "destination": "No 25 Lake Drive, Colombo 07",
+      "district": "Colombo",
+      "codAmount": 74500,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "07/10/2026 08:06 AM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #92104. Cash on Delivery (COD)",
+      "labelPrinted": false
+    },
+    {
+      "id": "wb-6345",
+      "orderId": "ord-wc-88721-6345",
+      "trackingNumber": "TE-2479",
+      "recipientName": "Chathura Bandara",
+      "recipientPhone": "0773401122",
+      "destination": "No. 204 Colombo Road, Gampaha",
+      "district": "Gampaha",
+      "codAmount": 58900,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "07/10/2026 07:46 AM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #88721. Cash on Delivery (COD)",
+      "labelPrinted": false
+    },
+    {
+      "id": "wb-1466",
+      "orderId": "ord-wc-10088-1466",
+      "trackingNumber": "TE-1360",
+      "recipientName": "Sanduni Jayawardena",
+      "recipientPhone": "0714567890",
+      "destination": "No 45 Havelock Road, Colombo",
+      "district": "Colombo",
+      "codAmount": 32500,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "07/10/2026 07:43 AM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #10088. Cash on Delivery (COD)",
+      "labelPrinted": false
+    },
+    {
+      "id": "wb-2388",
+      "orderId": "ord-wc-9942-2388",
+      "trackingNumber": "TE-2858",
+      "recipientName": "Duminda Ranasinghe",
+      "recipientPhone": "+94 77 982 3456",
+      "destination": "No. 88 Temple Road, Kandy",
+      "district": "Kandy",
+      "codAmount": 45600,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "07/10/2026 07:42 AM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #9942. Cash on Delivery (COD)",
+      "labelPrinted": false
+    },
+    {
+      "id": "wb-0500",
+      "orderId": "ord-wc-12345-0500",
+      "trackingNumber": "TE-3345",
+      "recipientName": "Kamal Perera",
+      "recipientPhone": "0771234567",
+      "destination": "No 12 Galle Rd, Colombo",
+      "district": "Colombo",
+      "codAmount": 15000,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "07/10/2026 07:34 AM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #12345. Cash on Delivery (COD)",
+      "labelPrinted": false
+    }
+  ],
+  "webhookEvents": [
+    {
+      "id": "evt-1791360367375-914",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-92104-4739",
+      "invoiceNumber": "WT-WC-92104",
+      "customerName": "Ruwan Dissanayake",
+      "customerPhone": "+94 77 555 9812",
+      "amount": 74500,
+      "status": "success",
+      "waybillId": "wb-4739",
+      "waybillNumber": "TE-1026",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791360367372",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 92104,
+        "status": "processing",
+        "total": "74500.00",
+        "currency": "LKR",
+        "payment_method": "cod",
+        "payment_method_title": "Cash on Delivery (COD)",
+        "billing": {
+          "first_name": "Ruwan",
+          "last_name": "Dissanayake",
+          "phone": "+94 77 555 9812",
+          "address_1": "No 25 Lake Drive",
+          "city": "Colombo 07"
+        },
+        "shipping": {
+          "first_name": "Ruwan",
+          "last_name": "Dissanayake",
+          "phone": "+94 77 555 9812",
+          "address_1": "No 25 Lake Drive",
+          "city": "Colombo 07"
+        },
+        "line_items": [
+          {
+            "id": 811,
+            "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+            "product_id": 104,
+            "sku": "WT-SSD-1TB-NVME",
+            "quantity": 2,
+            "price": "22800.00",
+            "total": "45600.00"
+          },
+          {
+            "id": 812,
+            "name": "Logitech MX Master 3S Wireless Mouse",
+            "product_id": 102,
+            "sku": "WT-MOUSE-MX3S",
+            "quantity": 1,
+            "price": "28900.00",
+            "total": "28900.00"
+          }
+        ]
+      },
+      "receivedAt": "2026-10-07T08:06:04.737Z"
+    },
+    {
+      "id": "evt-1791359176824-381",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-88721-6345",
+      "invoiceNumber": "WT-WC-88721",
+      "customerName": "Chathura Bandara",
+      "customerPhone": "0773401122",
+      "amount": 58900,
+      "status": "success",
+      "waybillId": "wb-6345",
+      "waybillNumber": "TE-2479",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791359176823",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 88721,
+        "status": "processing",
+        "currency": "LKR",
+        "total": "58900.00",
+        "payment_method": "cod",
+        "payment_method_title": "Cash on Delivery (COD)",
+        "billing": {
+          "first_name": "Chathura",
+          "last_name": "Bandara",
+          "phone": "0773401122",
+          "email": "chathura.b@gmail.com",
+          "address_1": "No. 204 Colombo Road",
+          "city": "Gampaha",
+          "country": "LK"
+        },
+        "shipping": {
+          "first_name": "Chathura",
+          "last_name": "Bandara",
+          "phone": "0773401122",
+          "address_1": "No. 204 Colombo Road",
+          "city": "Gampaha",
+          "country": "LK"
+        },
+        "line_items": [
+          {
+            "id": 501,
+            "name": "Anker 737 Power Bank (PowerCore 24K)",
+            "product_id": 205,
+            "quantity": 1,
+            "price": "34900.00",
+            "total": "34900.00",
+            "sku": "WT-ANKER-737"
+          },
+          {
+            "id": 502,
+            "name": "Logitech MX Master 3S Wireless Mouse",
+            "product_id": 102,
+            "quantity": 1,
+            "price": "24000.00",
+            "total": "24000.00",
+            "sku": "WT-MOUSE-MX3S"
+          }
+        ],
+        "customer_note": "Please deliver between 9 AM - 5 PM"
+      },
+      "receivedAt": "2026-10-07T07:46:16.344Z"
+    },
+    {
+      "id": "evt-ping-1791359167457",
+      "source": "woocommerce",
+      "event": "webhook.ping",
+      "status": "success",
+      "rawPayload": {
+        "webhook_id": 99201
+      },
+      "receivedAt": "2026-10-07T07:46:07.456Z"
+    },
+    {
+      "id": "evt-1791358982499-664",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-10088-1466",
+      "invoiceNumber": "WT-WC-10088",
+      "customerName": "Sanduni Jayawardena",
+      "customerPhone": "0714567890",
+      "amount": 32500,
+      "status": "success",
+      "waybillId": "wb-1466",
+      "waybillNumber": "TE-1360",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791358982498",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 10088,
+        "status": "processing",
+        "total": "32500.00",
+        "billing": {
+          "first_name": "Sanduni",
+          "last_name": "Jayawardena",
+          "phone": "0714567890",
+          "address_1": "No 45 Havelock Road",
+          "city": "Colombo"
+        },
+        "line_items": [
+          {
+            "id": 10,
+            "name": "Logitech MX Master 3S",
+            "sku": "WT-MOUSE-MX3S",
+            "quantity": 1,
+            "price": "32500"
+          }
+        ]
+      },
+      "receivedAt": "2026-10-07T07:43:01.465Z"
+    },
+    {
+      "id": "evt-1791358973059-234",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-9942-2388",
+      "invoiceNumber": "WT-WC-9942",
+      "customerName": "Duminda Ranasinghe",
+      "customerPhone": "+94 77 982 3456",
+      "amount": 45600,
+      "status": "success",
+      "waybillId": "wb-2388",
+      "waybillNumber": "TE-2858",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791358973057",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 9942,
+        "status": "processing",
+        "currency": "LKR",
+        "total": "45600.00",
+        "payment_method": "cod",
+        "payment_method_title": "Cash on Delivery (COD)",
+        "billing": {
+          "first_name": "Duminda",
+          "last_name": "Ranasinghe",
+          "phone": "+94 77 982 3456",
+          "email": "duminda.r@gmail.com",
+          "address_1": "No. 88 Temple Road",
+          "city": "Kandy",
+          "country": "LK"
+        },
+        "shipping": {
+          "first_name": "Duminda",
+          "last_name": "Ranasinghe",
+          "phone": "+94 77 982 3456",
+          "address_1": "No. 88 Temple Road",
+          "city": "Kandy",
+          "country": "LK"
+        },
+        "line_items": [
+          {
+            "id": 31,
+            "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+            "product_id": 104,
+            "quantity": 2,
+            "price": "22800.00",
+            "total": "45600.00",
+            "sku": "WT-SSD-1TB-NVME"
+          }
+        ],
+        "customer_note": "Please call before delivery"
+      },
+      "receivedAt": "2026-10-07T07:42:52.386Z"
+    },
+    {
+      "id": "evt-1791358490891-413",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-12345-0500",
+      "invoiceNumber": "WT-WC-12345",
+      "customerName": "Kamal Perera",
+      "customerPhone": "0771234567",
+      "amount": 15000,
+      "status": "success",
+      "waybillId": "wb-0500",
+      "waybillNumber": "TE-3345",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791358490890",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 12345,
+        "status": "processing",
+        "total": "15000",
+        "billing": {
+          "first_name": "Kamal",
+          "last_name": "Perera",
+          "phone": "0771234567",
+          "address_1": "No 12 Galle Rd",
+          "city": "Colombo"
+        },
+        "line_items": [
+          {
+            "id": 1,
+            "name": "Test Mouse",
+            "sku": "WT-MOUSE",
+            "quantity": 1,
+            "price": "15000"
+          }
+        ]
+      },
+      "receivedAt": "2026-10-07T07:34:50.498Z"
+    },
+    {
+      "id": "evt-listener-active",
+      "source": "woocommerce",
+      "event": "system.listener_active",
+      "status": "success",
+      "rawPayload": {
+        "status": "active",
+        "message": "WooCommerce Webhook Listener Active. Ready for live order testing.",
+        "routes": {
+          "webhook": "/api/webhooks/woocommerce",
+          "sync": "/api/orders/sync"
+        },
+        "supportedStatuses": [
+          "processing",
+          "pending",
+          "completed",
+          "on-hold"
+        ],
+        "autoActions": [
+          "Trans Express Waybill Auto-generation",
+          "SMSlenz Customer Confirmation Dispatch",
+          "POS Invoicing & Stock Sync"
+        ]
+      },
+      "receivedAt": "2026-10-06T09:00:00.000Z"
+    }
+  ],
+  "lastUpdated": "2026-10-07T08:06:07.376Z"
+}

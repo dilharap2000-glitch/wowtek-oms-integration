@@ -21,6 +21,7 @@ import {
   X,
   Play,
   Zap,
+  Key,
 } from 'lucide-react';
 import { WebhookEvent } from '@/types';
 
@@ -50,6 +51,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [isSimulating, setIsSimulating] = useState(false);
   const [filterSource, setFilterSource] = useState<string>('all');
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [copiedSecret, setCopiedSecret] = useState(false);
 
   const handleCopyPayload = (payload: any) => {
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
@@ -62,6 +64,12 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     navigator.clipboard.writeText(url);
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
+  };
+
+  const handleCopySecret = () => {
+    navigator.clipboard.writeText('WOWTEK-WC-Webhook-2026-9X7Kl42');
+    setCopiedSecret(true);
+    setTimeout(() => setCopiedSecret(false), 2000);
   };
 
   const handleRunTestOrder = async () => {
@@ -110,6 +118,16 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           >
             {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
             <span>{copiedUrl ? 'Copied URL!' : '/api/webhooks/woocommerce'}</span>
+          </button>
+
+          {/* Copy Secret Key button */}
+          <button
+            onClick={handleCopySecret}
+            className="px-2.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-xs font-mono text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5"
+            title="Secret: WOWTEK-WC-Webhook-2026-9X7Kl42"
+          >
+            {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Key className="w-3.5 h-3.5 text-amber-400" />}
+            <span>{copiedSecret ? 'Secret Copied!' : 'Secret: WOWTEK-WC-...'}</span>
           </button>
 
           {/* Simulate Live Order */}

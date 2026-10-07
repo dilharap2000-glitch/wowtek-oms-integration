@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
 
           const grossTotal = parseFloat(wcOrder.total) || items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
           const costOfGoods = items.reduce((s, i) => s + i.costPrice * i.quantity, 0);
-          const trackingNumber = `TX-CMB-${Math.floor(10000 + Math.random() * 90000)}`;
+          const trackingNumber = `TE-${Math.floor(1000 + Math.random() * 9000)}`;
 
           const newOrder: Order = {
             id: `ord-wc-${wcOrder.id}-${Date.now().toString().slice(-4)}`,
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
 
           await saveOrder(newOrder);
 
-          // Trans Express Waybill
+          // Trans Express Waybill with TE-XXXX code
           const waybill: TransExpressWaybill = {
             id: `wb-${Date.now().toString().slice(-4)}`,
             orderId: newOrder.id,

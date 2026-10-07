@@ -12,6 +12,7 @@ const nextConfig = {
         child_process: false,
         dns: false,
         timers: false,
+        'timers/promises': false,
         crypto: false,
         os: false,
         path: false,
@@ -19,6 +20,13 @@ const nextConfig = {
         http: false,
         https: false,
         zlib: false,
+        mongodb: false,
+        kerberos: false,
+        '@mongodb-js/zstd': false,
+        snappy: false,
+        'gcp-metadata': false,
+        '@aws-sdk/credential-providers': false,
+        'socks': false,
       };
     }
     return config;

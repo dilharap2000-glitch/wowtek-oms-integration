@@ -82,14 +82,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     : 'bg-amber-950 text-amber-300 border border-amber-800'
                 }`}
               >
-                {dbStatus.status === 'connected' ? 'Atlas Connected' : 'Mock DB Fallback (Safe Active)'}
+                {dbStatus.status === 'connected'
+                  ? 'MongoDB Atlas Connected (Live)'
+                  : 'Mock DB Fallback (Offline)'}
               </span>
               <span className="text-xs text-neutral-400 font-mono">
                 {dbStatus.latencyMs}ms latency
               </span>
             </div>
             <p className="text-xs text-neutral-400 mt-0.5">
-              MongoDB Atlas 30s timeout protection active. Zero crash fallback across Vercel & local environments.
+              {dbStatus.status === 'connected'
+                ? 'MongoDB Atlas live connection established with connection pooling. Real orders and webhooks persisted directly.'
+                : 'Offline resilient fallback active. Real WooCommerce orders prioritized.'}
             </p>
           </div>
         </div>
