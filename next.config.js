@@ -6,14 +6,14 @@ const nextConfig = {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
+        fs: false,
         net: false,
         tls: false,
-        fs: false,
-        child_process: false,
-        dns: false,
-        timers: false,
-        'timers/promises': false,
         crypto: false,
+        "timers/promises": false,
+        timers: false,
+        dns: false,
+        child_process: false,
         os: false,
         path: false,
         stream: false,
@@ -26,7 +26,7 @@ const nextConfig = {
         snappy: false,
         'gcp-metadata': false,
         '@aws-sdk/credential-providers': false,
-        'socks': false,
+        socks: false,
       };
     }
     return config;
@@ -39,4 +39,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

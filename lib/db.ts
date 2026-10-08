@@ -1,16 +1,3 @@
-import type { MongoClient, Db } from 'mongodb';
-
-async function getServerMongoConn(): Promise<{ client: MongoClient; db: Db } | null> {
-  if (typeof window !== 'undefined') return null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const req = eval('require');
-    const { connectToMongoDB } = req('./mongodb');
-    return await connectToMongoDB();
-  } catch {
-    return null;
-  }
-}
 import {
   Order,
   Product,
@@ -25,10 +12,6 @@ import {
   SupplierRmaClaim,
   WebhookEvent,
 } from '@/types';
-
-// Environment variables
-const MONGODB_URI = process.env.MONGODB_URI || '';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'wowtek_pro';
 
 // ---------------------------------------------------------------------------
 // Default Configurations for Dynamic Platform & Payment Gateway Fees
@@ -53,11 +36,11 @@ export const DEFAULT_SUPPLIERS: Supplier[] = [
     id: 'sup-001',
     name: 'Chama Computers (Pvt) Ltd',
     contactPerson: 'Nuwan Jayasinghe',
-    phone: '+94 11 258 4400',
+    phone: '+94 11 258 7744',
     email: 'warranty@chamacomputers.lk',
-    address: '142 Galle Road, Bambalapitiya, Colombo 04',
-    categories: 'Kingston, ASUS, Storage & SSDs, Motherboards',
-    paymentTerms: 'Net 30 Days',
+    address: 'No 112 Unity Plaza, Galle Road, Colombo 04',
+    categories: 'Kingston, ASUS, Corsair, RAM, SSDs, Motherboards',
+    paymentTerms: 'Credit 30 Days',
     notes: 'Authorized Kingston & ASUS distributor. 7-day turnaround for RMA replacements.',
     active: true,
     createdAt: '2026-01-15T08:00:00Z',
@@ -156,7 +139,6 @@ export const DEFAULT_RMA_CLAIMS: SupplierRmaClaim[] = [
   },
 ];
 
-// Clean Production State - Zero Mock Data
 const INITIAL_PRODUCTS: Product[] = [];
 const INITIAL_ORDERS: Order[] = [];
 const INITIAL_WAYBILLS: TransExpressWaybill[] = [];
@@ -209,10 +191,7 @@ export const DEFAULT_WEBHOOK_EVENTS: WebhookEvent[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Cross-Environment Persistent State (Browser LocalStorage + Global Singleton)
-// ---------------------------------------------------------------------------
-interface MockDatabaseStore {
+interface MockDatabaseState {
   orders: Order[];
   products: Product[];
   waybills: TransExpressWaybill[];
@@ -226,37 +205,35 @@ interface MockDatabaseStore {
   webhookEvents: WebhookEvent[];
 }
 
-const STORAGE_KEY = 'wowtek_pro_prod_v1';
+const STORAGE_KEY = 'wowtek_pos_v2_store';
 
-function initMockDb(): MockDatabaseStore {
+export function initMockDb(): MockDatabaseState {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          orders: Array.isArray(parsed.orders) ? parsed.orders : INITIAL_ORDERS,
+          products: Array.isArray(parsed.products) ? parsed.products : INITIAL_PRODUCTS,
+          waybills: Array.isArray(parsed.waybills) ? parsed.waybills : INITIAL_WAYBILLS,
+          warranties: Array.isArray(parsed.warranties) ? parsed.warranties : INITIAL_WARRANTIES,
+          expenses: Array.isArray(parsed.expenses) ? parsed.expenses : INITIAL_EXPENSES,
+          apiConfig: parsed.apiConfig ? { ...INITIAL_API_CONFIG, ...parsed.apiConfig } : { ...INITIAL_API_CONFIG },
+          platforms: Array.isArray(parsed.platforms) ? parsed.platforms : [...DEFAULT_PLATFORMS],
+          gateways: Array.isArray(parsed.gateways) ? parsed.gateways : [...DEFAULT_GATEWAYS],
+          suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [...DEFAULT_SUPPLIERS],
+          rmaClaims: Array.isArray(parsed.rmaClaims) ? parsed.rmaClaims : [...DEFAULT_RMA_CLAIMS],
+          webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [...DEFAULT_WEBHOOK_EVENTS],
+        };
+      }
+    } catch {
+      // Ignore parse error
+    }
+  }
+
   const g = globalThis as any;
   if (!g._wowtekMockDb) {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        // Clear any previous mock test data versions from localStorage
-        window.localStorage.removeItem('wowtek_pro_db_v1');
-        window.localStorage.removeItem('wowtek_pro_db_v2');
-
-        const stored = window.localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (!parsed.suppliers || parsed.suppliers.length === 0) {
-            parsed.suppliers = [...DEFAULT_SUPPLIERS];
-          }
-          if (!parsed.rmaClaims) {
-            parsed.rmaClaims = [...DEFAULT_RMA_CLAIMS];
-          }
-          if (!parsed.webhookEvents || parsed.webhookEvents.length === 0) {
-            parsed.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
-          }
-          g._wowtekMockDb = parsed;
-          return g._wowtekMockDb;
-        }
-      } catch {
-        // Fallback to clean empty arrays
-      }
-    }
-
     g._wowtekMockDb = {
       orders: [],
       products: [],
@@ -285,95 +262,22 @@ function persistMockDb() {
 }
 
 // ---------------------------------------------------------------------------
-// Native MongoClient Singleton with Connection Pooling (Server-Side)
+// Client Database Health Check (Fetches from server-only /api/health/database)
 // ---------------------------------------------------------------------------
-export async function getDatabase(): Promise<{
-  db: Db | null;
-  client: MongoClient | null;
-  isFallback: boolean;
-  message: string;
-}> {
-  if (typeof window !== 'undefined') {
-    return {
-      db: null,
-      client: null,
-      isFallback: true,
-      message: 'Browser environment operating in resilient client-side mode.',
-    };
-  }
-
-  try {
-    const conn = await getServerMongoConn();
-    if (conn) {
-      return {
-        db: conn.db,
-        client: conn.client,
-        isFallback: false,
-        message: `MongoDB Atlas Connected (Live): ${conn.db.databaseName}`,
-      };
-    }
-    return {
-      db: null,
-      client: null,
-      isFallback: true,
-      message: 'MONGODB_URI not configured. Operating in safe fallback mode.',
-    };
-  } catch (err: any) {
-    return {
-      db: null,
-      client: null,
-      isFallback: true,
-      message: `MongoDB connection unavailable: ${err?.message || 'Error'}. Operating in safe fallback mode.`,
-    };
-  }
-}
-
 export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
   const startTime = Date.now();
-  const mockDb = initMockDb();
-
-  try {
-    const conn = await getServerMongoConn();
-    if (conn) {
-      const [
-        ordersCount,
-        productsCount,
-        waybillsCount,
-        warrantiesCount,
-        expensesCount,
-        suppliersCount,
-        rmaCount,
-      ] = await Promise.all([
-        conn.db.collection('orders').countDocuments().catch(() => mockDb.orders.length),
-        conn.db.collection('products').countDocuments().catch(() => mockDb.products.length),
-        conn.db.collection('waybills').countDocuments().catch(() => mockDb.waybills.length),
-        conn.db.collection('warranties').countDocuments().catch(() => mockDb.warranties.length),
-        conn.db.collection('expenses').countDocuments().catch(() => mockDb.expenses.length),
-        conn.db.collection('suppliers').countDocuments().catch(() => mockDb.suppliers?.length || 0),
-        conn.db.collection('rma_claims').countDocuments().catch(() => mockDb.rmaClaims?.length || 0),
-      ]);
-
-      return {
-        status: 'connected',
-        latencyMs: Math.max(1, Date.now() - startTime),
-        database: 'MongoDB Atlas Connected (Live)',
-        message: `Connected to MongoDB Atlas: ${conn.db.databaseName} (Live)`,
-        timestamp: new Date().toISOString(),
-        recordCounts: {
-          orders: ordersCount,
-          products: productsCount,
-          waybills: waybillsCount,
-          warranties: warrantiesCount,
-          expenses: expensesCount,
-          suppliers: suppliersCount,
-          rmaClaims: rmaCount,
-        },
-      };
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/health/database', { cache: 'no-store' });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fall through to offline fallback
     }
-  } catch {
-    // Only falls back if explicitly offline or connection failed
   }
 
+  const mockDb = initMockDb();
   return {
     status: 'fallback',
     latencyMs: Math.max(1, Date.now() - startTime),
@@ -421,23 +325,17 @@ export async function savePaymentGateways(gateways: PaymentGatewayConfig[]): Pro
 // Order & POS Invoicing CRUD with Returns & Stock Restoration
 // ---------------------------------------------------------------------------
 export async function getOrders(): Promise<Order[]> {
-  if (typeof window === 'undefined') {
+  if (typeof window !== 'undefined') {
     try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        const docs = await conn.db
-          .collection('orders')
-          .find({})
-          .sort({ createdAt: -1 })
-          .toArray();
-        if (docs.length > 0) {
-          return docs.map(({ _id, ...rest }) => rest as Order);
+      const res = await fetch('/api/sync/live', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.orders) && data.orders.length > 0) {
+          return data.orders;
         }
       }
-    } catch {
-      // Fall through to serverStore
-    }
-
+    } catch {}
+  } else {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getServerStore } = require('./serverStore');
@@ -445,41 +343,26 @@ export async function getOrders(): Promise<Order[]> {
       if (store.orders && store.orders.length > 0) {
         return store.orders;
       }
-    } catch {
-      // Fall through to mockDb
-    }
+    } catch {}
   }
   return initMockDb().orders;
 }
 
 export async function saveOrder(order: Order): Promise<Order> {
-  if (typeof window === 'undefined') {
-    let mongoSaved = false;
+  if (typeof window !== 'undefined') {
     try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        await conn.db.collection('orders').updateOne(
-          { $or: [{ id: order.id }, { invoiceNumber: order.invoiceNumber }] },
-          { $set: order },
-          { upsert: true }
-        );
-        mongoSaved = true;
-      }
-    } catch {
-      // Continue to local sync
-    }
-
+      fetch('/api/sync/live', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sync_client_order', order }),
+      }).catch(() => {});
+    } catch {}
+  } else {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { saveServerOrder } = require('./serverStore');
       saveServerOrder(order);
-    } catch {
-      // Fall through
-    }
-
-    if (mongoSaved) {
-      return order;
-    }
+    } catch {}
   }
 
   const mock = initMockDb();
@@ -496,7 +379,7 @@ export async function saveOrder(order: Order): Promise<Order> {
     mock.orders.unshift(order);
   }
 
-  // If new sale, deduct stock from store
+  // Deduct stock from store
   order.items.forEach((item) => {
     const prod = mock.products.find((p) => p.sku === item.sku);
     if (prod) {
@@ -533,37 +416,28 @@ export async function deleteOrder(id: string): Promise<boolean> {
   return mock.orders.length < initialLength;
 }
 
-/**
- * Returns & Stock Restoration:
- * Marks an invoice or specific items as "Returned".
- * Automatically increments / restores the product stock in the database.
- */
 export async function processOrderReturn(
   orderId: string,
-  returnedSkus?: string[],
-  reason?: string
-): Promise<{ success: boolean; order: Order | null; restoredItems: Array<{ sku: string; qty: number }> }> {
+  returnedSkus: string[],
+  reason: string
+): Promise<{ success: boolean; order?: Order; restoredItems: string[] }> {
   const mock = initMockDb();
   const order = mock.orders.find((o) => o.id === orderId);
-  if (!order) {
-    return { success: false, order: null, restoredItems: [] };
-  }
+  if (!order) return { success: false, restoredItems: [] };
 
-  const restoredItems: Array<{ sku: string; qty: number }> = [];
+  const restoredItems: string[] = [];
 
-  // Update item return flags and restore stock
-  order.items = order.items.map((item) => {
-    const shouldReturn = !returnedSkus || returnedSkus.includes(item.sku);
-    if (shouldReturn && !item.returned) {
-      // Find product and restore stock to store front
+  order.items.forEach((item) => {
+    if (returnedSkus.includes(item.sku) && !item.returned) {
+      item.returned = true;
+      item.returnedQty = item.quantity;
+      restoredItems.push(`${item.name} (${item.quantity} qty)`);
+
       const prod = mock.products.find((p) => p.sku === item.sku);
       if (prod) {
         prod.stockStore += item.quantity;
-        restoredItems.push({ sku: item.sku, qty: item.quantity });
       }
-      return { ...item, returned: true, returnedQty: item.quantity };
     }
-    return item;
   });
 
   const allItemsReturned = order.items.every((it) => it.returned);
@@ -572,7 +446,6 @@ export async function processOrderReturn(
   order.returnReason = reason || 'Customer requested return & refund';
   order.updatedAt = new Date().toISOString();
 
-  // If full return, net profit & gross total reversed
   if (allItemsReturned) {
     order.netProfit = 0;
   }
@@ -623,21 +496,17 @@ export async function deleteProduct(id: string): Promise<boolean> {
 // Waybills, Warranties, Expenses, API Config
 // ---------------------------------------------------------------------------
 export async function getWaybills(): Promise<TransExpressWaybill[]> {
-  if (typeof window === 'undefined') {
+  if (typeof window !== 'undefined') {
     try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        const docs = await conn.db
-          .collection('waybills')
-          .find({})
-          .sort({ bookingDate: -1 })
-          .toArray();
-        if (docs.length > 0) {
-          return docs.map(({ _id, ...rest }) => rest as TransExpressWaybill);
+      const res = await fetch('/api/sync/live', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.waybills) && data.waybills.length > 0) {
+          return data.waybills;
         }
       }
     } catch {}
-
+  } else {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getServerStore } = require('./serverStore');
@@ -645,39 +514,18 @@ export async function getWaybills(): Promise<TransExpressWaybill[]> {
       if (store.waybills && store.waybills.length > 0) {
         return store.waybills;
       }
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
   return initMockDb().waybills;
 }
 
 export async function saveWaybill(waybill: TransExpressWaybill): Promise<TransExpressWaybill> {
   if (typeof window === 'undefined') {
-    let mongoSaved = false;
-    try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        await conn.db.collection('waybills').updateOne(
-          { $or: [{ id: waybill.id }, { trackingNumber: waybill.trackingNumber }] },
-          { $set: waybill },
-          { upsert: true }
-        );
-        mongoSaved = true;
-      }
-    } catch {}
-
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { saveServerWaybill } = require('./serverStore');
       saveServerWaybill(waybill);
-    } catch {
-      // Fall through
-    }
-
-    if (mongoSaved) {
-      return waybill;
-    }
+    } catch {}
   }
 
   const mock = initMockDb();
@@ -693,10 +541,7 @@ export async function saveWaybill(waybill: TransExpressWaybill): Promise<TransEx
   return waybill;
 }
 
-export async function updateWaybill(
-  id: string,
-  updates: Partial<TransExpressWaybill>
-): Promise<TransExpressWaybill | null> {
+export async function updateWaybill(id: string, updates: Partial<TransExpressWaybill>): Promise<TransExpressWaybill | null> {
   const mock = initMockDb();
   const index = mock.waybills.findIndex((w: TransExpressWaybill) => w.id === id);
   if (index !== -1) {
@@ -718,12 +563,9 @@ export async function saveWarranty(warranty: WarrantyRecord): Promise<WarrantyRe
   return warranty;
 }
 
-export async function updateWarranty(
-  id: string,
-  updates: Partial<WarrantyRecord>
-): Promise<WarrantyRecord | null> {
+export async function updateWarranty(id: string, updates: Partial<WarrantyRecord>): Promise<WarrantyRecord | null> {
   const mock = initMockDb();
-  const index = mock.warranties.findIndex((w) => w.id === id);
+  const index = mock.warranties.findIndex((w: WarrantyRecord) => w.id === id);
   if (index !== -1) {
     mock.warranties[index] = { ...mock.warranties[index], ...updates };
     persistMockDb();
@@ -751,33 +593,25 @@ export async function saveApiConfig(config: ApiIntegrationConfig): Promise<ApiIn
   const mock = initMockDb();
   mock.apiConfig = { ...config };
   persistMockDb();
-  return mock.apiConfig;
+  return config;
 }
 
-// ---------------------------------------------------------------------------
-// Suppliers & Purchasing CRUD
-// ---------------------------------------------------------------------------
 export async function getSuppliers(): Promise<Supplier[]> {
   return initMockDb().suppliers;
 }
 
 export async function saveSupplier(supplier: Supplier): Promise<Supplier> {
   const mock = initMockDb();
-  const existingIdx = mock.suppliers.findIndex((s) => s.id === supplier.id);
-  if (existingIdx !== -1) {
-    mock.suppliers[existingIdx] = supplier;
-  } else {
-    mock.suppliers.unshift(supplier);
-  }
+  mock.suppliers.unshift(supplier);
   persistMockDb();
   return supplier;
 }
 
 export async function updateSupplier(id: string, updates: Partial<Supplier>): Promise<Supplier | null> {
   const mock = initMockDb();
-  const index = mock.suppliers.findIndex((s) => s.id === id);
+  const index = mock.suppliers.findIndex((s: Supplier) => s.id === id);
   if (index !== -1) {
-    mock.suppliers[index] = { ...mock.suppliers[index], ...updates, updatedAt: new Date().toISOString() };
+    mock.suppliers[index] = { ...mock.suppliers[index], ...updates };
     persistMockDb();
     return mock.suppliers[index];
   }
@@ -792,31 +626,20 @@ export async function deleteSupplier(id: string): Promise<boolean> {
   return mock.suppliers.length < initialLength;
 }
 
-// ---------------------------------------------------------------------------
-// Supplier Warranty Claims (RMA) CRUD
-// ---------------------------------------------------------------------------
 export async function getSupplierRmaClaims(): Promise<SupplierRmaClaim[]> {
   return initMockDb().rmaClaims;
 }
 
 export async function saveSupplierRmaClaim(claim: SupplierRmaClaim): Promise<SupplierRmaClaim> {
   const mock = initMockDb();
-  const existingIdx = mock.rmaClaims.findIndex((r) => r.id === claim.id);
-  if (existingIdx !== -1) {
-    mock.rmaClaims[existingIdx] = claim;
-  } else {
-    mock.rmaClaims.unshift(claim);
-  }
+  mock.rmaClaims.unshift(claim);
   persistMockDb();
   return claim;
 }
 
-export async function updateSupplierRmaClaim(
-  id: string,
-  updates: Partial<SupplierRmaClaim>
-): Promise<SupplierRmaClaim | null> {
+export async function updateSupplierRmaClaim(id: string, updates: Partial<SupplierRmaClaim>): Promise<SupplierRmaClaim | null> {
   const mock = initMockDb();
-  const index = mock.rmaClaims.findIndex((r) => r.id === id);
+  const index = mock.rmaClaims.findIndex((r: SupplierRmaClaim) => r.id === id);
   if (index !== -1) {
     mock.rmaClaims[index] = { ...mock.rmaClaims[index], ...updates, updatedAt: new Date().toISOString() };
     persistMockDb();
@@ -837,22 +660,17 @@ export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
 // Incoming Webhook Events & Transaction Audit Log
 // ---------------------------------------------------------------------------
 export async function getWebhookEvents(): Promise<WebhookEvent[]> {
-  if (typeof window === 'undefined') {
+  if (typeof window !== 'undefined') {
     try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        const docs = await conn.db
-          .collection('webhook_events')
-          .find({})
-          .sort({ receivedAt: -1 })
-          .limit(100)
-          .toArray();
-        if (docs.length > 0) {
-          return docs.map(({ _id, ...rest }) => rest as WebhookEvent);
+      const res = await fetch('/api/webhooks/events', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.events) && data.events.length > 0) {
+          return data.events;
         }
       }
     } catch {}
-
+  } else {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getServerStore } = require('./serverStore');
@@ -860,39 +678,18 @@ export async function getWebhookEvents(): Promise<WebhookEvent[]> {
       if (store.webhookEvents && store.webhookEvents.length > 0) {
         return store.webhookEvents;
       }
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
   return initMockDb().webhookEvents;
 }
 
 export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEvent> {
   if (typeof window === 'undefined') {
-    let mongoSaved = false;
-    try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        await conn.db.collection('webhook_events').updateOne(
-          { id: event.id },
-          { $set: event },
-          { upsert: true }
-        );
-        mongoSaved = true;
-      }
-    } catch {}
-
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { saveServerWebhookEvent } = require('./serverStore');
       saveServerWebhookEvent(event);
-    } catch {
-      // Fall through
-    }
-
-    if (mongoSaved) {
-      return event;
-    }
+    } catch {}
   }
 
   const mock = initMockDb();
@@ -901,7 +698,6 @@ export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEven
     mock.webhookEvents[existingIdx] = event;
   } else {
     mock.webhookEvents.unshift(event);
-    // Keep last 50 events in buffer
     if (mock.webhookEvents.length > 50) {
       mock.webhookEvents = mock.webhookEvents.slice(0, 50);
     }
@@ -911,21 +707,16 @@ export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEven
 }
 
 export async function clearWebhookEvents(): Promise<boolean> {
-  if (typeof window === 'undefined') {
+  if (typeof window !== 'undefined') {
     try {
-      const conn = await getServerMongoConn();
-      if (conn) {
-        await conn.db.collection('webhook_events').deleteMany({});
-      }
+      fetch('/api/webhooks/events', { method: 'DELETE' }).catch(() => {});
     } catch {}
-
+  } else {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { clearServerWebhookEvents } = require('./serverStore');
       clearServerWebhookEvents();
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
 
   const mock = initMockDb();
