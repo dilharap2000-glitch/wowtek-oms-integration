@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import {
   Truck,
@@ -11,6 +13,9 @@ import {
   MapPin,
   Phone,
   Barcode,
+  Package,
+  DollarSign,
+  Zap,
 } from 'lucide-react';
 import { TransExpressWaybill, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
@@ -42,6 +47,13 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
 
   const safeWaybills = waybills || [];
 
+  const queuedCount = safeWaybills.filter((w) => w?.status === 'Queued').length;
+  const inTransitCount = safeWaybills.filter(
+    (w) => w?.status === 'Manifested' || w?.status === 'Dispatched' || w?.status === 'Out for Delivery'
+  ).length;
+  const deliveredCount = safeWaybills.filter((w) => w?.status === 'Delivered').length;
+  const totalCodCollection = safeWaybills.reduce((sum, w) => sum + (Number(w?.codAmount) || 0), 0);
+
   const filteredWaybills = safeWaybills.filter((wb) => {
     if (!wb) return false;
     const matchesStatus = statusFilter === 'all' || wb.status === statusFilter;
@@ -65,15 +77,56 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Trans Express Logistics Queue</h2>
           <p className="text-xs text-neutral-400 mt-1">
-            Automated courier waybill generation, district routing, and cash-on-delivery (COD) dispatch tracking.
+            Automated courier waybill generation, Single Auto API uploads, district routing, and cash-on-delivery (COD) tracking.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-300 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>Trans Express API: Live Synced</span>
+          <div className="px-3 py-1.5 rounded-lg bg-neutral-900 border border-purple-500/30 text-xs text-neutral-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-mono text-[11px] text-purple-300">Single Auto API: Ready</span>
           </div>
+        </div>
+      </div>
+
+      {/* Real-time Logistics Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+          <div className="flex items-center justify-between text-neutral-400 text-xs">
+            <span>Total Waybills</span>
+            <Package className="w-4 h-4 text-purple-400" />
+          </div>
+          <div className="text-xl font-bold text-white font-mono">{safeWaybills.length}</div>
+          <div className="text-[10px] text-neutral-400">All registered courier parcels</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+          <div className="flex items-center justify-between text-amber-400 text-xs">
+            <span>Queued for Pickup</span>
+            <Clock className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-xl font-bold text-amber-300 font-mono">{queuedCount}</div>
+          <div className="text-[10px] text-neutral-400">Awaiting hub manifest / rider</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+          <div className="flex items-center justify-between text-blue-400 text-xs">
+            <span>In Transit</span>
+            <Truck className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="text-xl font-bold text-blue-300 font-mono">{inTransitCount}</div>
+          <div className="text-[10px] text-neutral-400">Linehaul or Out for Delivery</div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 space-y-1">
+          <div className="flex items-center justify-between text-emerald-400 text-xs">
+            <span>COD Collectible</span>
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-lg font-bold text-emerald-300 font-mono truncate">
+            Rs. {totalCodCollection.toLocaleString()}
+          </div>
+          <div className="text-[10px] text-neutral-400">Cash collection across riders</div>
         </div>
       </div>
 
@@ -139,7 +192,14 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                 (filteredWaybills || []).map((wb) => (
                   <tr key={wb.id} className="hover:bg-neutral-850/40 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</span>
+                        {wb.courierNotes?.includes('Trans Express Live Gateway Verified') && (
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-mono font-medium">
+                            API Verified
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] text-neutral-400 mt-0.5">{wb.bookingDate}</div>
                     </td>
 

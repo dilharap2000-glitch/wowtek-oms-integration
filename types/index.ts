@@ -61,6 +61,8 @@ export interface Order {
   updatedAt: string;
   waybillGenerated: boolean;
   waybillNumber?: string;
+  waybillId?: string;
+  transExpressTrackingNumber?: string;
   notes?: string;
   isPosSale?: boolean;
   returnedAt?: string;
