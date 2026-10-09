@@ -136,29 +136,35 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
     }
   };
 
+  // Safe array bindings
+  const safeSuppliers = suppliers || [];
+  const safeProducts = products || [];
+  const safeRmaClaims = rmaClaims || [];
+
   // Metrics
-  const totalSuppliers = suppliers.length;
-  const activeCreditSuppliers = suppliers.filter(
-    (s) => s.paymentTerms.toLowerCase().includes('net') || s.paymentTerms.toLowerCase().includes('credit')
+  const totalSuppliers = safeSuppliers.length;
+  const activeCreditSuppliers = safeSuppliers.filter(
+    (s) => (s?.paymentTerms || '').toLowerCase().includes('net') || (s?.paymentTerms || '').toLowerCase().includes('credit')
   ).length;
-  const totalLinkedProducts = products.filter(
-    (p) => suppliers.some((s) => s.name.toLowerCase() === p.supplier?.toLowerCase() || s.id === p.supplierId)
+  const totalLinkedProducts = safeProducts.filter(
+    (p) => safeSuppliers.some((s) => (s?.name || '').toLowerCase() === (p?.supplier || '').toLowerCase() || s?.id === p?.supplierId)
   ).length;
-  const activeRmaWithSuppliers = rmaClaims.filter((r) => r.status === 'Pending with Supplier').length;
+  const activeRmaWithSuppliers = safeRmaClaims.filter((r) => r?.status === 'Pending with Supplier').length;
 
   // Filtered List
-  const filteredSuppliers = suppliers.filter((sup) => {
-    const query = searchQuery.toLowerCase();
+  const filteredSuppliers = safeSuppliers.filter((sup) => {
+    if (!sup) return false;
+    const query = (searchQuery || '').toLowerCase();
     const matchesSearch =
-      sup.name.toLowerCase().includes(query) ||
-      sup.contactPerson.toLowerCase().includes(query) ||
-      sup.categories.toLowerCase().includes(query) ||
-      sup.phone.includes(query) ||
-      sup.email.toLowerCase().includes(query);
+      (sup.name || '').toLowerCase().includes(query) ||
+      (sup.contactPerson || '').toLowerCase().includes(query) ||
+      (sup.categories || '').toLowerCase().includes(query) ||
+      (sup.phone || '').includes(query) ||
+      (sup.email || '').toLowerCase().includes(query);
 
     const matchesTerms =
       termsFilter === 'all' ||
-      sup.paymentTerms.toLowerCase().includes(termsFilter.toLowerCase());
+      (sup.paymentTerms || '').toLowerCase().includes(termsFilter.toLowerCase());
 
     return matchesSearch && matchesTerms;
   });
@@ -267,18 +273,18 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
 
       {/* Suppliers Grid Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredSuppliers.map((sup) => {
+        {(filteredSuppliers || []).map((sup) => {
           // Count linked inventory products
-          const linkedProds = products.filter(
+          const linkedProds = (safeProducts || []).filter(
             (p) =>
-              p.supplierId === sup.id ||
-              p.supplier?.toLowerCase().trim() === sup.name.toLowerCase().trim()
+              p?.supplierId === sup.id ||
+              (p?.supplier || '').toLowerCase().trim() === (sup?.name || '').toLowerCase().trim()
           );
           // Count linked RMA claims
-          const linkedClaims = rmaClaims.filter(
+          const linkedClaims = (safeRmaClaims || []).filter(
             (r) =>
-              r.supplierId === sup.id ||
-              r.supplierName?.toLowerCase().trim() === sup.name.toLowerCase().trim()
+              r?.supplierId === sup.id ||
+              (r?.supplierName || '').toLowerCase().trim() === (sup?.name || '').toLowerCase().trim()
           );
           const activeClaims = linkedClaims.filter((c) => c.status === 'Pending with Supplier');
 
@@ -681,18 +687,18 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                   )}
                 </div>
 
-                {products.filter(
+                {safeProducts.filter(
                   (p) =>
-                    p.supplierId === selectedSupplierDetail.id ||
-                    p.supplier?.toLowerCase().trim() ===
+                    p?.supplierId === selectedSupplierDetail.id ||
+                    (p?.supplier || '').toLowerCase().trim() ===
                       selectedSupplierDetail.name.toLowerCase().trim()
                 ).length > 0 ? (
                   <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800/80">
-                    {products
+                    {safeProducts
                       .filter(
                         (p) =>
-                          p.supplierId === selectedSupplierDetail.id ||
-                          p.supplier?.toLowerCase().trim() ===
+                          p?.supplierId === selectedSupplierDetail.id ||
+                          (p?.supplier || '').toLowerCase().trim() ===
                             selectedSupplierDetail.name.toLowerCase().trim()
                       )
                       .map((p) => (
@@ -745,18 +751,18 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                   )}
                 </div>
 
-                {rmaClaims.filter(
+                {safeRmaClaims.filter(
                   (r) =>
-                    r.supplierId === selectedSupplierDetail.id ||
-                    r.supplierName?.toLowerCase().trim() ===
+                    r?.supplierId === selectedSupplierDetail.id ||
+                    (r?.supplierName || '').toLowerCase().trim() ===
                       selectedSupplierDetail.name.toLowerCase().trim()
                 ).length > 0 ? (
                   <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800/80">
-                    {rmaClaims
+                    {safeRmaClaims
                       .filter(
                         (r) =>
-                          r.supplierId === selectedSupplierDetail.id ||
-                          r.supplierName?.toLowerCase().trim() ===
+                          r?.supplierId === selectedSupplierDetail.id ||
+                          (r?.supplierName || '').toLowerCase().trim() ===
                             selectedSupplierDetail.name.toLowerCase().trim()
                       )
                       .map((claim) => (

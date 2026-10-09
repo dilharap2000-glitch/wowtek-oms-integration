@@ -137,84 +137,75 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                 </tr>
               ) : (
                 (filteredWaybills || []).map((wb) => (
-                <tr key={wb.id} className="hover:bg-neutral-850/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</div>
-                    <div className="text-[11px] text-neutral-400 mt-0.5">{wb.bookingDate}</div>
-                  </td>
+                  <tr key={wb.id} className="hover:bg-neutral-850/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</div>
+                      <div className="text-[11px] text-neutral-400 mt-0.5">{wb.bookingDate}</div>
+                    </td>
 
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-white">{wb.recipientName}</div>
-                    <div className="font-mono text-neutral-400 text-[11px]">{wb.recipientPhone}</div>
-                  </td>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-white">{wb.recipientName}</div>
+                      <div className="font-mono text-neutral-400 text-[11px]">{wb.recipientPhone}</div>
+                    </td>
 
-                  <td className="py-3 px-4">
-                    <div className="text-neutral-200">{wb.destination}</div>
-                    <div className="text-[11px] text-purple-300 font-medium">
-                      District: {wb.district}
-                    </div>
-                  </td>
+                    <td className="py-3 px-4">
+                      <div className="text-neutral-200">{wb.destination}</div>
+                      <div className="text-[11px] text-purple-300 font-medium">
+                        District: {wb.district}
+                      </div>
+                    </td>
 
-                  <td className="py-3 px-4 text-right font-mono tabular-nums">
-                    {wb.codAmount > 0 ? (
-                      <span className="font-semibold text-white">
-                        Rs. {wb.codAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </span>
-                    ) : (
-                      <span className="text-neutral-400">Paid Online (Rs. 0)</span>
-                    )}
-                  </td>
+                    <td className="py-3 px-4 text-right font-mono tabular-nums">
+                      {wb.codAmount > 0 ? (
+                        <span className="font-semibold text-white">
+                          Rs. {wb.codAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-400">Paid Online (Rs. 0)</span>
+                      )}
+                    </td>
 
-                  <td className="py-3 px-4 text-center font-mono text-neutral-300">
-                    {wb.weightKg} kg
-                  </td>
+                    <td className="py-3 px-4 text-center font-mono text-neutral-300">
+                      {wb.weightKg} kg
+                    </td>
 
-                  <td className="py-3 px-4">
-                    <select
-                      value={wb.status}
-                      onChange={(e) =>
-                        onUpdateWaybillStatus(wb.id, e.target.value as TransExpressWaybill['status'])
-                      }
-                      className="bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-purple-500"
-                    >
-                      <option value="Queued">Queued (Pending Manifest)</option>
-                      <option value="Manifested">Manifested (Hub Scanned)</option>
-                      <option value="Dispatched">Dispatched (Linehaul)</option>
-                      <option value="Out for Delivery">Out for Delivery (Rider)</option>
-                      <option value="Delivered">Delivered & Closed</option>
-                      <option value="Returned">Returned / RTS</option>
-                    </select>
-                  </td>
+                    <td className="py-3 px-4">
+                      <select
+                        value={wb.status}
+                        onChange={(e) =>
+                          onUpdateWaybillStatus(wb.id, e.target.value as TransExpressWaybill['status'])
+                        }
+                        className="bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-purple-500"
+                      >
+                        <option value="Queued">Queued (Pending Manifest)</option>
+                        <option value="Manifested">Manifested (Hub Scanned)</option>
+                        <option value="Dispatched">Dispatched (Linehaul)</option>
+                        <option value="Out for Delivery">Out for Delivery (Rider)</option>
+                        <option value="Delivered">Delivered & Closed</option>
+                        <option value="Returned">Returned / RTS</option>
+                      </select>
+                    </td>
 
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => handlePrintLabel(wb)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        wb.labelPrinted
-                          ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                          : 'bg-purple-600 text-white hover:bg-purple-500'
-                      }`}
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        onClick={() => handlePrintLabel(wb)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          wb.labelPrinted
+                            ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                            : 'bg-purple-600 text-white hover:bg-purple-500'
+                        }`}
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Live WooCommerce Courier Webhook Pipeline Log */}
-      <WebhookAuditLogSection
-        events={webhookEvents}
-        onRefreshEvents={onRefreshWebhookEvents}
-        onClearEvents={onClearWebhookEvents}
-        onTriggerTestOrder={onTriggerTestOrder}
-        title="Live Courier Dispatch Webhook Pipeline"
-        subtitle="Real-time log of incoming WooCommerce orders auto-generating Trans Express tracking IDs and delivery manifests."
-      />
 
       {/* Print-Ready Trans Express Shipping Label Modal */}
       {selectedWaybillForPrint && (

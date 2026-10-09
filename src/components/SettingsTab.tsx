@@ -22,13 +22,21 @@ interface SettingsTabProps {
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
-  platforms,
-  gateways,
+  platforms = [],
+  gateways = [],
   onSavePlatforms,
   onSaveGateways,
 }) => {
-  const [localPlatforms, setLocalPlatforms] = useState<PlatformConfig[]>([...platforms]);
-  const [localGateways, setLocalGateways] = useState<PaymentGatewayConfig[]>([...gateways]);
+  const [localPlatforms, setLocalPlatforms] = useState<PlatformConfig[]>([...(platforms || [])]);
+  const [localGateways, setLocalGateways] = useState<PaymentGatewayConfig[]>([...(gateways || [])]);
+
+  React.useEffect(() => {
+    setLocalPlatforms([...(platforms || [])]);
+  }, [platforms]);
+
+  React.useEffect(() => {
+    setLocalGateways([...(gateways || [])]);
+  }, [gateways]);
 
   const [newPlatformName, setNewPlatformName] = useState('');
   const [newPlatformFee, setNewPlatformFee] = useState<number>(10);
@@ -200,7 +208,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           <div className="space-y-3">
-            {localPlatforms.map((plt) => (
+            {(localPlatforms || []).map((plt) => (
               <div
                 key={plt.id}
                 className="p-3 bg-neutral-950 border border-neutral-800/80 rounded-xl flex items-center justify-between text-xs"
@@ -302,7 +310,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           <div className="space-y-3">
-            {localGateways.map((gw) => (
+            {(localGateways || []).map((gw) => (
               <div
                 key={gw.id}
                 className="p-3 bg-neutral-950 border border-neutral-800/80 rounded-xl flex items-center justify-between text-xs"
@@ -434,7 +442,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               onChange={(e) => setSimPlatformId(e.target.value)}
               className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
             >
-              {localPlatforms.map((p) => (
+              {(localPlatforms || []).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.feePercent}%)
                 </option>
@@ -449,7 +457,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               onChange={(e) => setSimGatewayId(e.target.value)}
               className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
             >
-              {localGateways.map((g) => (
+              {(localGateways || []).map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name} ({g.feePercent}%)
                 </option>

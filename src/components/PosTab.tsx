@@ -419,7 +419,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
 
@@ -793,7 +793,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                           </div>
                         </td>
                       </tr>
-                    ))
+                    )))
                   }
                 </tbody>
               </table>

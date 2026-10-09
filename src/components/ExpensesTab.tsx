@@ -252,29 +252,30 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 </tr>
               ) : (
                 (filteredExpenses || []).map((exp) => (
-                <tr key={exp.id} className="hover:bg-neutral-850/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="font-mono text-white font-medium">{exp.reference}</div>
-                    <div className="text-[11px] text-neutral-400">{exp.date}</div>
-                  </td>
+                  <tr key={exp.id} className="hover:bg-neutral-850/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-mono text-white font-medium">{exp.reference}</div>
+                      <div className="text-[11px] text-neutral-400">{exp.date}</div>
+                    </td>
 
-                  <td className="py-3 px-4">
-                    <span className="text-purple-300 font-medium">{exp.category}</span>
-                  </td>
+                    <td className="py-3 px-4">
+                      <span className="text-purple-300 font-medium">{exp.category}</span>
+                    </td>
 
-                  <td className="py-3 px-4">
-                    <div className="text-white">{exp.description}</div>
-                  </td>
+                    <td className="py-3 px-4">
+                      <div className="text-white">{exp.description}</div>
+                    </td>
 
-                  <td className="py-3 px-4 text-neutral-300">
-                    {exp.channel}
-                  </td>
+                    <td className="py-3 px-4 text-neutral-300">
+                      {exp.channel}
+                    </td>
 
-                  <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-white">
-                    Rs. {exp.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-white">
+                      Rs. {exp.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

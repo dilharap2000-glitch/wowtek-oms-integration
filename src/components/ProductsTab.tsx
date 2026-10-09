@@ -452,7 +452,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

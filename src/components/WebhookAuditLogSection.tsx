@@ -82,7 +82,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     }
   };
 
-  const filteredEvents = events.filter((e) => {
+  const safeEvents = events || [];
+
+  const filteredEvents = safeEvents.filter((e) => {
+    if (!e) return false;
     if (filterSource === 'all') return true;
     return e.source === filterSource;
   });
@@ -205,7 +208,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                 </td>
               </tr>
             ) : (
-              filteredEvents.slice(0, compact ? 6 : 25).map((evt) => {
+              (filteredEvents || []).slice(0, compact ? 6 : 25).map((evt) => {
                 const isSuccess = evt.status === 'success';
                 const timeStr = new Date(evt.receivedAt).toLocaleTimeString([], {
                   hour: '2-digit',

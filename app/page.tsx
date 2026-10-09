@@ -144,17 +144,17 @@ export default function WowtekProApp() {
           checkDatabaseHealth(),
         ]);
 
-        setOrders(loadedOrders);
-        setProducts(loadedProducts);
-        setWaybills(loadedWaybills);
-        setWarranties(loadedWarranties);
-        setExpenses(loadedExpenses);
-        setPlatforms(loadedPlatforms);
-        setGateways(loadedGateways);
+        setOrders(Array.isArray(loadedOrders) ? loadedOrders : []);
+        setProducts(Array.isArray(loadedProducts) ? loadedProducts : []);
+        setWaybills(Array.isArray(loadedWaybills) ? loadedWaybills : []);
+        setWarranties(Array.isArray(loadedWarranties) ? loadedWarranties : []);
+        setExpenses(Array.isArray(loadedExpenses) ? loadedExpenses : []);
+        setPlatforms(Array.isArray(loadedPlatforms) ? loadedPlatforms : []);
+        setGateways(Array.isArray(loadedGateways) ? loadedGateways : []);
         setApiConfig(loadedConfig);
-        setSuppliers(loadedSuppliers);
-        setRmaClaims(loadedRmaClaims);
-        setWebhookEvents(loadedEvents);
+        setSuppliers(Array.isArray(loadedSuppliers) ? loadedSuppliers : []);
+        setRmaClaims(Array.isArray(loadedRmaClaims) ? loadedRmaClaims : []);
+        setWebhookEvents(Array.isArray(loadedEvents) ? loadedEvents : []);
         setDbHealth({
           status: health.status === 'connected' ? 'connected' : 'fallback',
           latencyMs: health.latencyMs || 8,
@@ -340,7 +340,7 @@ export default function WowtekProApp() {
       }
     };
 
-    const intervalId = setInterval(syncServerData, 2000);
+    const intervalId = setInterval(syncServerData, 6000);
 
     // Also listen for BroadcastChannel updates if available
     let channel: BroadcastChannel | null = null;
