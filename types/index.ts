@@ -247,7 +247,9 @@ export interface WebhookEvent {
   customerName?: string;
   customerPhone?: string;
   amount?: number;
-  status: 'success' | 'failed' | 'processing';
+  status: 'success' | 'failed' | 'processing' | 'skipped';
+  skipReason?: string;
+  orderStatus?: string;
   waybillId?: string;
   waybillNumber?: string;
   smsSent?: boolean;

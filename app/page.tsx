@@ -238,7 +238,8 @@ export default function WowtekProApp() {
             } else if (
               data.type === 'webhook_event_saved' ||
               data.type === 'webhook_ping' ||
-              data.type === 'webhook_error'
+              data.type === 'webhook_error' ||
+              data.type === 'webhook_skipped'
             ) {
               if (data.event) {
                 setWebhookEvents((prev) => [
@@ -556,12 +557,12 @@ export default function WowtekProApp() {
   };
 
   // Webhook Live Testing & Event Handlers
-  const handleTriggerTestOrder = async () => {
+  const handleTriggerTestOrder = async (status: 'processing' | 'pending' = 'processing') => {
     try {
       const res = await fetch('/api/orders/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ simulate: true }),
+        body: JSON.stringify({ simulate: true, status }),
       });
       if (res.ok) {
         const liveRes = await fetch('/api/sync/live', { cache: 'no-store' });

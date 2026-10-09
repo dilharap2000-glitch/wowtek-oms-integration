@@ -248,14 +248,84 @@ export async function POST(req: NextRequest) {
       rawOrderObj.number ||
       Math.floor(10000 + Math.random() * 90000);
 
-    // 1. Map WooCommerce status ('processing' | 'pending' | 'completed' | 'on-hold')
-    const rawStatus = (rawOrderObj.status || 'processing').toLowerCase();
-    let orderStatus: OrderStatus = 'Processing';
-    if (rawStatus === 'completed') orderStatus = 'Completed';
-    else if (rawStatus === 'pending') orderStatus = 'Pending';
-    else if (rawStatus === 'on-hold') orderStatus = 'Pending';
-    else if (rawStatus === 'cancelled') orderStatus = 'Cancelled';
-    else if (rawStatus === 'refunded') orderStatus = 'Returned';
+    // 1. Read the incoming payload status field: payload.status
+    const rawStatus = (rawOrderObj.status || '').toLowerCase().trim();
+
+    // -------------------------------------------------------------------------
+    // STRICT FILTER FOR WOOCOMMERCE ORDERS: FILTER ONLY 'PROCESSING' STATUS.
+    // DO NOT import or create Waybills/Orders for 'pending' or 'on-hold' status.
+    // Only accept and process orders when payment is confirmed and status transitions to 'processing'.
+    // -------------------------------------------------------------------------
+    if (rawStatus !== 'processing') {
+      const billing = rawOrderObj.billing || {};
+      const shipping = rawOrderObj.shipping || {};
+      const firstName = billing.first_name || shipping.first_name || 'Online';
+      const lastName = billing.last_name || shipping.last_name || 'Customer';
+      const customerName = `${firstName} ${lastName}`.trim();
+      const customerPhone = billing.phone || shipping.phone || rawOrderObj.customer_phone || '';
+      const grossTotal = parseFloat(rawOrderObj.total) || 0;
+      const invoiceNumber = `WT-WC-${wcOrderId}`;
+      const skipMessage = `Skipped: Payment Pending (Status: '${rawStatus || 'unspecified'}')`;
+
+      const skippedEvent: WebhookEvent = {
+        id: `evt-skip-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+        source: 'woocommerce',
+        event: topicHeader || 'order.created',
+        orderId: `ord-wc-${wcOrderId}`,
+        invoiceNumber,
+        customerName,
+        customerPhone,
+        amount: grossTotal,
+        status: 'skipped',
+        skipReason: skipMessage,
+        orderStatus: rawStatus || 'pending',
+        rawPayload: rawOrderObj,
+        receivedAt,
+        errorMessage: `Order #${wcOrderId} skipped: Payment Pending (status: '${rawStatus || 'none'}'). Only 'processing' status orders are imported and manifested.`,
+      };
+
+      // Persist skipped audit log record to MongoDB Atlas & serverStore
+      try {
+        const mongoConn = await connectToMongoDB();
+        if (mongoConn) {
+          await mongoConn.db.collection('webhook_events').updateOne(
+            { id: skippedEvent.id },
+            { $set: skippedEvent },
+            { upsert: true }
+          );
+        }
+      } catch (mongoErr: any) {
+        console.warn('MongoDB Atlas write deferred to serverStore for skipped event:', mongoErr?.message);
+      }
+
+      saveServerWebhookEvent(skippedEvent);
+      await saveWebhookEvent(skippedEvent);
+
+      // Broadcast skipped event via SSE so live dashboard renders the skipped badge immediately
+      broadcastLiveUpdate({
+        type: 'webhook_skipped',
+        event: skippedEvent,
+        timestamp: receivedAt,
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          action: 'skipped',
+          status: 'skipped',
+          orderStatus: rawStatus || 'pending',
+          message: `Order #${wcOrderId} skipped: Payment Pending. Orders are only imported when status is 'processing'.`,
+          reason: 'Skipped: Payment Pending',
+          orderId: invoiceNumber,
+          webhookEventId: skippedEvent.id,
+          timestamp: receivedAt,
+        },
+        { headers: corsHeaders }
+      );
+    }
+
+    // Status is strictly 'processing' - proceed with order import, TE waybill, and SMS
+    const orderStatus: OrderStatus = 'Processing';
 
     // 2. Extract Customer Info
     const billing = rawOrderObj.billing || {};
@@ -637,6 +707,7 @@ export async function GET() {
         'action.woocommerce_order_status_pending',
         'webhook.ping',
       ],
+      statusFilterPolicy: "STRICT: Only 'processing' status orders are imported and manifested with TE waybills. Orders in 'pending' or 'on-hold' are logged as 'Skipped: Payment Pending' without database ingestion.",
       autoPipelineActive: {
         transExpressCourier: 'TE-XXXX Code Auto Generation',
         smslenzInstantSms: '07X Customer Confirmation Dispatch',

@@ -1,6 +1,43 @@
 {
   "orders": [
     {
+      "id": "ord-wc-99883-8022",
+      "invoiceNumber": "WT-WC-99883",
+      "channel": "woocommerce",
+      "channelName": "WooCommerce Store",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash on Delivery (COD)",
+      "customerName": "Kasun Perera",
+      "customerPhone": "0778899001",
+      "deliveryAddress": "No. 142 Galle Road, Bambalapitiya",
+      "city": "Colombo 04",
+      "items": [
+        {
+          "sku": "WT-WC-DIRECT",
+          "barcode": "4792038100142",
+          "name": "WooCommerce Web Order Item",
+          "quantity": 1,
+          "unitPrice": 32000,
+          "costPrice": 23040
+        }
+      ],
+      "grossTotal": 32000,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 450,
+      "costOfGoods": 23040,
+      "netProfit": 8960,
+      "status": "Processing",
+      "createdAt": "2026-10-09T14:44:08.022Z",
+      "updatedAt": "2026-10-09T14:44:08.022Z",
+      "waybillGenerated": true,
+      "waybillNumber": "TE-6148",
+      "smsConfirmationSent": false,
+      "notes": "Live WooCommerce Order #99883. Event: order.created. No signature header present (Lenient test mode accepted - order processed). "
+    },
+    {
       "id": "ord-test-persist-001",
       "invoiceNumber": "WT-TEST-001",
       "channel": "pos",
@@ -238,6 +275,21 @@
   ],
   "waybills": [
     {
+      "id": "wb-8022",
+      "orderId": "ord-wc-99883-8022",
+      "trackingNumber": "TE-6148",
+      "recipientName": "Kasun Perera",
+      "recipientPhone": "0778899001",
+      "destination": "No. 142 Galle Road, Bambalapitiya, Colombo 04",
+      "district": "Colombo",
+      "codAmount": 32000,
+      "weightKg": 1.2,
+      "status": "Queued",
+      "bookingDate": "09/10/2026 02:44 PM",
+      "courierNotes": "Auto-manifested from WooCommerce Order #99883. Cash on Delivery (COD)",
+      "labelPrinted": false
+    },
+    {
       "id": "wb-4739",
       "orderId": "ord-wc-92104-4739",
       "trackingNumber": "TE-1026",
@@ -314,6 +366,83 @@
     }
   ],
   "webhookEvents": [
+    {
+      "id": "evt-1791557050431-928",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-99883-8022",
+      "invoiceNumber": "WT-WC-99883",
+      "customerName": "Kasun Perera",
+      "customerPhone": "0778899001",
+      "amount": 32000,
+      "status": "success",
+      "waybillId": "wb-8022",
+      "waybillNumber": "TE-6148",
+      "smsSent": false,
+      "smsMessageId": "SMSLZ-1791557050247",
+      "smsGateway": "SMSlenz",
+      "rawPayload": {
+        "id": 99883,
+        "status": "processing",
+        "total": "32000",
+        "billing": {
+          "first_name": "Kasun",
+          "last_name": "Perera",
+          "phone": "0778899001"
+        }
+      },
+      "receivedAt": "2026-10-09T14:44:08.022Z"
+    },
+    {
+      "id": "evt-skip-1791557040753-756",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-99882",
+      "invoiceNumber": "WT-WC-99882",
+      "customerName": "Kamal Silva",
+      "customerPhone": "0779988776",
+      "amount": 24000,
+      "status": "skipped",
+      "skipReason": "Skipped: Payment Pending (Status: 'on-hold')",
+      "orderStatus": "on-hold",
+      "rawPayload": {
+        "id": 99882,
+        "status": "on-hold",
+        "total": "24000",
+        "billing": {
+          "first_name": "Kamal",
+          "last_name": "Silva",
+          "phone": "0779988776"
+        }
+      },
+      "receivedAt": "2026-10-09T14:44:00.752Z",
+      "errorMessage": "Order #99882 skipped: Payment Pending (status: 'on-hold'). Only 'processing' status orders are imported and manifested."
+    },
+    {
+      "id": "evt-skip-1791557034979-102",
+      "source": "woocommerce",
+      "event": "order.created",
+      "orderId": "ord-wc-99881",
+      "invoiceNumber": "WT-WC-99881",
+      "customerName": "Nimal Fernando",
+      "customerPhone": "0771122334",
+      "amount": 18500,
+      "status": "skipped",
+      "skipReason": "Skipped: Payment Pending (Status: 'pending')",
+      "orderStatus": "pending",
+      "rawPayload": {
+        "id": 99881,
+        "status": "pending",
+        "total": "18500",
+        "billing": {
+          "first_name": "Nimal",
+          "last_name": "Fernando",
+          "phone": "0771122334"
+        }
+      },
+      "receivedAt": "2026-10-09T14:43:54.977Z",
+      "errorMessage": "Order #99881 skipped: Payment Pending (status: 'pending'). Only 'processing' status orders are imported and manifested."
+    },
     {
       "id": "evt-1791360367375-914",
       "source": "woocommerce",
@@ -603,5 +732,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-08T08:41:39.594Z"
+  "lastUpdated": "2026-10-09T14:44:10.497Z"
 }

@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     try {
       const baseUrl = config.woocommerceUrl.replace(/\/+$/, '');
       const url = new URL(`${baseUrl}/wp-json/wc/v3/orders`);
-      url.searchParams.append('status', 'processing,pending');
+      url.searchParams.append('status', 'processing');
       url.searchParams.append('per_page', '10');
 
       // Basic Auth Header
@@ -80,6 +80,13 @@ export async function GET(req: NextRequest) {
         const newlyImported: any[] = [];
 
         for (const wcOrder of liveOrders) {
+          // STRICT FILTER: Accept ONLY confirmed 'processing' status orders.
+          // Ignore any pending payment ('pending', 'on-hold') or cancelled orders.
+          const wcStatus = (wcOrder.status || '').toLowerCase().trim();
+          if (wcStatus !== 'processing') {
+            continue;
+          }
+
           const invoiceNumber = `WT-WC-${wcOrder.id}`;
           // Check if already in system
           if (existingOrders.some((o) => o.invoiceNumber === invoiceNumber)) {

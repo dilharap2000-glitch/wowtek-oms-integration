@@ -29,7 +29,7 @@ interface WebhookAuditLogSectionProps {
   events: WebhookEvent[];
   onRefreshEvents?: () => void;
   onClearEvents?: () => void;
-  onTriggerTestOrder?: () => Promise<void>;
+  onTriggerTestOrder?: (status?: 'processing' | 'pending') => Promise<void>;
   title?: string;
   subtitle?: string;
   compact?: boolean;
@@ -42,14 +42,14 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   onClearEvents,
   onTriggerTestOrder,
   title = 'Incoming Webhook Events & Transaction Audit Log',
-  subtitle = 'Live payload listener for connected WooCommerce store. Auto-executes Trans Express waybills and SMSlenz dispatches.',
+  subtitle = 'Strict Filter Active: Only orders in \'processing\' status are accepted. Pending and on-hold orders are safely skipped.',
   compact = false,
   onNavigateTab,
 }) => {
   const [selectedEventForPayload, setSelectedEventForPayload] = useState<WebhookEvent | null>(null);
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
-  const [filterSource, setFilterSource] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
 
@@ -72,11 +72,11 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     setTimeout(() => setCopiedSecret(false), 2000);
   };
 
-  const handleRunTestOrder = async () => {
+  const handleRunTestOrder = async (status: 'processing' | 'pending' = 'processing') => {
     if (!onTriggerTestOrder) return;
     setIsSimulating(true);
     try {
-      await onTriggerTestOrder();
+      await onTriggerTestOrder(status);
     } finally {
       setIsSimulating(false);
     }
@@ -86,16 +86,22 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
 
   const filteredEvents = safeEvents.filter((e) => {
     if (!e) return false;
-    if (filterSource === 'all') return true;
-    return e.source === filterSource;
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'processing' || filterStatus === 'success') return e.status === 'success';
+    if (filterStatus === 'skipped') return e.status === 'skipped';
+    if (filterStatus === 'failed') return e.status === 'failed';
+    return true;
   });
+
+  const skippedCount = safeEvents.filter((e) => e?.status === 'skipped').length;
+  const processedCount = safeEvents.filter((e) => e?.status === 'success').length;
 
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-900/90 overflow-hidden shadow-lg">
       {/* Header Bar */}
       <div className="p-4 sm:p-5 border-b border-neutral-800 bg-neutral-950/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="relative flex items-center justify-center">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
               <span className="absolute w-4 h-4 rounded-full bg-emerald-400/30 animate-ping"></span>
@@ -106,6 +112,9 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
             </h3>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
               Live Listener Active
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-950 text-purple-300 border border-purple-800">
+              Strict Policy: &apos;processing&apos; Only
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-1">{subtitle}</p>
@@ -133,20 +142,33 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
             <span>{copiedSecret ? 'Secret Copied!' : 'Secret: WOWTEK-WC-...'}</span>
           </button>
 
-          {/* Simulate Live Order */}
+          {/* Simulate Live Order Buttons */}
           {onTriggerTestOrder && (
-            <button
-              onClick={handleRunTestOrder}
-              disabled={isSimulating}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors"
-            >
-              {isSimulating ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Zap className="w-3.5 h-3.5 text-amber-300" />
-              )}
-              <span>{isSimulating ? 'Processing Pipeline...' : 'Test Live Webhook Order'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleRunTestOrder('processing')}
+                disabled={isSimulating}
+                className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors"
+                title="Test order with status 'processing' (triggers TE waybill + SMS)"
+              >
+                {isSimulating ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                )}
+                <span>Test &apos;Processing&apos; Order</span>
+              </button>
+
+              <button
+                onClick={() => handleRunTestOrder('pending')}
+                disabled={isSimulating}
+                className="px-2.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-amber-300 border border-amber-900/60 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 transition-colors"
+                title="Test order with status 'pending' (verifies strict skip filter)"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span>Test &apos;Pending&apos; (Skip)</span>
+              </button>
+            </div>
           )}
 
           {onRefreshEvents && (
@@ -171,6 +193,43 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         </div>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="px-4 py-2 bg-neutral-950/40 border-b border-neutral-800 flex items-center gap-2 overflow-x-auto text-xs">
+        <span className="text-neutral-500 font-medium">Filter Audit Feed:</span>
+        <button
+          onClick={() => setFilterStatus('all')}
+          className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+            filterStatus === 'all'
+              ? 'bg-purple-600 text-white font-medium'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+          }`}
+        >
+          All Events ({safeEvents.length})
+        </button>
+        <button
+          onClick={() => setFilterStatus('processing')}
+          className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+            filterStatus === 'processing'
+              ? 'bg-emerald-600 text-white font-medium'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+          }`}
+        >
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+          <span>Processed ({processedCount})</span>
+        </button>
+        <button
+          onClick={() => setFilterStatus('skipped')}
+          className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+            filterStatus === 'skipped'
+              ? 'bg-amber-600 text-white font-medium'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+          }`}
+        >
+          <AlertTriangle className="w-3 h-3 text-amber-400" />
+          <span>Skipped / Pending Payment ({skippedCount})</span>
+        </button>
+      </div>
+
       {/* Events Table / Feed */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
@@ -193,16 +252,25 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <Radio className="w-8 h-8 text-neutral-600 animate-pulse" />
                     <p className="font-semibold text-white text-xs">Waiting for Incoming WooCommerce Orders...</p>
                     <p className="text-[11px] text-neutral-400">
-                      When you place an order on your connected WooCommerce store, the webhook payload and auto-execution pipeline will stream here in real time.
+                      Strict Filter Active: Orders are only ingested when payment is confirmed and status is &apos;processing&apos;. Pending and on-hold orders are safely skipped.
                     </p>
                     {onTriggerTestOrder && (
-                      <button
-                        onClick={handleRunTestOrder}
-                        className="mt-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>Trigger Live Test Order</span>
-                      </button>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => handleRunTestOrder('processing')}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Test &apos;Processing&apos; Order</span>
+                        </button>
+                        <button
+                          onClick={() => handleRunTestOrder('pending')}
+                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-amber-800/80 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Test &apos;Pending&apos; Skip</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                 </td>
@@ -210,6 +278,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
             ) : (
               (filteredEvents || []).slice(0, compact ? 6 : 25).map((evt) => {
                 const isSuccess = evt.status === 'success';
+                const isSkipped = evt.status === 'skipped';
                 const timeStr = new Date(evt.receivedAt).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -251,8 +320,23 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                       ) : (
                         <span className="text-neutral-500 font-mono text-[11px]">{evt.id}</span>
                       )}
-                      <div className="text-[10px] text-neutral-400 mt-0.5">
-                        Status: <span className="text-emerald-400 font-semibold">{isSuccess ? 'Processed' : 'Failed'}</span>
+                      <div className="mt-1">
+                        {isSkipped ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-amber-950/80 text-amber-300 border border-amber-800">
+                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            Skipped (Pending Payment)
+                          </span>
+                        ) : isSuccess ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            Processed (Payment Confirmed)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-red-950/80 text-red-300 border border-red-800">
+                            <AlertTriangle className="w-3 h-3 text-red-400" />
+                            Failed / Parse Error
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -289,6 +373,13 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                           </span>
                           <span className="text-[9px] text-neutral-400 mt-0.5 font-mono">Auto Manifested</span>
                         </div>
+                      ) : isSkipped ? (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-amber-400/90 font-mono text-[10px]">
+                            No Waybill
+                          </span>
+                          <span className="text-[9px] text-neutral-500 mt-0.5 font-mono">Awaiting Payment</span>
+                        </div>
                       ) : isSuccess && !evt.orderId ? (
                         <span className="text-[10px] text-neutral-500 font-mono">N/A (Ping)</span>
                       ) : (
@@ -307,6 +398,13 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                           <span className="text-[9px] text-neutral-400 mt-0.5 font-mono">
                             {evt.smsMessageId || 'SMSlenz Gateway'}
                           </span>
+                        </div>
+                      ) : isSkipped ? (
+                        <div className="inline-flex flex-col items-center">
+                          <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-500 font-mono text-[10px]">
+                            Skipped
+                          </span>
+                          <span className="text-[9px] text-neutral-600 mt-0.5 font-mono">Unpaid Order</span>
                         </div>
                       ) : evt.customerPhone ? (
                         <span className="text-[10px] text-neutral-500 font-mono">Pending</span>
@@ -370,6 +468,15 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                 <span>{copiedPayload ? 'Copied JSON!' : 'Copy Raw Payload'}</span>
               </button>
             </div>
+
+            {selectedEventForPayload.status === 'skipped' && (
+              <div className="px-4 py-2 bg-amber-950/60 border-b border-amber-900/60 flex items-center gap-2 text-xs text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {selectedEventForPayload.skipReason || 'Order skipped: Payment Pending (strict filter requires "processing" status).'}
+                </span>
+              </div>
+            )}
 
             <div className="p-4 overflow-y-auto flex-1 font-mono text-xs bg-neutral-950">
               <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed select-text">
