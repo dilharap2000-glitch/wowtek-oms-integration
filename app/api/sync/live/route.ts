@@ -59,11 +59,10 @@ export async function GET() {
     atlasConnected = false;
   }
 
-  // When Atlas is connected, use Atlas records directly.
-  // Merge with any real-time in-flight store items not yet flushed
-  const finalOrders = atlasConnected && atlasOrders.length > 0 ? atlasOrders : store.orders;
-  const finalWaybills = atlasConnected && atlasWaybills.length > 0 ? atlasWaybills : store.waybills;
-  const finalEvents = atlasConnected && atlasEvents.length > 0 ? atlasEvents : store.webhookEvents;
+  // When Atlas is connected, use Atlas records directly without falling back to mock state
+  const finalOrders = atlasConnected ? atlasOrders : store.orders;
+  const finalWaybills = atlasConnected ? atlasWaybills : store.waybills;
+  const finalEvents = atlasConnected ? atlasEvents : store.webhookEvents;
 
   return NextResponse.json(
     {

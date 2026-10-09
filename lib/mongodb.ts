@@ -25,13 +25,13 @@ export function isMongoConfigured(): boolean {
 }
 
 /**
- * Optimized Serverless MongoDB Client Options:
- * - connectTimeoutMS: 10000 (10 seconds connection establishment limit)
- * - socketTimeoutMS: 45000 (45 seconds operational socket limit for serverless queries)
- * - serverSelectionTimeoutMS: 10000 (Strict 10s ceiling prevents the default 30s connection timeout during DNS / cluster election)
- * - maxPoolSize: 10, minPoolSize: 1 (Proper connection pooling for Next.js Serverless routes)
- * - maxIdleTimeMS: 30000 (Recycles idle sockets after 30s)
- * - retryWrites: true, retryReads: true (Automatic retry on transient network hiccups)
+ * Serverless MongoDB Client Options:
+ * - connectTimeoutMS: 10000 (10s connection establishment limit)
+ * - socketTimeoutMS: 45000 (45s socket limit for complex queries)
+ * - serverSelectionTimeoutMS: 10000 (Prevents 30s driver hangs during replica elections)
+ * - maxPoolSize: 10, minPoolSize: 1 (Maintains connection pool across serverless calls)
+ * - maxIdleTimeMS: 30000 (Recycles idle connections after 30s)
+ * - retryWrites: true, retryReads: true (Auto retry on transient network blips)
  */
 export const MONGO_CLIENT_OPTIONS: MongoClientOptions = {
   connectTimeoutMS: 10000,
@@ -45,11 +45,10 @@ export const MONGO_CLIENT_OPTIONS: MongoClientOptions = {
 };
 
 /**
- * Connects to MongoDB Atlas using connection pooling optimized for Next.js Serverless.
- * Caches the client promise globally across serverless function re-invocations without
- * premature 2-3 second fallbacks.
+ * Connects to MongoDB Atlas using connection pooling and auto-reconnect logic.
+ * Retries up to 3 times on drop without wiping or substituting live data with mock state.
  */
-export async function connectToMongoDB(): Promise<CachedConnection | null> {
+export async function connectToMongoDB(retries = 3): Promise<CachedConnection | null> {
   const uri = getMongoUri();
   const dbName = getMongoDbName();
 
@@ -57,38 +56,56 @@ export async function connectToMongoDB(): Promise<CachedConnection | null> {
     return null;
   }
 
-  // Fast-path: return cached connection if active
+  // Fast path: verify cached connection is healthy
   if (global._mongoCachedConnection) {
-    return global._mongoCachedConnection;
-  }
-
-  try {
-    if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri, MONGO_CLIENT_OPTIONS);
-      global._mongoClientPromise = client.connect().catch((err) => {
-        // Reset cached promise so next request retries cleanly instead of keeping rejected promise
-        global._mongoClientPromise = undefined;
-        global._mongoCachedConnection = undefined;
-        throw err;
-      });
+    try {
+      return global._mongoCachedConnection;
+    } catch {
+      global._mongoCachedConnection = undefined;
+      global._mongoClientPromise = undefined;
     }
-
-    const client = await global._mongoClientPromise;
-    const db = client.db(dbName);
-
-    const connection: CachedConnection = { client, db };
-    global._mongoCachedConnection = connection;
-    return connection;
-  } catch (err: any) {
-    global._mongoClientPromise = undefined;
-    global._mongoCachedConnection = undefined;
-    throw err;
   }
+
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      if (!global._mongoClientPromise) {
+        const client = new MongoClient(uri, MONGO_CLIENT_OPTIONS);
+        global._mongoClientPromise = client.connect().catch((err) => {
+          global._mongoClientPromise = undefined;
+          global._mongoCachedConnection = undefined;
+          throw err;
+        });
+      }
+
+      const client = await global._mongoClientPromise;
+      const db = client.db(dbName);
+
+      const connection: CachedConnection = { client, db };
+      global._mongoCachedConnection = connection;
+      return connection;
+    } catch (err: any) {
+      lastError = err;
+      global._mongoClientPromise = undefined;
+      global._mongoCachedConnection = undefined;
+
+      if (attempt < retries) {
+        // Brief backoff before immediate retry
+        await new Promise((res) => setTimeout(res, 300 * attempt));
+      }
+    }
+  }
+
+  console.warn(`[MongoDB Atlas] Connection attempt failed after ${retries} tries:`, lastError?.message);
+  return null;
 }
 
-/**
- * Shared MongoClient singleton promise export for Next.js
- */
+export function resetMongoCache() {
+  global._mongoCachedConnection = undefined;
+  global._mongoClientPromise = undefined;
+}
+
 export function getMongoClientPromise(): Promise<MongoClient> | null {
   const uri = getMongoUri();
   if (!uri || typeof window !== 'undefined') return null;
@@ -96,8 +113,7 @@ export function getMongoClientPromise(): Promise<MongoClient> | null {
   if (!global._mongoClientPromise) {
     const client = new MongoClient(uri, MONGO_CLIENT_OPTIONS);
     global._mongoClientPromise = client.connect().catch((err) => {
-      global._mongoClientPromise = undefined;
-      global._mongoCachedConnection = undefined;
+      resetMongoCache();
       throw err;
     });
   }

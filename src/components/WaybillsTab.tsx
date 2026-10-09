@@ -40,13 +40,16 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const filteredWaybills = waybills.filter((wb) => {
+  const safeWaybills = waybills || [];
+
+  const filteredWaybills = safeWaybills.filter((wb) => {
+    if (!wb) return false;
     const matchesStatus = statusFilter === 'all' || wb.status === statusFilter;
     const matchesSearch =
-      wb.trackingNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      wb.recipientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      wb.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      wb.district.toLowerCase().includes(searchQuery.toLowerCase());
+      (wb.trackingNumber || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (wb.recipientName || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (wb.destination || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (wb.district || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -132,8 +135,8 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                     </div>
                   </td>
                 </tr>
-              ) :
-                filteredWaybills.map((wb) => (
+              ) : (
+                (filteredWaybills || []).map((wb) => (
                 <tr key={wb.id} className="hover:bg-neutral-850/40 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-mono font-semibold text-purple-400">{wb.trackingNumber}</div>

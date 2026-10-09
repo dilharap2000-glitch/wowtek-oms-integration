@@ -1,6 +1,40 @@
 {
   "orders": [
     {
+      "id": "ord-test-persist-001",
+      "invoiceNumber": "WT-TEST-001",
+      "channel": "pos",
+      "channelName": "POS Retail",
+      "paymentGateway": "cash_cod",
+      "paymentGatewayName": "Cash",
+      "customerName": "Test Customer",
+      "customerPhone": "0771122334",
+      "deliveryAddress": "Colombo 03",
+      "city": "Colombo",
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "barcode": "4792038100142",
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "quantity": 1,
+          "unitPrice": 22800,
+          "costPrice": 16500
+        }
+      ],
+      "grossTotal": 22800,
+      "platformFeePercent": 0,
+      "platformFeeAmount": 0,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 0,
+      "costOfGoods": 16500,
+      "netProfit": 6300,
+      "status": "Completed",
+      "createdAt": "2026-10-08T08:40:00Z",
+      "updatedAt": "2026-10-08T08:40:00Z",
+      "waybillGenerated": false
+    },
+    {
       "id": "ord-wc-92104-4739",
       "invoiceNumber": "WT-WC-92104",
       "channel": "woocommerce",
@@ -569,5 +603,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-07T08:06:07.376Z"
+  "lastUpdated": "2026-10-08T08:41:39.594Z"
 }

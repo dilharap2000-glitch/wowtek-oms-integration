@@ -33,30 +33,35 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
   const [channel, setChannel] = useState<'General' | 'WooCommerce' | 'PickMe' | 'Uber Eats'>('General');
   const [reference, setReference] = useState('');
 
+  // Safe array bindings
+  const safeOrders = orders || [];
+  const safeExpenses = expenses || [];
+
   // Financial calculations
-  const totalGrossRevenue = orders.reduce((sum, o) => sum + o.grossTotal, 0);
-  const totalCogs = orders.reduce((sum, o) => sum + o.costOfGoods, 0);
-  const totalCommissions = orders.reduce(
-    (sum, o) => sum + (o.platformFeeAmount || 0) + (o.gatewayFeeAmount || 0),
+  const totalGrossRevenue = safeOrders.reduce((sum, o) => sum + (o?.grossTotal || 0), 0);
+  const totalCogs = safeOrders.reduce((sum, o) => sum + (o?.costOfGoods || 0), 0);
+  const totalCommissions = safeOrders.reduce(
+    (sum, o) => sum + (o?.platformFeeAmount || 0) + (o?.gatewayFeeAmount || 0),
     0
   );
-  const totalCourierFees = orders.reduce((sum, o) => sum + o.courierFee, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalCourierFees = safeOrders.reduce((sum, o) => sum + (o?.courierFee || 0), 0);
+  const totalExpenses = safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
 
   // Net Business Operating Profit
   const netBusinessProfit = totalGrossRevenue - totalCogs - totalCommissions - totalCourierFees - totalExpenses;
 
   // Channel breakdown
-  const wcGross = orders.filter((o) => o.channel === 'woocommerce').reduce((s, o) => s + o.grossTotal, 0);
-  const pkmGross = orders.filter((o) => o.channel === 'pickme').reduce((s, o) => s + o.grossTotal, 0);
-  const ubrGross = orders.filter((o) => o.channel === 'ubereats').reduce((s, o) => s + o.grossTotal, 0);
+  const wcGross = safeOrders.filter((o) => o?.channel === 'woocommerce').reduce((s, o) => s + (o?.grossTotal || 0), 0);
+  const pkmGross = safeOrders.filter((o) => o?.channel === 'pickme').reduce((s, o) => s + (o?.grossTotal || 0), 0);
+  const ubrGross = safeOrders.filter((o) => o?.channel === 'ubereats').reduce((s, o) => s + (o?.grossTotal || 0), 0);
 
-  const filteredExpenses = expenses.filter((e) => {
+  const filteredExpenses = safeExpenses.filter((e) => {
+    if (!e) return false;
     const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter;
     const matchesSearch =
-      e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.category.toLowerCase().includes(searchQuery.toLowerCase());
+      (e.description || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (e.reference || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (e.category || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
@@ -245,8 +250,8 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                     </div>
                   </td>
                 </tr>
-              ) :
-                filteredExpenses.map((exp) => (
+              ) : (
+                (filteredExpenses || []).map((exp) => (
                 <tr key={exp.id} className="hover:bg-neutral-850/40 transition-colors">
                   <td className="py-3 px-4">
                     <div className="font-mono text-white font-medium">{exp.reference}</div>

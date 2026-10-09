@@ -51,8 +51,10 @@ import {
   getWarranties,
   saveWarranty,
   updateWarranty,
+  deleteWarranty,
   getExpenses,
   saveExpense,
+  deleteExpense,
   getApiConfig,
   saveApiConfig,
   getPlatforms,
@@ -285,6 +287,9 @@ export default function WowtekProApp() {
 
           if (Array.isArray(data.orders)) {
             setOrders((prev) => {
+              if (data.dbStatus === 'connected') {
+                return data.orders;
+              }
               const serverOrders: Order[] = data.orders;
               if (serverOrders.length === 0) return prev;
               const merged = [...serverOrders];
@@ -299,6 +304,9 @@ export default function WowtekProApp() {
 
           if (Array.isArray(data.waybills)) {
             setWaybills((prev) => {
+              if (data.dbStatus === 'connected') {
+                return data.waybills;
+              }
               const serverWaybills: TransExpressWaybill[] = data.waybills;
               if (serverWaybills.length === 0) return prev;
               const merged = [...serverWaybills];
@@ -465,6 +473,11 @@ export default function WowtekProApp() {
     }
   };
 
+  const handleDeleteWarranty = async (id: string) => {
+    await deleteWarranty(id);
+    setWarranties((prev) => prev.filter((w) => w.id !== id));
+  };
+
   const handleDispatchSms = (id: string, gateway: 'SMSlenz' | 'Dialog' | 'Mobitel') => {
     const timeStr = `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
       [],
@@ -519,6 +532,11 @@ export default function WowtekProApp() {
   const handleAddExpense = async (expense: ExpenseItem) => {
     setExpenses((prev) => [expense, ...prev]);
     await saveExpense(expense);
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    await deleteExpense(id);
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
   };
 
   // Settings: Dynamic Platform & Gateway Fees

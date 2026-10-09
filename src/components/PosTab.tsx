@@ -92,8 +92,9 @@ export const PosTab: React.FC<PosTabProps> = ({
   };
 
   // Cart calculations
-  const grossTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const totalCostOfGoods = cart.reduce((sum, item) => sum + item.costPrice * item.quantity, 0);
+  const safeCart = cart || [];
+  const grossTotal = safeCart.reduce((sum, item) => sum + (item?.unitPrice || 0) * (item?.quantity || 0), 0);
+  const totalCostOfGoods = safeCart.reduce((sum, item) => sum + (item?.costPrice || 0) * (item?.quantity || 0), 0);
 
   const platformFeeAmount = Math.round((grossTotal * activePlatform.feePercent) / 100);
   const gatewayFeeAmount = Math.round((grossTotal * activeGateway.feePercent) / 100);
@@ -376,8 +377,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                     Your store inventory is empty. Add products in the Products & Barcode GRN tab or scan barcodes to begin invoicing.
                   </p>
                 </div>
-              ) :
-                filteredProducts.map((prod) => {
+              ) : (
+                (filteredProducts || []).map((prod) => {
                 const profitMargin =
                   prod.sellingPrice > 0
                     ? Math.round(((prod.sellingPrice - prod.costPrice) / prod.sellingPrice) * 100)
@@ -450,7 +451,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     Click products from catalog or scan a barcode to add.
                   </div>
                 ) : (
-                  cart.map((item) => (
+                  (cart || []).map((item) => (
                     <div
                       key={item.sku}
                       className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800/90 flex items-center justify-between text-xs"
@@ -511,7 +512,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {platforms.map((plt) => (
+                    {(platforms || []).map((plt) => (
                       <button
                         key={plt.code}
                         type="button"
@@ -538,7 +539,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {gateways.map((gw) => (
+                    {(gateways || []).map((gw) => (
                       <button
                         key={gw.code}
                         type="button"
@@ -689,38 +690,38 @@ export const PosTab: React.FC<PosTabProps> = ({
                         </div>
                       </td>
                     </tr>
-                  ) :
-                    filteredOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-neutral-850/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="font-mono font-semibold text-white">{order.invoiceNumber}</div>
-                          <div className="text-[10px] text-neutral-400 font-mono">
-                            {new Date(order.createdAt).toLocaleDateString('en-GB')}
-                          </div>
-                        </td>
+              ) : (
+                (filteredOrders || []).map((order) => (
+                  <tr key={order.id} className="hover:bg-neutral-850/40 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-mono font-semibold text-white">{order.invoiceNumber}</div>
+                      <div className="text-[10px] text-neutral-400 font-mono">
+                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : '-'}
+                      </div>
+                    </td>
 
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-white">{order.customerName}</div>
-                          <div className="text-neutral-400 font-mono text-[11px]">{order.customerPhone}</div>
-                        </td>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-white">{order.customerName}</div>
+                      <div className="text-neutral-400 font-mono text-[11px]">{order.customerPhone}</div>
+                    </td>
 
-                        <td className="py-3 px-4">
-                          <div className="text-neutral-200">{order.channelName}</div>
-                          <div className="text-[11px] text-purple-300 font-mono">
-                            {order.paymentGatewayName} ({order.gatewayFeePercent}%)
-                          </div>
-                        </td>
+                    <td className="py-3 px-4">
+                      <div className="text-neutral-200">{order.channelName}</div>
+                      <div className="text-[11px] text-purple-300 font-mono">
+                        {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                      </div>
+                    </td>
 
-                        <td className="py-3 px-4">
-                          {order.items.map((it, idx) => (
-                            <div key={idx} className="text-neutral-300 text-[11px]">
-                              <span className="font-semibold text-white">{it.quantity}x</span> {it.name}
-                              {it.returned && (
-                                <span className="ml-1 text-[10px] text-amber-400 font-mono">[Returned]</span>
-                              )}
-                            </div>
-                          ))}
-                        </td>
+                    <td className="py-3 px-4">
+                      {((order?.items) || []).map((it, idx) => (
+                        <div key={idx} className="text-neutral-300 text-[11px]">
+                          <span className="font-semibold text-white">{it.quantity}x</span> {it.name}
+                          {it.returned && (
+                            <span className="ml-1 text-[10px] text-amber-400 font-mono">[Returned]</span>
+                          )}
+                        </div>
+                      ))}
+                    </td>
 
                         <td className="py-3 px-4 text-right font-mono tabular-nums text-white font-medium">
                           Rs. {order.grossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -810,7 +811,7 @@ export const PosTab: React.FC<PosTabProps> = ({
         products={products}
         title="POS Camera Barcode Scanner"
         description="Scan any product barcode or SKU to continuously add to cart"
-        cartItemCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
+        cartItemCount={(cart || []).reduce((sum, item) => sum + (item?.quantity || 0), 0)}
         onLoadSampleProducts={onLoadSampleProducts}
       />
 
@@ -856,7 +857,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                   Items Returning to Store Stock:
                 </label>
                 <div className="p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg space-y-1.5">
-                  {returnModalOrder.items.map((it, idx) => (
+                  {((returnModalOrder?.items) || []).map((it, idx) => (
                     <div key={idx} className="flex justify-between items-center text-[11px]">
                       <span className="text-white">
                         {it.quantity}x {it.name}
@@ -1056,7 +1057,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                 </div>
 
                 <div className="border-t border-b border-dashed border-black py-2 space-y-1.5">
-                  {selectedInvoiceForPrint.items.map((it, idx) => (
+                  {((selectedInvoiceForPrint?.items) || []).map((it, idx) => (
                     <div key={idx} className="flex justify-between items-start text-[11px]">
                       <div>
                         <div>{it.name}</div>

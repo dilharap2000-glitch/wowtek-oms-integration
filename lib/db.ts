@@ -12,6 +12,7 @@ import {
   SupplierRmaClaim,
   WebhookEvent,
 } from '@/types';
+import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
 
 // ---------------------------------------------------------------------------
 // Default Configurations for Dynamic Platform & Payment Gateway Fees
@@ -139,12 +140,6 @@ export const DEFAULT_RMA_CLAIMS: SupplierRmaClaim[] = [
   },
 ];
 
-const INITIAL_PRODUCTS: Product[] = [];
-const INITIAL_ORDERS: Order[] = [];
-const INITIAL_WAYBILLS: TransExpressWaybill[] = [];
-const INITIAL_WARRANTIES: WarrantyRecord[] = [];
-const INITIAL_EXPENSES: ExpenseItem[] = [];
-
 const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   woocommerceUrl: 'https://store.wowtek.lk',
   woocommerceConsumerKey: 'ck_7f99148d9a20078b671a5c68dfb9101',
@@ -214,11 +209,11 @@ export function initMockDb(): MockDatabaseState {
       if (stored) {
         const parsed = JSON.parse(stored);
         return {
-          orders: Array.isArray(parsed.orders) ? parsed.orders : INITIAL_ORDERS,
-          products: Array.isArray(parsed.products) ? parsed.products : INITIAL_PRODUCTS,
-          waybills: Array.isArray(parsed.waybills) ? parsed.waybills : INITIAL_WAYBILLS,
-          warranties: Array.isArray(parsed.warranties) ? parsed.warranties : INITIAL_WARRANTIES,
-          expenses: Array.isArray(parsed.expenses) ? parsed.expenses : INITIAL_EXPENSES,
+          orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+          products: Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : SAMPLE_PRODUCTS,
+          waybills: Array.isArray(parsed.waybills) ? parsed.waybills : [],
+          warranties: Array.isArray(parsed.warranties) ? parsed.warranties : [],
+          expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
           apiConfig: parsed.apiConfig ? { ...INITIAL_API_CONFIG, ...parsed.apiConfig } : { ...INITIAL_API_CONFIG },
           platforms: Array.isArray(parsed.platforms) ? parsed.platforms : [...DEFAULT_PLATFORMS],
           gateways: Array.isArray(parsed.gateways) ? parsed.gateways : [...DEFAULT_GATEWAYS],
@@ -227,16 +222,14 @@ export function initMockDb(): MockDatabaseState {
           webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [...DEFAULT_WEBHOOK_EVENTS],
         };
       }
-    } catch {
-      // Ignore parse error
-    }
+    } catch {}
   }
 
   const g = globalThis as any;
   if (!g._wowtekMockDb) {
     g._wowtekMockDb = {
       orders: [],
-      products: [],
+      products: [...SAMPLE_PRODUCTS],
       waybills: [],
       warranties: [],
       expenses: [],
@@ -255,14 +248,12 @@ function persistMockDb() {
   if (typeof window !== 'undefined' && window.localStorage && (globalThis as any)._wowtekMockDb) {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify((globalThis as any)._wowtekMockDb));
-    } catch {
-      // Ignore quota warnings
-    }
+    } catch {}
   }
 }
 
 // ---------------------------------------------------------------------------
-// Client Database Health Check (Fetches from server-only /api/health/database)
+// Health check: Fetches from server-only /api/health/database route
 // ---------------------------------------------------------------------------
 export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
   const startTime = Date.now();
@@ -272,9 +263,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
       if (res.ok) {
         return await res.json();
       }
-    } catch {
-      // Fall through to offline fallback
-    }
+    } catch {}
   }
 
   const mockDb = initMockDb();
@@ -297,9 +286,23 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthStatus> {
 }
 
 // ---------------------------------------------------------------------------
-// Dynamic Platform & Payment Gateway Fee Accessors
+// Platforms & Payment Gateways
 // ---------------------------------------------------------------------------
 export async function getPlatforms(): Promise<PlatformConfig[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/settings', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.platforms) && data.platforms.length > 0) {
+          const mock = initMockDb();
+          mock.platforms = data.platforms;
+          persistMockDb();
+          return data.platforms;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().platforms;
 }
 
@@ -307,10 +310,34 @@ export async function savePlatforms(platforms: PlatformConfig[]): Promise<Platfo
   const mock = initMockDb();
   mock.platforms = platforms;
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platforms }),
+      }).catch(() => {});
+    } catch {}
+  }
   return platforms;
 }
 
 export async function getPaymentGateways(): Promise<PaymentGatewayConfig[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/settings', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.gateways) && data.gateways.length > 0) {
+          const mock = initMockDb();
+          mock.gateways = data.gateways;
+          persistMockDb();
+          return data.gateways;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().gateways;
 }
 
@@ -318,30 +345,34 @@ export async function savePaymentGateways(gateways: PaymentGatewayConfig[]): Pro
   const mock = initMockDb();
   mock.gateways = gateways;
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gateways }),
+      }).catch(() => {});
+    } catch {}
+  }
   return gateways;
 }
 
 // ---------------------------------------------------------------------------
-// Order & POS Invoicing CRUD with Returns & Stock Restoration
+// Orders CRUD (Direct to /api/orders)
 // ---------------------------------------------------------------------------
 export async function getOrders(): Promise<Order[]> {
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch('/api/sync/live', { cache: 'no-store' });
+      const res = await fetch('/api/orders', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.orders) && data.orders.length > 0) {
+        if (Array.isArray(data.orders)) {
+          const mock = initMockDb();
+          mock.orders = data.orders;
+          persistMockDb();
           return data.orders;
         }
-      }
-    } catch {}
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getServerStore } = require('./serverStore');
-      const store = getServerStore();
-      if (store.orders && store.orders.length > 0) {
-        return store.orders;
       }
     } catch {}
   }
@@ -349,22 +380,6 @@ export async function getOrders(): Promise<Order[]> {
 }
 
 export async function saveOrder(order: Order): Promise<Order> {
-  if (typeof window !== 'undefined') {
-    try {
-      fetch('/api/sync/live', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sync_client_order', order }),
-      }).catch(() => {});
-    } catch {}
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { saveServerOrder } = require('./serverStore');
-      saveServerOrder(order);
-    } catch {}
-  }
-
   const mock = initMockDb();
   const existingIdx = mock.orders.findIndex(
     (o) => o.id === order.id || o.invoiceNumber === order.invoiceNumber
@@ -379,7 +394,7 @@ export async function saveOrder(order: Order): Promise<Order> {
     mock.orders.unshift(order);
   }
 
-  // Deduct stock from store
+  // Deduct stock in local state
   order.items.forEach((item) => {
     const prod = mock.products.find((p) => p.sku === item.sku);
     if (prod) {
@@ -392,8 +407,17 @@ export async function saveOrder(order: Order): Promise<Order> {
       }
     }
   });
-
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order),
+      });
+    } catch {}
+  }
   return order;
 }
 
@@ -403,9 +427,18 @@ export async function updateOrder(id: string, updates: Partial<Order>): Promise<
   if (index !== -1) {
     mock.orders[index] = { ...mock.orders[index], ...updates, updatedAt: new Date().toISOString() };
     persistMockDb();
-    return mock.orders[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.orders[index] : null;
 }
 
 export async function deleteOrder(id: string): Promise<boolean> {
@@ -413,6 +446,12 @@ export async function deleteOrder(id: string): Promise<boolean> {
   const initialLength = mock.orders.length;
   mock.orders = mock.orders.filter((o: Order) => o.id !== id);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/orders?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
   return mock.orders.length < initialLength;
 }
 
@@ -449,15 +488,39 @@ export async function processOrderReturn(
   if (allItemsReturned) {
     order.netProfit = 0;
   }
-
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'return', orderId, returnedSkus, reason }),
+      });
+    } catch {}
+  }
+
   return { success: true, order, restoredItems };
 }
 
 // ---------------------------------------------------------------------------
-// Product Inventory & Valuation
+// Product Inventory (Direct to /api/products)
 // ---------------------------------------------------------------------------
 export async function getProducts(): Promise<Product[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/products', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          const mock = initMockDb();
+          mock.products = data.products;
+          persistMockDb();
+          return data.products;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().products;
 }
 
@@ -470,49 +533,68 @@ export async function saveProduct(product: Product): Promise<Product> {
     mock.products.unshift(product);
   }
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+    } catch {}
+  }
   return product;
 }
 
 export async function updateProduct(id: string, updates: Partial<Product>): Promise<Product | null> {
   const mock = initMockDb();
-  const index = mock.products.findIndex((p) => p.id === id);
+  const index = mock.products.findIndex((p) => p.id === id || p.sku === id);
   if (index !== -1) {
     mock.products[index] = { ...mock.products[index], ...updates };
     persistMockDb();
-    return mock.products[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.products[index] : null;
 }
 
 export async function deleteProduct(id: string): Promise<boolean> {
   const mock = initMockDb();
   const prevLen = mock.products.length;
-  mock.products = mock.products.filter((p) => p.id !== id);
+  mock.products = mock.products.filter((p) => p.id !== id && p.sku !== id);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/products?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
   return mock.products.length < prevLen;
 }
 
 // ---------------------------------------------------------------------------
-// Waybills, Warranties, Expenses, API Config
+// Waybills (Direct to /api/waybills)
 // ---------------------------------------------------------------------------
 export async function getWaybills(): Promise<TransExpressWaybill[]> {
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch('/api/sync/live', { cache: 'no-store' });
+      const res = await fetch('/api/waybills', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.waybills) && data.waybills.length > 0) {
+        if (Array.isArray(data.waybills)) {
+          const mock = initMockDb();
+          mock.waybills = data.waybills;
+          persistMockDb();
           return data.waybills;
         }
-      }
-    } catch {}
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getServerStore } = require('./serverStore');
-      const store = getServerStore();
-      if (store.waybills && store.waybills.length > 0) {
-        return store.waybills;
       }
     } catch {}
   }
@@ -520,14 +602,6 @@ export async function getWaybills(): Promise<TransExpressWaybill[]> {
 }
 
 export async function saveWaybill(waybill: TransExpressWaybill): Promise<TransExpressWaybill> {
-  if (typeof window === 'undefined') {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { saveServerWaybill } = require('./serverStore');
-      saveServerWaybill(waybill);
-    } catch {}
-  }
-
   const mock = initMockDb();
   const existingIdx = mock.waybills.findIndex(
     (w: TransExpressWaybill) => w.id === waybill.id || w.trackingNumber === waybill.trackingNumber
@@ -538,6 +612,16 @@ export async function saveWaybill(waybill: TransExpressWaybill): Promise<TransEx
     mock.waybills.unshift(waybill);
   }
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/waybills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(waybill),
+      });
+    } catch {}
+  }
   return waybill;
 }
 
@@ -547,12 +631,38 @@ export async function updateWaybill(id: string, updates: Partial<TransExpressWay
   if (index !== -1) {
     mock.waybills[index] = { ...mock.waybills[index], ...updates };
     persistMockDb();
-    return mock.waybills[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/waybills', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.waybills[index] : null;
 }
 
+// ---------------------------------------------------------------------------
+// Warranties (Direct to /api/warranties)
+// ---------------------------------------------------------------------------
 export async function getWarranties(): Promise<WarrantyRecord[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/warranties', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.warranties)) {
+          const mock = initMockDb();
+          mock.warranties = data.warranties;
+          persistMockDb();
+          return data.warranties;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().warranties;
 }
 
@@ -560,6 +670,16 @@ export async function saveWarranty(warranty: WarrantyRecord): Promise<WarrantyRe
   const mock = initMockDb();
   mock.warranties.unshift(warranty);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/warranties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(warranty),
+      });
+    } catch {}
+  }
   return warranty;
 }
 
@@ -569,12 +689,52 @@ export async function updateWarranty(id: string, updates: Partial<WarrantyRecord
   if (index !== -1) {
     mock.warranties[index] = { ...mock.warranties[index], ...updates };
     persistMockDb();
-    return mock.warranties[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/warranties', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.warranties[index] : null;
 }
 
+export async function deleteWarranty(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const initialLength = mock.warranties.length;
+  mock.warranties = mock.warranties.filter((w) => w.id !== id);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/warranties?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
+  return mock.warranties.length < initialLength;
+}
+
+// ---------------------------------------------------------------------------
+// Expenses (Direct to /api/expenses)
+// ---------------------------------------------------------------------------
 export async function getExpenses(): Promise<ExpenseItem[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/expenses', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.expenses)) {
+          const mock = initMockDb();
+          mock.expenses = data.expenses;
+          persistMockDb();
+          return data.expenses;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().expenses;
 }
 
@@ -582,10 +742,51 @@ export async function saveExpense(expense: ExpenseItem): Promise<ExpenseItem> {
   const mock = initMockDb();
   mock.expenses.unshift(expense);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(expense),
+      });
+    } catch {}
+  }
   return expense;
 }
 
+export async function deleteExpense(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const initialLength = mock.expenses.length;
+  mock.expenses = mock.expenses.filter((e) => e.id !== id);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/expenses?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
+  return mock.expenses.length < initialLength;
+}
+
+// ---------------------------------------------------------------------------
+// API Integrations Config
+// ---------------------------------------------------------------------------
 export async function getApiConfig(): Promise<ApiIntegrationConfig> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/settings', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.apiConfig) {
+          const mock = initMockDb();
+          mock.apiConfig = { ...INITIAL_API_CONFIG, ...data.apiConfig };
+          persistMockDb();
+          return mock.apiConfig;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().apiConfig;
 }
 
@@ -593,10 +794,37 @@ export async function saveApiConfig(config: ApiIntegrationConfig): Promise<ApiIn
   const mock = initMockDb();
   mock.apiConfig = { ...config };
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiConfig: config }),
+      });
+    } catch {}
+  }
   return config;
 }
 
+// ---------------------------------------------------------------------------
+// Suppliers (Direct to /api/suppliers)
+// ---------------------------------------------------------------------------
 export async function getSuppliers(): Promise<Supplier[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/suppliers', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.suppliers) && data.suppliers.length > 0) {
+          const mock = initMockDb();
+          mock.suppliers = data.suppliers;
+          persistMockDb();
+          return data.suppliers;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().suppliers;
 }
 
@@ -604,6 +832,16 @@ export async function saveSupplier(supplier: Supplier): Promise<Supplier> {
   const mock = initMockDb();
   mock.suppliers.unshift(supplier);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(supplier),
+      });
+    } catch {}
+  }
   return supplier;
 }
 
@@ -613,9 +851,18 @@ export async function updateSupplier(id: string, updates: Partial<Supplier>): Pr
   if (index !== -1) {
     mock.suppliers[index] = { ...mock.suppliers[index], ...updates };
     persistMockDb();
-    return mock.suppliers[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/suppliers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.suppliers[index] : null;
 }
 
 export async function deleteSupplier(id: string): Promise<boolean> {
@@ -623,10 +870,33 @@ export async function deleteSupplier(id: string): Promise<boolean> {
   const initialLength = mock.suppliers.length;
   mock.suppliers = mock.suppliers.filter((s) => s.id !== id);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/suppliers?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
   return mock.suppliers.length < initialLength;
 }
 
+// ---------------------------------------------------------------------------
+// Supplier RMA Claims (Direct to /api/rma)
+// ---------------------------------------------------------------------------
 export async function getSupplierRmaClaims(): Promise<SupplierRmaClaim[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/rma', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.rmaClaims) && data.rmaClaims.length > 0) {
+          const mock = initMockDb();
+          mock.rmaClaims = data.rmaClaims;
+          persistMockDb();
+          return data.rmaClaims;
+        }
+      }
+    } catch {}
+  }
   return initMockDb().rmaClaims;
 }
 
@@ -634,6 +904,16 @@ export async function saveSupplierRmaClaim(claim: SupplierRmaClaim): Promise<Sup
   const mock = initMockDb();
   mock.rmaClaims.unshift(claim);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/rma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(claim),
+      });
+    } catch {}
+  }
   return claim;
 }
 
@@ -643,9 +923,18 @@ export async function updateSupplierRmaClaim(id: string, updates: Partial<Suppli
   if (index !== -1) {
     mock.rmaClaims[index] = { ...mock.rmaClaims[index], ...updates, updatedAt: new Date().toISOString() };
     persistMockDb();
-    return mock.rmaClaims[index];
   }
-  return null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/rma', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates }),
+      });
+    } catch {}
+  }
+  return index !== -1 ? mock.rmaClaims[index] : null;
 }
 
 export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
@@ -653,11 +942,17 @@ export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {
   const initialLength = mock.rmaClaims.length;
   mock.rmaClaims = mock.rmaClaims.filter((r) => r.id !== id);
   persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/rma?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
   return mock.rmaClaims.length < initialLength;
 }
 
 // ---------------------------------------------------------------------------
-// Incoming Webhook Events & Transaction Audit Log
+// Incoming Webhook Events & Transaction Audit Log (Direct to /api/webhooks/events)
 // ---------------------------------------------------------------------------
 export async function getWebhookEvents(): Promise<WebhookEvent[]> {
   if (typeof window !== 'undefined') {
@@ -666,17 +961,11 @@ export async function getWebhookEvents(): Promise<WebhookEvent[]> {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.events) && data.events.length > 0) {
+          const mock = initMockDb();
+          mock.webhookEvents = data.events;
+          persistMockDb();
           return data.events;
         }
-      }
-    } catch {}
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getServerStore } = require('./serverStore');
-      const store = getServerStore();
-      if (store.webhookEvents && store.webhookEvents.length > 0) {
-        return store.webhookEvents;
       }
     } catch {}
   }
@@ -684,14 +973,6 @@ export async function getWebhookEvents(): Promise<WebhookEvent[]> {
 }
 
 export async function saveWebhookEvent(event: WebhookEvent): Promise<WebhookEvent> {
-  if (typeof window === 'undefined') {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { saveServerWebhookEvent } = require('./serverStore');
-      saveServerWebhookEvent(event);
-    } catch {}
-  }
-
   const mock = initMockDb();
   const existingIdx = mock.webhookEvents.findIndex((e) => e.id === event.id);
   if (existingIdx !== -1) {
@@ -711,14 +992,7 @@ export async function clearWebhookEvents(): Promise<boolean> {
     try {
       fetch('/api/webhooks/events', { method: 'DELETE' }).catch(() => {});
     } catch {}
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { clearServerWebhookEvents } = require('./serverStore');
-      clearServerWebhookEvents();
-    } catch {}
   }
-
   const mock = initMockDb();
   mock.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
   persistMockDb();

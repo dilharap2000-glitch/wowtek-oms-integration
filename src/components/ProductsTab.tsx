@@ -59,30 +59,35 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [grnBatch, setGrnBatch] = useState('GRN-2026-OCT-020');
   const [warrantyMonths, setWarrantyMonths] = useState(24);
 
+  // Safe array bindings
+  const safeProducts = products || [];
+  const safeSuppliers = suppliers || [];
+
   // Inventory Valuation Metrics
-  const totalCostValue = products.reduce(
-    (sum, p) => sum + (p.stockWarehouse + p.stockStore) * p.costPrice,
+  const totalCostValue = safeProducts.reduce(
+    (sum, p) => sum + ((p?.stockWarehouse || 0) + (p?.stockStore || 0)) * (p?.costPrice || 0),
     0
   );
-  const totalRetailValue = products.reduce(
-    (sum, p) => sum + (p.stockWarehouse + p.stockStore) * p.sellingPrice,
+  const totalRetailValue = safeProducts.reduce(
+    (sum, p) => sum + ((p?.stockWarehouse || 0) + (p?.stockStore || 0)) * (p?.sellingPrice || 0),
     0
   );
   const potentialProfit = totalRetailValue - totalCostValue;
   const overallMarginPercent =
     totalRetailValue > 0 ? ((potentialProfit / totalRetailValue) * 100).toFixed(1) : '0';
 
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = safeProducts.filter((p) => {
+    if (!p) return false;
     const matchesSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.barcode.includes(searchQuery) ||
-      (p.supplier && p.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
+      (p.name || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (p.sku || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (p.category || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (p.barcode || '').includes(searchQuery || '') ||
+      (p.supplier && p.supplier.toLowerCase().includes((searchQuery || '').toLowerCase()));
 
     const matchesSupplier =
       supplierFilter === 'all' ||
-      p.supplier?.toLowerCase().trim() === supplierFilter.toLowerCase().trim() ||
+      (p.supplier || '').toLowerCase().trim() === (supplierFilter || '').toLowerCase().trim() ||
       p.supplierId === supplierFilter;
 
     return matchesSearch && matchesSupplier;
@@ -238,11 +243,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             <Layers className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold font-mono tabular-nums text-white">
-            {products.length}{' '}
+            {(safeProducts || []).length}{' '}
             <span className="text-xs font-sans font-normal text-neutral-400">SKUs</span>
           </div>
           <div className="text-[11px] text-neutral-400 mt-2">
-            {products.reduce((s, p) => s + p.stockStore + p.stockWarehouse, 0)} total units on hand
+            {(safeProducts || []).reduce((s, p) => s + (p?.stockStore || 0) + (p?.stockWarehouse || 0), 0)} total units on hand
           </div>
         </div>
       </div>
@@ -261,15 +266,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             />
           </div>
 
-          {suppliers.length > 0 && (
+          {(safeSuppliers || []).length > 0 && (
             <div className="flex items-center gap-1.5">
               <select
                 value={supplierFilter}
                 onChange={(e) => setSupplierFilter(e.target.value)}
                 className="px-2.5 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-purple-500"
               >
-                <option value="all">All Suppliers ({suppliers.length})</option>
-                {suppliers.map((s) => (
+                <option value="all">All Suppliers ({(safeSuppliers || []).length})</option>
+                {(safeSuppliers || []).map((s) => (
                   <option key={s.id} value={s.name}>
                     {s.name}
                   </option>
@@ -343,8 +348,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     </div>
                   </td>
                 </tr>
-              ) :
-                filteredProducts.map((p) => {
+              ) : (
+                (filteredProducts || []).map((p) => {
                 const marginPercent =
                   p.sellingPrice > 0
                     ? Math.round(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100)
@@ -659,7 +664,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
                   >
                     <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
-                    {suppliers.map((s) => (
+                    {(safeSuppliers || []).map((s) => (
                       <option key={s.id} value={s.name}>
                         {s.name} ({s.paymentTerms})
                       </option>
@@ -833,7 +838,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
                   >
                     <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
-                    {suppliers.map((s) => (
+                    {(safeSuppliers || []).map((s) => (
                       <option key={s.id} value={s.name}>
                         {s.name} ({s.paymentTerms})
                       </option>

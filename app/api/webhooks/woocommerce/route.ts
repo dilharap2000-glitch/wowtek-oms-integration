@@ -477,6 +477,16 @@ export async function POST(req: NextRequest) {
             { upsert: true }
           ),
         ]);
+
+        // Decrement stock in MongoDB products collection
+        if (Array.isArray(newOrder.items)) {
+          for (const item of newOrder.items) {
+            await mongoConn.db.collection('products').updateOne(
+              { sku: item.sku },
+              { $inc: { stockStore: -item.quantity } }
+            );
+          }
+        }
         atlasConnected = true;
       }
     } catch (mongoErr: any) {

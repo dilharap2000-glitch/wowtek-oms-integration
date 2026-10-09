@@ -41,28 +41,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onClearWebhookEvents,
   onTriggerTestOrder,
 }) => {
-  // Financial computations
-  const totalGrossRevenue = orders
-    .filter((o) => o.status !== 'Returned')
-    .reduce((sum, o) => sum + o.grossTotal, 0);
+  // Defensive array bindings
+  const safeOrders = orders || [];
+  const safeWaybills = waybills || [];
+  const safeWarranties = warranties || [];
+  const safeExpenses = expenses || [];
+  const safeWebhookEvents = webhookEvents || [];
 
-  const totalNetProfit = orders.reduce((sum, o) => sum + o.netProfit, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalCommissionsDeducted = orders.reduce(
-    (sum, o) => sum + (o.platformFeeAmount || 0) + (o.gatewayFeeAmount || 0),
+  // Financial computations
+  const totalGrossRevenue = safeOrders
+    .filter((o) => o && o.status !== 'Returned')
+    .reduce((sum, o) => sum + (o?.grossTotal || 0), 0);
+
+  const totalNetProfit = safeOrders.reduce((sum, o) => sum + (o?.netProfit || 0), 0);
+  const totalExpenses = safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
+  const totalCommissionsDeducted = safeOrders.reduce(
+    (sum, o) => sum + (o?.platformFeeAmount || 0) + (o?.gatewayFeeAmount || 0),
     0
   );
 
   // Channel breakdown
-  const wcOrders = orders.filter((o) => o.channel === 'woocommerce');
-  const pkmOrders = orders.filter((o) => o.channel === 'pickme');
-  const ubrOrders = orders.filter((o) => o.channel === 'ubereats');
-  const posOrders = orders.filter((o) => o.channel === 'pos' || o.isPosSale);
+  const wcOrders = safeOrders.filter((o) => o?.channel === 'woocommerce');
+  const pkmOrders = safeOrders.filter((o) => o?.channel === 'pickme');
+  const ubrOrders = safeOrders.filter((o) => o?.channel === 'ubereats');
+  const posOrders = safeOrders.filter((o) => o?.channel === 'pos' || o?.isPosSale);
 
-  const pendingWaybills = waybills.filter((w) => w.status === 'Queued' || w.status === 'Manifested');
-  const activeWarranties = warranties.filter((w) => w.status === 'Active');
-  const expiringWarranties = warranties.filter((w) => w.status === 'Expiring Soon');
-  const returnedOrders = orders.filter((o) => o.status === 'Returned' || o.status === 'Partially Returned');
+  const pendingWaybills = safeWaybills.filter((w) => w?.status === 'Queued' || w?.status === 'Manifested');
+  const activeWarranties = safeWarranties.filter((w) => w?.status === 'Active');
+  const expiringWarranties = safeWarranties.filter((w) => w?.status === 'Expiring Soon');
+  const returnedOrders = safeOrders.filter((o) => o?.status === 'Returned' || o?.status === 'Partially Returned');
 
   return (
     <div className="space-y-6">
@@ -220,7 +227,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">0% Platform Fee</span>
                   <span className="text-white font-mono font-medium">
-                    Rs. {posOrders.reduce((s, o) => s + o.grossTotal, 0).toLocaleString()}
+                    Rs. {(posOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -232,14 +239,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                     <span className="font-medium text-white">PickMe Market (20%)</span>
                   </div>
-                  <span className="text-neutral-400 font-mono">{pkmOrders.length} orders</span>
+                  <span className="text-neutral-400 font-mono">{(pkmOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">
-                    Comm: -Rs. {pkmOrders.reduce((s, o) => s + (o.platformFeeAmount || 0), 0).toLocaleString()}
+                    Comm: -Rs. {(pkmOrders || []).reduce((s, o) => s + (o?.platformFeeAmount || 0), 0).toLocaleString()}
                   </span>
                   <span className="text-white font-mono font-medium">
-                    Rs. {pkmOrders.reduce((s, o) => s + o.grossTotal, 0).toLocaleString()}
+                    Rs. {(pkmOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -251,14 +258,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span className="font-medium text-white">Uber Eats Retail (15.4%)</span>
                   </div>
-                  <span className="text-neutral-400 font-mono">{ubrOrders.length} orders</span>
+                  <span className="text-neutral-400 font-mono">{(ubrOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">
-                    Comm: -Rs. {ubrOrders.reduce((s, o) => s + (o.platformFeeAmount || 0), 0).toLocaleString()}
+                    Comm: -Rs. {(ubrOrders || []).reduce((s, o) => s + (o?.platformFeeAmount || 0), 0).toLocaleString()}
                   </span>
                   <span className="text-white font-mono font-medium">
-                    Rs. {ubrOrders.reduce((s, o) => s + o.grossTotal, 0).toLocaleString()}
+                    Rs. {(ubrOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -270,12 +277,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                     <span className="font-medium text-white">WooCommerce Website</span>
                   </div>
-                  <span className="text-neutral-400 font-mono">{wcOrders.length} orders</span>
+                  <span className="text-neutral-400 font-mono">{(wcOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-neutral-400">Trans Express Auto-Linked</span>
                   <span className="text-white font-mono font-medium">
-                    Rs. {wcOrders.reduce((s, o) => s + o.grossTotal, 0).toLocaleString()}
+                    Rs. {(wcOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -338,7 +345,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  orders.slice(0, 5).map((order) => (
+                  (safeOrders || []).slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-neutral-850/50 transition-colors">
                       <td className="py-3 font-mono font-medium text-white">{order.invoiceNumber}</td>
                       <td className="py-3">

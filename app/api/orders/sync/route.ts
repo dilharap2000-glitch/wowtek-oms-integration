@@ -13,6 +13,12 @@ import {
   TransExpressWaybill,
   WebhookEvent,
 } from '@/types';
+import { connectToMongoDB } from '@/lib/mongodb';
+import {
+  saveServerOrder,
+  saveServerWaybill,
+  saveServerWebhookEvent,
+} from '@/lib/serverStore';
 
 /**
  * Normalizes Sri Lankan phone numbers
@@ -139,8 +145,6 @@ export async function GET(req: NextRequest) {
             notes: `Synced via WooCommerce REST API polling.`,
           };
 
-          await saveOrder(newOrder);
-
           // Trans Express Waybill with TE-XXXX code
           const waybill: TransExpressWaybill = {
             id: `wb-${Date.now().toString().slice(-4)}`,
@@ -160,7 +164,6 @@ export async function GET(req: NextRequest) {
             courierNotes: `Synced from WooCommerce Store #${wcOrder.id}`,
             labelPrinted: false,
           };
-          await saveWaybill(waybill);
 
           // Audit Log Event
           const evt: WebhookEvent = {
@@ -180,6 +183,46 @@ export async function GET(req: NextRequest) {
             rawPayload: wcOrder,
             receivedAt,
           };
+
+          try {
+            const mongoConn = await connectToMongoDB();
+            if (mongoConn) {
+              await Promise.all([
+                mongoConn.db.collection('orders').updateOne(
+                  { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }] },
+                  { $set: newOrder },
+                  { upsert: true }
+                ),
+                mongoConn.db.collection('waybills').updateOne(
+                  { $or: [{ id: waybill.id }, { trackingNumber: waybill.trackingNumber }] },
+                  { $set: waybill },
+                  { upsert: true }
+                ),
+                mongoConn.db.collection('webhook_events').updateOne(
+                  { id: evt.id },
+                  { $set: evt },
+                  { upsert: true }
+                ),
+              ]);
+
+              if (Array.isArray(newOrder.items)) {
+                for (const item of newOrder.items) {
+                  await mongoConn.db.collection('products').updateOne(
+                    { sku: item.sku },
+                    { $inc: { stockStore: -item.quantity } }
+                  );
+                }
+              }
+            }
+          } catch (err: any) {
+            console.warn('[Orders Sync API] MongoDB write error:', err?.message);
+          }
+
+          saveServerOrder(newOrder);
+          saveServerWaybill(waybill);
+          saveServerWebhookEvent(evt);
+          await saveOrder(newOrder);
+          await saveWaybill(waybill);
           await saveWebhookEvent(evt);
           newlyImported.push(newOrder);
         }

@@ -120,17 +120,24 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
     return `RMA-${prefix}-2026-${num}`;
   };
 
+  // Safe array bindings
+  const safeWarranties = warranties || [];
+  const safeProducts = products || [];
+  const safeSuppliers = suppliers || [];
+  const safeRmaClaims = rmaClaims || [];
+
   // ---------------------------------------------------------------------------
   // Customer Warranty Registration & SMS
   // ---------------------------------------------------------------------------
-  const filteredWarranties = warranties.filter((w) => {
+  const filteredWarranties = safeWarranties.filter((w) => {
+    if (!w) return false;
     const matchesStatus = statusFilter === 'all' || w.status === statusFilter;
     const matchesSearch =
-      w.serialNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.customerPhone.includes(searchQuery) ||
-      w.supplierName.toLowerCase().includes(searchQuery.toLowerCase());
+      (w.serialNumber || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (w.customerName || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (w.productName || '').toLowerCase().includes((searchQuery || '').toLowerCase()) ||
+      (w.customerPhone || '').includes(searchQuery || '') ||
+      (w.supplierName || '').toLowerCase().includes((searchQuery || '').toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
@@ -357,25 +364,26 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
   // RMA Metrics & Filtering
   // ---------------------------------------------------------------------------
   const todayStr = new Date().toISOString().split('T')[0];
-  const totalRma = rmaClaims.length;
-  const pendingRmaCount = rmaClaims.filter((r) => r.status === 'Pending with Supplier').length;
-  const repairedRmaCount = rmaClaims.filter((r) => r.status === 'Repaired').length;
-  const replacedRmaCount = rmaClaims.filter((r) => r.status === 'Replaced').length;
-  const rejectedRmaCount = rmaClaims.filter((r) => r.status === 'Rejected/Returned').length;
-  const overdueRmaCount = rmaClaims.filter(
-    (r) => r.status === 'Pending with Supplier' && r.expectedReturnDate && r.expectedReturnDate < todayStr
+  const totalRma = safeRmaClaims.length;
+  const pendingRmaCount = safeRmaClaims.filter((r) => r?.status === 'Pending with Supplier').length;
+  const repairedRmaCount = safeRmaClaims.filter((r) => r?.status === 'Repaired').length;
+  const replacedRmaCount = safeRmaClaims.filter((r) => r?.status === 'Replaced').length;
+  const rejectedRmaCount = safeRmaClaims.filter((r) => r?.status === 'Rejected/Returned').length;
+  const overdueRmaCount = safeRmaClaims.filter(
+    (r) => r?.status === 'Pending with Supplier' && r.expectedReturnDate && r.expectedReturnDate < todayStr
   ).length;
 
-  const filteredRmaClaims = rmaClaims.filter((claim) => {
-    const query = rmaSearchQuery.toLowerCase();
+  const filteredRmaClaims = safeRmaClaims.filter((claim) => {
+    if (!claim) return false;
+    const query = (rmaSearchQuery || '').toLowerCase();
     const matchesSearch =
-      claim.rmaNumber.toLowerCase().includes(query) ||
-      claim.serialNumber.toLowerCase().includes(query) ||
-      claim.productName.toLowerCase().includes(query) ||
-      claim.productSku.toLowerCase().includes(query) ||
-      claim.supplierName.toLowerCase().includes(query) ||
-      claim.customerName.toLowerCase().includes(query) ||
-      claim.customerPhone.includes(query);
+      (claim.rmaNumber || '').toLowerCase().includes(query) ||
+      (claim.serialNumber || '').toLowerCase().includes(query) ||
+      (claim.productName || '').toLowerCase().includes(query) ||
+      (claim.productSku || '').toLowerCase().includes(query) ||
+      (claim.supplierName || '').toLowerCase().includes(query) ||
+      (claim.customerName || '').toLowerCase().includes(query) ||
+      (claim.customerPhone || '').includes(query);
 
     let matchesStatus = true;
     if (rmaStatusFilter === 'Overdue') {
@@ -389,7 +397,7 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
     const matchesSupplier =
       rmaSupplierFilter === 'all' ||
       claim.supplierId === rmaSupplierFilter ||
-      claim.supplierName.toLowerCase() === rmaSupplierFilter.toLowerCase();
+      (claim.supplierName || '').toLowerCase() === (rmaSupplierFilter || '').toLowerCase();
 
     return matchesSearch && matchesStatus && matchesSupplier;
   });
