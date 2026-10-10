@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { getServerStore, saveServerWaybill } from '@/lib/serverStore';
+import { getServerStore, saveServerWaybill, deleteServerWaybill } from '@/lib/serverStore';
 import { TransExpressWaybill } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -72,6 +72,33 @@ export async function PUT(req: NextRequest) {
     } catch (err: any) {
       console.warn('[Waybills API PUT] MongoDB update error:', err.message);
     }
+
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
+    }
+
+    try {
+      const mongoConn = await connectToMongoDB();
+      if (mongoConn) {
+        await mongoConn.db.collection('waybills').deleteOne({
+          $or: [{ id }, { trackingNumber: id }],
+        });
+      }
+    } catch (err: any) {
+      console.warn('[Waybills API DELETE] MongoDB delete error:', err.message);
+    }
+
+    deleteServerWaybill(id);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

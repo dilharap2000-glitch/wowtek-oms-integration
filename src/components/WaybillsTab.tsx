@@ -16,6 +16,7 @@ import {
   Package,
   DollarSign,
   Zap,
+  Trash2,
 } from 'lucide-react';
 import { TransExpressWaybill, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
@@ -28,6 +29,7 @@ interface WaybillsTabProps {
   onRefreshWebhookEvents?: () => void;
   onClearWebhookEvents?: () => void;
   onTriggerTestOrder?: () => Promise<void>;
+  onDeleteWaybill?: (id: string) => void;
 }
 
 export const WaybillsTab: React.FC<WaybillsTabProps> = ({
@@ -38,6 +40,7 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   onRefreshWebhookEvents,
   onClearWebhookEvents,
   onTriggerTestOrder,
+  onDeleteWaybill,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedWaybillForPrint, setSelectedWaybillForPrint] = useState<TransExpressWaybill | null>(
@@ -247,17 +250,28 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                     </td>
 
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => handlePrintLabel(wb)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                          wb.labelPrinted
-                            ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                            : 'bg-purple-600 text-white hover:bg-purple-500'
-                        }`}
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handlePrintLabel(wb)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            wb.labelPrinted
+                              ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                              : 'bg-purple-600 text-white hover:bg-purple-500'
+                          }`}
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
+                        </button>
+                        {onDeleteWaybill && (
+                          <button
+                            onClick={() => onDeleteWaybill(wb.id)}
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Delete Waybill permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

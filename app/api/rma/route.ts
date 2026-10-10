@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { DEFAULT_RMA_CLAIMS } from '@/lib/db';
 import { SupplierRmaClaim } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -9,11 +8,7 @@ export async function GET() {
   try {
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
-      let claims = await mongoConn.db.collection('rma_claims').find({}).toArray();
-      if (claims.length === 0) {
-        await mongoConn.db.collection('rma_claims').insertMany(DEFAULT_RMA_CLAIMS);
-        claims = await mongoConn.db.collection('rma_claims').find({}).toArray();
-      }
+      const claims = await mongoConn.db.collection('rma_claims').find({}).toArray();
       const clean = claims.map(({ _id, ...rest }) => rest as SupplierRmaClaim);
       return NextResponse.json({ success: true, rmaClaims: clean });
     }
@@ -21,7 +16,7 @@ export async function GET() {
     console.warn('[RMA API GET] MongoDB read error:', err.message);
   }
 
-  return NextResponse.json({ success: true, rmaClaims: DEFAULT_RMA_CLAIMS });
+  return NextResponse.json({ success: true, rmaClaims: [] });
 }
 
 export async function POST(req: NextRequest) {

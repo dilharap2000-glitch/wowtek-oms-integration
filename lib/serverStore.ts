@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { Order, TransExpressWaybill, WebhookEvent } from '@/types';
-import { DEFAULT_WEBHOOK_EVENTS } from './db';
 
 interface ServerStoreData {
   orders: Order[];
@@ -60,11 +59,9 @@ function readFromDisk(): ServerStoreData {
         const data = JSON.parse(content);
         if (data && Array.isArray(data.orders)) {
           return {
-            orders: data.orders || [],
-            waybills: data.waybills || [],
-            webhookEvents: Array.isArray(data.webhookEvents) && data.webhookEvents.length > 0
-              ? data.webhookEvents
-              : [...DEFAULT_WEBHOOK_EVENTS],
+            orders: Array.isArray(data.orders) ? data.orders : [],
+            waybills: Array.isArray(data.waybills) ? data.waybills : [],
+            webhookEvents: Array.isArray(data.webhookEvents) ? data.webhookEvents : [],
             lastUpdated: data.lastUpdated || new Date().toISOString(),
           };
         }
@@ -77,7 +74,7 @@ function readFromDisk(): ServerStoreData {
   return {
     orders: [],
     waybills: [],
-    webhookEvents: [...DEFAULT_WEBHOOK_EVENTS],
+    webhookEvents: [],
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -182,30 +179,47 @@ export function saveServerWebhookEvent(event: WebhookEvent): WebhookEvent {
   return event;
 }
 
+export function deleteServerOrder(id: string): boolean {
+  const store = getServerStore();
+  const prevLen = store.orders.length;
+  store.orders = store.orders.filter((o) => o.id !== id && o.invoiceNumber !== id);
+  store.lastUpdated = new Date().toISOString();
+  writeToDisk(store);
+
+  broadcastLiveUpdate({
+    type: 'order_deleted',
+    orderId: id,
+    timestamp: store.lastUpdated,
+  });
+
+  return store.orders.length < prevLen;
+}
+
+export function deleteServerWaybill(id: string): boolean {
+  const store = getServerStore();
+  const prevLen = store.waybills.length;
+  store.waybills = store.waybills.filter((w) => w.id !== id && w.trackingNumber !== id);
+  store.lastUpdated = new Date().toISOString();
+  writeToDisk(store);
+
+  broadcastLiveUpdate({
+    type: 'waybill_deleted',
+    waybillId: id,
+    timestamp: store.lastUpdated,
+  });
+
+  return store.waybills.length < prevLen;
+}
+
 export function clearServerWebhookEvents(): boolean {
   const store = getServerStore();
-  store.webhookEvents = [
-    {
-      id: `evt-reset-${Date.now()}`,
-      source: 'woocommerce',
-      event: 'system.listener_active',
-      status: 'success',
-      rawPayload: {
-        status: 'active',
-        message: 'Webhook events reset. Live listener actively awaiting incoming WooCommerce orders.',
-        secret: 'WOWTEK-WC-Webhook-2026-9X7Kl42',
-        autoPipeline: 'Trans Express TE-XXXX waybill + SMSlenz SMS',
-      },
-      receivedAt: new Date().toISOString(),
-    },
-  ];
-
+  store.webhookEvents = [];
   store.lastUpdated = new Date().toISOString();
   writeToDisk(store);
 
   broadcastLiveUpdate({
     type: 'events_cleared',
-    webhookEvents: store.webhookEvents,
+    webhookEvents: [],
     timestamp: store.lastUpdated,
   });
 

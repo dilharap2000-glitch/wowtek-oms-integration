@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { DEFAULT_SUPPLIERS } from '@/lib/db';
 import { Supplier } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -9,11 +8,7 @@ export async function GET() {
   try {
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
-      let suppliers = await mongoConn.db.collection('suppliers').find({}).toArray();
-      if (suppliers.length === 0) {
-        await mongoConn.db.collection('suppliers').insertMany(DEFAULT_SUPPLIERS);
-        suppliers = await mongoConn.db.collection('suppliers').find({}).toArray();
-      }
+      const suppliers = await mongoConn.db.collection('suppliers').find({}).toArray();
       const clean = suppliers.map(({ _id, ...rest }) => rest as Supplier);
       return NextResponse.json({ success: true, suppliers: clean });
     }
@@ -21,7 +16,7 @@ export async function GET() {
     console.warn('[Suppliers API GET] MongoDB read error:', err.message);
   }
 
-  return NextResponse.json({ success: true, suppliers: DEFAULT_SUPPLIERS });
+  return NextResponse.json({ success: true, suppliers: [] });
 }
 
 export async function POST(req: NextRequest) {

@@ -12,7 +12,6 @@ import {
   SupplierRmaClaim,
   WebhookEvent,
 } from '@/types';
-import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
 
 // ---------------------------------------------------------------------------
 // Default Configurations for Dynamic Platform & Payment Gateway Fees
@@ -32,113 +31,9 @@ export const DEFAULT_GATEWAYS: PaymentGatewayConfig[] = [
   { id: 'gw-card', name: 'Card / Online Bank Gateway', code: 'card_online', feePercent: 3, isCustom: false, active: true },
 ];
 
-export const DEFAULT_SUPPLIERS: Supplier[] = [
-  {
-    id: 'sup-001',
-    name: 'Chama Computers (Pvt) Ltd',
-    contactPerson: 'Nuwan Jayasinghe',
-    phone: '+94 11 258 7744',
-    email: 'warranty@chamacomputers.lk',
-    address: 'No 112 Unity Plaza, Galle Road, Colombo 04',
-    categories: 'Kingston, ASUS, Corsair, RAM, SSDs, Motherboards',
-    paymentTerms: 'Credit 30 Days',
-    notes: 'Authorized Kingston & ASUS distributor. 7-day turnaround for RMA replacements.',
-    active: true,
-    createdAt: '2026-01-15T08:00:00Z',
-  },
-  {
-    id: 'sup-002',
-    name: 'Trident Technologies Colombo',
-    contactPerson: 'Dhammika Fernando',
-    phone: '+94 11 472 8899',
-    email: 'rma@tridenttech.lk',
-    address: '45/2 Nawala Road, Nugegoda',
-    categories: 'Logitech, Corsair, Keyboards & Mice, Gaming Gear',
-    paymentTerms: 'Credit 14 Days',
-    notes: 'Official Logitech sub-distributor. Serial verification portal enabled.',
-    active: true,
-    createdAt: '2026-02-01T09:30:00Z',
-  },
-  {
-    id: 'sup-003',
-    name: 'Future World Distributors',
-    contactPerson: 'Kavinda Senanayake',
-    phone: '+94 77 340 1122',
-    email: 'orders@futureworld.lk',
-    address: '88 Duplication Road, Kollupitiya, Colombo 03',
-    categories: 'Anker, Baseus, GaN Chargers, Power Banks, Cables',
-    paymentTerms: 'Cash on Delivery',
-    notes: 'Exclusive Anker importer. One-to-one replacement on defective chargers.',
-    active: true,
-    createdAt: '2026-02-10T11:15:00Z',
-  },
-  {
-    id: 'sup-004',
-    name: 'Singer Sri Lanka IT Hub',
-    contactPerson: 'Shanika Gunawardena',
-    phone: '+94 11 540 0400',
-    email: 'itcorporate@singersl.com',
-    address: 'Singer Mega Complex, No 80 Nawam Mawatha, Colombo 02',
-    categories: 'Dell, HP, Monitors, Laptops, Commercial Displays',
-    paymentTerms: 'Net 60 Days',
-    notes: 'Dell Official Corporate Partner. On-site warranty support available.',
-    active: true,
-    createdAt: '2026-03-05T14:20:00Z',
-  },
-  {
-    id: 'sup-005',
-    name: 'Redline Technologies Imports',
-    contactPerson: 'Hasitha Gamage',
-    phone: '+94 71 889 0011',
-    email: 'support@redlinetech.lk',
-    address: 'Majestic City Level 3, Station Road, Colombo 04',
-    categories: 'HyperX, SteelSeries, Audiophile Headsets, Microphones',
-    paymentTerms: 'Advance 50%',
-    notes: 'Specialist gaming peripheral distributor. RMA claims processed weekly.',
-    active: true,
-    createdAt: '2026-03-12T16:00:00Z',
-  },
-];
+export const DEFAULT_SUPPLIERS: Supplier[] = [];
 
-export const DEFAULT_RMA_CLAIMS: SupplierRmaClaim[] = [
-  {
-    id: 'rma-001',
-    serialNumber: 'SN-481920',
-    productSku: 'WT-SSD-1TB-NVME',
-    productName: 'Kingston NV2 1TB PCIe 4.0 NVMe SSD',
-    customerName: 'Roshan Wickramasinghe',
-    customerPhone: '+94 77 891 2345',
-    supplierId: 'sup-001',
-    supplierName: 'Chama Computers (Pvt) Ltd',
-    rmaNumber: 'RMA-CHAMA-2026-041',
-    dateSent: '2026-10-01',
-    status: 'Pending with Supplier',
-    expectedReturnDate: '2026-10-12',
-    issueDescription: 'Drive not detected in BIOS / I/O device error on cold boot',
-    notes: 'Dispatched via courier. Nuwan confirmed receipt at Chama service center.',
-    createdAt: '2026-10-01T10:30:00Z',
-    updatedAt: '2026-10-01T10:30:00Z',
-  },
-  {
-    id: 'rma-002',
-    serialNumber: 'SN-902184',
-    productSku: 'WT-MOUSE-MX3S',
-    productName: 'Logitech MX Master 3S Wireless Mouse - Graphite',
-    customerName: 'Dilshan Silva',
-    customerPhone: '+94 71 456 7890',
-    supplierId: 'sup-002',
-    supplierName: 'Trident Technologies Colombo',
-    rmaNumber: 'RMA-TRIDENT-2026-019',
-    dateSent: '2026-09-24',
-    status: 'Repaired',
-    expectedReturnDate: '2026-10-05',
-    actualReturnDate: '2026-10-05',
-    issueDescription: 'Scroll wheel ratchet motor stuck in free-spin mode',
-    notes: 'Optical switch replaced and recalibrated by Trident. Tested OK. Ready for customer handover.',
-    createdAt: '2026-09-24T14:15:00Z',
-    updatedAt: '2026-10-05T16:20:00Z',
-  },
-];
+export const DEFAULT_RMA_CLAIMS: SupplierRmaClaim[] = [];
 
 const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   woocommerceUrl: 'https://store.wowtek.lk',
@@ -162,29 +57,7 @@ const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   smsExpiryReminderDays: 30,
 };
 
-export const DEFAULT_WEBHOOK_EVENTS: WebhookEvent[] = [
-  {
-    id: 'evt-listener-active',
-    source: 'woocommerce',
-    event: 'system.listener_active',
-    status: 'success',
-    rawPayload: {
-      status: 'active',
-      message: 'WooCommerce Webhook Listener Active. Ready for live order testing.',
-      routes: {
-        webhook: '/api/webhooks/woocommerce',
-        sync: '/api/orders/sync',
-      },
-      supportedStatuses: ['processing', 'pending', 'completed', 'on-hold'],
-      autoActions: [
-        'Trans Express Waybill Auto-generation',
-        'SMSlenz Customer Confirmation Dispatch',
-        'POS Invoicing & Stock Sync',
-      ],
-    },
-    receivedAt: '2026-10-06T09:00:00.000Z',
-  },
-];
+export const DEFAULT_WEBHOOK_EVENTS: WebhookEvent[] = [];
 
 interface MockDatabaseState {
   orders: Order[];
@@ -210,16 +83,16 @@ export function initMockDb(): MockDatabaseState {
         const parsed = JSON.parse(stored);
         return {
           orders: Array.isArray(parsed.orders) ? parsed.orders : [],
-          products: Array.isArray(parsed.products) && parsed.products.length > 0 ? parsed.products : SAMPLE_PRODUCTS,
+          products: Array.isArray(parsed.products) ? parsed.products : [],
           waybills: Array.isArray(parsed.waybills) ? parsed.waybills : [],
           warranties: Array.isArray(parsed.warranties) ? parsed.warranties : [],
           expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
           apiConfig: parsed.apiConfig ? { ...INITIAL_API_CONFIG, ...parsed.apiConfig } : { ...INITIAL_API_CONFIG },
           platforms: Array.isArray(parsed.platforms) ? parsed.platforms : [...DEFAULT_PLATFORMS],
           gateways: Array.isArray(parsed.gateways) ? parsed.gateways : [...DEFAULT_GATEWAYS],
-          suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [...DEFAULT_SUPPLIERS],
-          rmaClaims: Array.isArray(parsed.rmaClaims) ? parsed.rmaClaims : [...DEFAULT_RMA_CLAIMS],
-          webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [...DEFAULT_WEBHOOK_EVENTS],
+          suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
+          rmaClaims: Array.isArray(parsed.rmaClaims) ? parsed.rmaClaims : [],
+          webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [],
         };
       }
     } catch {}
@@ -229,16 +102,16 @@ export function initMockDb(): MockDatabaseState {
   if (!g._wowtekMockDb) {
     g._wowtekMockDb = {
       orders: [],
-      products: [...SAMPLE_PRODUCTS],
+      products: [],
       waybills: [],
       warranties: [],
       expenses: [],
       apiConfig: { ...INITIAL_API_CONFIG },
       platforms: [...DEFAULT_PLATFORMS],
       gateways: [...DEFAULT_GATEWAYS],
-      suppliers: [...DEFAULT_SUPPLIERS],
-      rmaClaims: [...DEFAULT_RMA_CLAIMS],
-      webhookEvents: [...DEFAULT_WEBHOOK_EVENTS],
+      suppliers: [],
+      rmaClaims: [],
+      webhookEvents: [],
     };
   }
   return g._wowtekMockDb;
@@ -512,7 +385,7 @@ export async function getProducts(): Promise<Product[]> {
       const res = await fetch('/api/products', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.products) && data.products.length > 0) {
+        if (Array.isArray(data.products)) {
           const mock = initMockDb();
           mock.products = data.products;
           persistMockDb();
@@ -643,6 +516,20 @@ export async function updateWaybill(id: string, updates: Partial<TransExpressWay
     } catch {}
   }
   return index !== -1 ? mock.waybills[index] : null;
+}
+
+export async function deleteWaybill(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const initialLength = mock.waybills.length;
+  mock.waybills = mock.waybills.filter((w: TransExpressWaybill) => w.id !== id && w.trackingNumber !== id);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/waybills?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
+  return mock.waybills.length < initialLength;
 }
 
 // ---------------------------------------------------------------------------
@@ -816,7 +703,7 @@ export async function getSuppliers(): Promise<Supplier[]> {
       const res = await fetch('/api/suppliers', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.suppliers) && data.suppliers.length > 0) {
+        if (Array.isArray(data.suppliers)) {
           const mock = initMockDb();
           mock.suppliers = data.suppliers;
           persistMockDb();
@@ -888,7 +775,7 @@ export async function getSupplierRmaClaims(): Promise<SupplierRmaClaim[]> {
       const res = await fetch('/api/rma', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.rmaClaims) && data.rmaClaims.length > 0) {
+        if (Array.isArray(data.rmaClaims)) {
           const mock = initMockDb();
           mock.rmaClaims = data.rmaClaims;
           persistMockDb();
@@ -960,7 +847,7 @@ export async function getWebhookEvents(): Promise<WebhookEvent[]> {
       const res = await fetch('/api/webhooks/events', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.events) && data.events.length > 0) {
+        if (Array.isArray(data.events)) {
           const mock = initMockDb();
           mock.webhookEvents = data.events;
           persistMockDb();
@@ -994,7 +881,7 @@ export async function clearWebhookEvents(): Promise<boolean> {
     } catch {}
   }
   const mock = initMockDb();
-  mock.webhookEvents = [...DEFAULT_WEBHOOK_EVENTS];
+  mock.webhookEvents = [];
   persistMockDb();
   return true;
 }

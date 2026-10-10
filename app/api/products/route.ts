@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
 import { Product } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -9,14 +8,7 @@ export async function GET() {
   try {
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
-      let products = await mongoConn.db.collection('products').find({}).toArray();
-
-      // Seed initial catalog if collection is completely fresh
-      if (products.length === 0) {
-        await mongoConn.db.collection('products').insertMany(SAMPLE_PRODUCTS);
-        products = await mongoConn.db.collection('products').find({}).toArray();
-      }
-
+      const products = await mongoConn.db.collection('products').find({}).toArray();
       const clean = products.map(({ _id, ...rest }) => rest as Product);
       return NextResponse.json({ success: true, products: clean, source: 'mongodb' });
     }
@@ -24,7 +16,7 @@ export async function GET() {
     console.warn('[Products API GET] MongoDB read error:', err.message);
   }
 
-  return NextResponse.json({ success: true, products: SAMPLE_PRODUCTS, source: 'fallback' });
+  return NextResponse.json({ success: true, products: [], source: 'fallback' });
 }
 
 export async function POST(req: NextRequest) {

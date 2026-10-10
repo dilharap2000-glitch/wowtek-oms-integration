@@ -48,6 +48,7 @@ import {
   getWaybills,
   saveWaybill,
   updateWaybill,
+  deleteWaybill,
   getWarranties,
   saveWarranty,
   updateWarranty,
@@ -172,13 +173,13 @@ export default function WowtekProApp() {
         const liveRes = await fetch('/api/sync/live', { cache: 'no-store' });
         if (liveRes.ok) {
           const liveData = await liveRes.json();
-          if (Array.isArray(liveData.orders) && liveData.orders.length > 0) {
+          if (Array.isArray(liveData.orders)) {
             setOrders(liveData.orders);
           }
-          if (Array.isArray(liveData.waybills) && liveData.waybills.length > 0) {
+          if (Array.isArray(liveData.waybills)) {
             setWaybills(liveData.waybills);
           }
-          if (Array.isArray(liveData.webhookEvents) && liveData.webhookEvents.length > 0) {
+          if (Array.isArray(liveData.webhookEvents)) {
             setWebhookEvents(liveData.webhookEvents);
           }
           if (liveData.dbStatus) {
@@ -287,40 +288,14 @@ export default function WowtekProApp() {
           const latency = Date.now() - start;
 
           if (Array.isArray(data.orders)) {
-            setOrders((prev) => {
-              if (data.dbStatus === 'connected') {
-                return data.orders;
-              }
-              const serverOrders: Order[] = data.orders;
-              if (serverOrders.length === 0) return prev;
-              const merged = [...serverOrders];
-              for (const p of prev) {
-                if (!merged.some((m) => m.id === p.id || m.invoiceNumber === p.invoiceNumber)) {
-                  merged.push(p);
-                }
-              }
-              return merged;
-            });
+            setOrders(data.orders);
           }
 
           if (Array.isArray(data.waybills)) {
-            setWaybills((prev) => {
-              if (data.dbStatus === 'connected') {
-                return data.waybills;
-              }
-              const serverWaybills: TransExpressWaybill[] = data.waybills;
-              if (serverWaybills.length === 0) return prev;
-              const merged = [...serverWaybills];
-              for (const p of prev) {
-                if (!merged.some((m) => m.id === p.id || m.trackingNumber === p.trackingNumber)) {
-                  merged.push(p);
-                }
-              }
-              return merged;
-            });
+            setWaybills(data.waybills);
           }
 
-          if (Array.isArray(data.webhookEvents) && data.webhookEvents.length > 0) {
+          if (Array.isArray(data.webhookEvents)) {
             setWebhookEvents(data.webhookEvents);
           }
 
@@ -459,6 +434,11 @@ export default function WowtekProApp() {
   const handleMarkLabelPrinted = async (id: string) => {
     setWaybills((prev) => prev.map((w) => (w.id === id ? { ...w, labelPrinted: true } : w)));
     await updateWaybill(id, { labelPrinted: true });
+  };
+
+  const handleDeleteWaybill = async (id: string) => {
+    await deleteWaybill(id);
+    setWaybills((prev) => prev.filter((w) => w.id !== id && w.trackingNumber !== id));
   };
 
   // Handlers for Warranty & SMS
@@ -841,6 +821,7 @@ export default function WowtekProApp() {
                 onRefreshWebhookEvents={handleRefreshWebhookEvents}
                 onClearWebhookEvents={handleClearWebhookEvents}
                 onTriggerTestOrder={handleTriggerTestOrder}
+                onDeleteWaybill={handleDeleteWaybill}
               />
             )}
 

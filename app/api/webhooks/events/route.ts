@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { getServerStore, clearServerWebhookEvents } from '@/lib/serverStore';
-import { DEFAULT_WEBHOOK_EVENTS } from '@/lib/db';
 import { WebhookEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -20,17 +19,15 @@ export async function GET() {
         .sort({ receivedAt: -1 })
         .limit(100)
         .toArray();
-      if (events.length > 0) {
-        const clean = events.map(({ _id, ...rest }) => rest as WebhookEvent);
-        return NextResponse.json({ success: true, count: clean.length, events: clean });
-      }
+      const clean = events.map(({ _id, ...rest }) => rest as WebhookEvent);
+      return NextResponse.json({ success: true, count: clean.length, events: clean });
     }
   } catch (err: any) {
     console.warn('[Webhook Events API GET] MongoDB read error:', err.message);
   }
 
   const store = getServerStore();
-  const finalEvents = store.webhookEvents.length > 0 ? store.webhookEvents : DEFAULT_WEBHOOK_EVENTS;
+  const finalEvents = Array.isArray(store.webhookEvents) ? store.webhookEvents : [];
   return NextResponse.json({
     success: true,
     count: finalEvents.length,
@@ -56,7 +53,7 @@ export async function DELETE() {
 
   return NextResponse.json({
     success: true,
-    message: 'Webhook audit events reset to baseline.',
-    events: DEFAULT_WEBHOOK_EVENTS,
+    message: 'Webhook audit events cleared.',
+    events: [],
   });
 }

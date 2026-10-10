@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { getServerStore, saveServerOrder } from '@/lib/serverStore';
+import { getServerStore, saveServerOrder, deleteServerOrder } from '@/lib/serverStore';
 import { Order } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -158,11 +158,15 @@ export async function DELETE(req: NextRequest) {
     try {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
-        await mongoConn.db.collection('orders').deleteOne({ id });
+        await mongoConn.db.collection('orders').deleteOne({
+          $or: [{ id }, { invoiceNumber: id }],
+        });
       }
     } catch (err: any) {
       console.warn('[Orders API DELETE] MongoDB delete error:', err.message);
     }
+
+    deleteServerOrder(id);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
