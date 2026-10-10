@@ -548,13 +548,13 @@ export default function WowtekProApp() {
         const liveRes = await fetch('/api/sync/live', { cache: 'no-store' });
         if (liveRes.ok) {
           const liveData = await liveRes.json();
-          if (Array.isArray(liveData.orders) && liveData.orders.length > 0) {
+          if (Array.isArray(liveData.orders)) {
             setOrders(liveData.orders);
           }
-          if (Array.isArray(liveData.waybills) && liveData.waybills.length > 0) {
+          if (Array.isArray(liveData.waybills)) {
             setWaybills(liveData.waybills);
           }
-          if (Array.isArray(liveData.webhookEvents) && liveData.webhookEvents.length > 0) {
+          if (Array.isArray(liveData.webhookEvents)) {
             setWebhookEvents(liveData.webhookEvents);
           }
         }
@@ -569,13 +569,13 @@ export default function WowtekProApp() {
       const liveRes = await fetch('/api/sync/live', { cache: 'no-store' });
       if (liveRes.ok) {
         const liveData = await liveRes.json();
-        if (Array.isArray(liveData.orders) && liveData.orders.length > 0) {
+        if (Array.isArray(liveData.orders)) {
           setOrders(liveData.orders);
         }
-        if (Array.isArray(liveData.waybills) && liveData.waybills.length > 0) {
+        if (Array.isArray(liveData.waybills)) {
           setWaybills(liveData.waybills);
         }
-        if (Array.isArray(liveData.webhookEvents) && liveData.webhookEvents.length > 0) {
+        if (Array.isArray(liveData.webhookEvents)) {
           setWebhookEvents(liveData.webhookEvents);
         }
       }
@@ -815,6 +815,7 @@ export default function WowtekProApp() {
             {activeTab === 'waybills' && (
               <WaybillsTab
                 waybills={waybills}
+                orders={orders}
                 webhookEvents={webhookEvents}
                 onUpdateWaybillStatus={handleUpdateWaybillStatus}
                 onMarkLabelPrinted={handleMarkLabelPrinted}

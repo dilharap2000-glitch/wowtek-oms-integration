@@ -17,12 +17,15 @@ import {
   DollarSign,
   Zap,
   Trash2,
+  FileText,
 } from 'lucide-react';
-import { TransExpressWaybill, WebhookEvent } from '@/types';
+import { Order, TransExpressWaybill, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
+import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 
 interface WaybillsTabProps {
   waybills: TransExpressWaybill[];
+  orders?: Order[];
   webhookEvents?: WebhookEvent[];
   onUpdateWaybillStatus: (id: string, status: TransExpressWaybill['status']) => void;
   onMarkLabelPrinted: (id: string) => void;
@@ -34,6 +37,7 @@ interface WaybillsTabProps {
 
 export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   waybills,
+  orders = [],
   webhookEvents = [],
   onUpdateWaybillStatus,
   onMarkLabelPrinted,
@@ -43,6 +47,7 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   onDeleteWaybill,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
   const [selectedWaybillForPrint, setSelectedWaybillForPrint] = useState<TransExpressWaybill | null>(
     null
   );
@@ -262,6 +267,64 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                           <Printer className="w-3.5 h-3.5" />
                           <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
                         </button>
+
+                        <button
+                          onClick={() => {
+                            const matchedOrder = orders.find(
+                              (o) =>
+                                o.id === wb.orderId ||
+                                o.invoiceNumber === wb.orderId ||
+                                o.transExpressTrackingNumber === wb.trackingNumber ||
+                                o.waybillNumber === wb.trackingNumber
+                            );
+                            if (matchedOrder) {
+                              setSelectedOrderForInvoice(matchedOrder);
+                            } else {
+                              setSelectedOrderForInvoice({
+                                id: wb.orderId || wb.id,
+                                invoiceNumber: `WT-WC-${wb.id.slice(-5)}`,
+                                channel: 'woocommerce',
+                                channelName: 'WooCommerce Store',
+                                paymentGateway: wb.codAmount > 0 ? 'cash_cod' : 'card_online',
+                                paymentGatewayName: wb.codAmount > 0 ? 'Cash on Delivery (COD)' : 'Prepaid / Online Card',
+                                customerName: wb.recipientName,
+                                customerPhone: wb.recipientPhone,
+                                deliveryAddress: wb.destination,
+                                city: wb.district,
+                                items: [
+                                  {
+                                    sku: 'WT-WC-PKG',
+                                    barcode: wb.trackingNumber,
+                                    name: wb.courierNotes || 'E-Commerce Package Order',
+                                    quantity: 1,
+                                    unitPrice: wb.codAmount || 0,
+                                    costPrice: Math.round((wb.codAmount || 0) * 0.75),
+                                  },
+                                ],
+                                grossTotal: wb.codAmount || 0,
+                                platformFeePercent: 0,
+                                platformFeeAmount: 0,
+                                gatewayFeePercent: 0,
+                                gatewayFeeAmount: 0,
+                                courierFee: 450,
+                                costOfGoods: Math.round((wb.codAmount || 0) * 0.75),
+                                netProfit: Math.round((wb.codAmount || 0) * 0.25),
+                                status: 'Processing',
+                                createdAt: new Date().toISOString(),
+                                updatedAt: new Date().toISOString(),
+                                waybillGenerated: true,
+                                waybillNumber: wb.trackingNumber,
+                                transExpressTrackingNumber: wb.trackingNumber,
+                              });
+                            }
+                          }}
+                          className="px-2 py-1.5 rounded-lg text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 transition-colors flex items-center gap-1 text-xs font-medium"
+                          title="View & Print A4 Warranty Invoice"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">A4 Invoice</span>
+                        </button>
+
                         {onDeleteWaybill && (
                           <button
                             onClick={() => onDeleteWaybill(wb.id)}
@@ -398,6 +461,13 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
         title="Live WooCommerce Webhook Events & Logistics Stream"
         subtitle="Real-time incoming orders from connected WooCommerce store with automatic Trans Express Waybill generation (TE-XXXX)."
       />
+      {/* A4 Warranty Invoice Modal */}
+      {selectedOrderForInvoice && (
+        <A4WarrantyInvoiceModal
+          order={selectedOrderForInvoice}
+          onClose={() => setSelectedOrderForInvoice(null)}
+        />
+      )}
     </div>
   );
 };

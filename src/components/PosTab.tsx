@@ -29,6 +29,7 @@ import {
   PaymentGatewayConfig,
 } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 
 interface PosTabProps {
   products: Product[];
@@ -751,13 +752,14 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center gap-1.5">
-                            {/* View / Print Invoice */}
+                            {/* View / Print A4 Warranty Invoice */}
                             <button
                               onClick={() => setSelectedInvoiceForPrint(order)}
-                              className="p-1.5 text-neutral-400 hover:text-white rounded hover:bg-neutral-800 transition-colors"
-                              title="Print Thermal Receipt / Tax Invoice"
+                              className="px-2.5 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-lg transition-all flex items-center gap-1.5 text-[11px] font-semibold"
+                              title="Print / Download A4 Warranty Invoice"
                             >
-                              <Printer className="w-3.5 h-3.5" />
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>A4 Invoice</span>
                             </button>
 
                             {/* Process Return & Restock */}
@@ -1001,98 +1003,13 @@ export const PosTab: React.FC<PosTabProps> = ({
         </div>
       )}
 
-      {/* Printable Thermal Receipt / Invoice Modal */}
+      {/* Official A4 Warranty Invoice & Print Modal */}
       {selectedInvoiceForPrint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-semibold text-white">
-                  Official POS Receipt & Tax Invoice
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print 80mm Receipt</span>
-                </button>
-                <button
-                  onClick={() => setSelectedInvoiceForPrint(null)}
-                  className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Thermal Slip Simulation */}
-            <div className="p-6 bg-neutral-950 flex justify-center">
-              <div className="w-full max-w-xs bg-white text-black p-4 rounded border border-neutral-300 font-mono text-xs space-y-3">
-                <div className="text-center pb-2 border-b border-dashed border-black">
-                  <div className="font-bold text-base tracking-wider">WOWTEK PRO</div>
-                  <div className="text-[10px] text-neutral-700">SRI LANKA E-COMMERCE & RETAIL</div>
-                  <div className="text-[9px] text-neutral-600">No. 182, Galle Road, Colombo 04</div>
-                  <div className="text-[9px] text-neutral-600">VAT: 10488921-7000 · Tel: 011 258 9000</div>
-                </div>
-
-                <div className="text-[10px] space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>INVOICE:</span>
-                    <span className="font-bold">{selectedInvoiceForPrint.invoiceNumber}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>DATE:</span>
-                    <span>{new Date(selectedInvoiceForPrint.createdAt).toLocaleDateString('en-GB')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>CUSTOMER:</span>
-                    <span className="font-bold">{selectedInvoiceForPrint.customerName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>GATEWAY:</span>
-                    <span>{selectedInvoiceForPrint.paymentGatewayName}</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-b border-dashed border-black py-2 space-y-1.5">
-                  {((selectedInvoiceForPrint?.items) || []).map((it, idx) => (
-                    <div key={idx} className="flex justify-between items-start text-[11px]">
-                      <div>
-                        <div>{it.name}</div>
-                        <div className="text-[9px] text-neutral-600">
-                          {it.quantity} x Rs. {it.unitPrice.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="font-bold">
-                        Rs. {(it.unitPrice * it.quantity).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-1 text-right text-[11px]">
-                  <div className="flex justify-between font-bold text-sm pt-1 border-t border-black">
-                    <span>TOTAL PAYABLE:</span>
-                    <span>Rs. {selectedInvoiceForPrint.grossTotal.toLocaleString()}</span>
-                  </div>
-                  <div className="text-[9px] text-neutral-600 flex justify-between">
-                    <span>Payment Gateway Fee:</span>
-                    <span>{selectedInvoiceForPrint.gatewayFeePercent}% applied</span>
-                  </div>
-                </div>
-
-                <div className="text-center text-[9px] text-neutral-600 pt-2 border-t border-dashed border-black space-y-1">
-                  <div>*** THANK YOU FOR YOUR PURCHASE ***</div>
-                  <div>Eligible for manufacturer warranty. Retain invoice for claims.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <A4WarrantyInvoiceModal
+          order={selectedInvoiceForPrint}
+          onClose={() => setSelectedInvoiceForPrint(null)}
+          products={products}
+        />
       )}
     </div>
   );
