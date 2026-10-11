@@ -20,6 +20,8 @@ import {
   TrendingUp,
   FileText,
   Package,
+  Truck,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Order,
@@ -30,6 +32,7 @@ import {
 } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
+import { ThermalWaybillModal } from './ThermalWaybillModal';
 
 interface PosTabProps {
   products: Product[];
@@ -69,6 +72,7 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Order | null>(null);
+  const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = useState<Order | null>(null);
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('Customer Return & Restock');
   const [editModalOrder, setEditModalOrder] = useState<Order | null>(null);
@@ -701,6 +705,20 @@ export const PosTab: React.FC<PosTabProps> = ({
                       <div className="text-[10px] text-neutral-400 font-mono">
                         {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : '-'}
                       </div>
+                      {order.waybillNumber ? (
+                        <div className="mt-1 flex items-center gap-1 text-[10px] text-cyan-400 font-mono">
+                          <Truck className="w-3 h-3" />
+                          <span>TX: {order.waybillNumber}</span>
+                        </div>
+                      ) : order.waybillError ? (
+                        <div
+                          className="mt-1 flex items-center gap-1 text-[10px] text-red-400 font-mono truncate max-w-[140px]"
+                          title={order.waybillError}
+                        >
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">Courier Failed</span>
+                        </div>
+                      ) : null}
                     </td>
 
                     <td className="py-3 px-4">
@@ -755,11 +773,21 @@ export const PosTab: React.FC<PosTabProps> = ({
                             {/* View / Print A4 Warranty Invoice */}
                             <button
                               onClick={() => setSelectedInvoiceForPrint(order)}
-                              className="px-2.5 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-lg transition-all flex items-center gap-1.5 text-[11px] font-semibold"
+                              className="px-2 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold"
                               title="Print / Download A4 Warranty Invoice"
                             >
-                              <FileText className="w-3.5 h-3.5" />
-                              <span>A4 Invoice</span>
+                              <FileText className="w-3 h-3" />
+                              <span>A4</span>
+                            </button>
+
+                            {/* Print 4x6 Daraz-Style Thermal Shipping Label */}
+                            <button
+                              onClick={() => setSelectedOrderForThermalPrint(order)}
+                              className="px-2 py-1 text-emerald-300 hover:text-white bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold"
+                              title="Print 100mm x 150mm Daraz-Style 4x6 Thermal Shipping Waybill"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>4x6 Label</span>
                             </button>
 
                             {/* Process Return & Restock */}
@@ -1009,6 +1037,16 @@ export const PosTab: React.FC<PosTabProps> = ({
           order={selectedInvoiceForPrint}
           onClose={() => setSelectedInvoiceForPrint(null)}
           products={products}
+        />
+      )}
+
+      {/* 4x6 Daraz-Style Thermal Shipping Waybill Modal */}
+      {selectedOrderForThermalPrint && (
+        <ThermalWaybillModal
+          order={selectedOrderForThermalPrint}
+          orders={orders}
+          products={products}
+          onClose={() => setSelectedOrderForThermalPrint(null)}
         />
       )}
     </div>

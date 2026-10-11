@@ -48,18 +48,42 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // New product form
+  // New product form (clean default values, reset on open/close/submit)
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Computer Components');
-  const [costPrice, setCostPrice] = useState(15000);
-  const [sellingPrice, setSellingPrice] = useState(21000);
-  const [stockWarehouse, setStockWarehouse] = useState(20);
-  const [stockStore, setStockStore] = useState(5);
-  const [supplier, setSupplier] = useState(suppliers[0]?.name || 'Chama Computers (Pvt) Ltd');
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id || '');
-  const [grnBatch, setGrnBatch] = useState('GRN-2026-OCT-020');
-  const [warrantyMonths, setWarrantyMonths] = useState(24);
+  const [costPrice, setCostPrice] = useState<number | ''>('');
+  const [sellingPrice, setSellingPrice] = useState<number | ''>('');
+  const [stockWarehouse, setStockWarehouse] = useState<number | ''>('');
+  const [stockStore, setStockStore] = useState<number | ''>('');
+  const [supplier, setSupplier] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [grnBatch, setGrnBatch] = useState('');
+  const [warrantyMonths, setWarrantyMonths] = useState<number | ''>('');
+
+  const resetForm = () => {
+    setSku('');
+    setName('');
+    setCategory('Computer Components');
+    setCostPrice('');
+    setSellingPrice('');
+    setStockWarehouse('');
+    setStockStore('');
+    setSupplier('');
+    setSupplierId('');
+    setGrnBatch('');
+    setWarrantyMonths('');
+  };
+
+  const handleOpenAddModal = () => {
+    resetForm();
+    setShowAddModal(true);
+  };
+
+  const handleCloseAddModal = () => {
+    resetForm();
+    setShowAddModal(false);
+  };
 
   // Safe array bindings
   const safeProducts = products || [];
@@ -102,23 +126,21 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
       id: `prod-${Date.now().toString().slice(-4)}`,
       sku: sku.toUpperCase() || `WT-${Date.now().toString().slice(-5)}`,
       barcode: `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-      name,
+      name: name.trim(),
       category,
-      costPrice,
-      sellingPrice,
-      stockWarehouse,
-      stockStore,
+      costPrice: typeof costPrice === 'number' ? costPrice : 0,
+      sellingPrice: typeof sellingPrice === 'number' ? sellingPrice : 0,
+      stockWarehouse: typeof stockWarehouse === 'number' ? stockWarehouse : 0,
+      stockStore: typeof stockStore === 'number' ? stockStore : 0,
       stockReserved: 0,
-      grnBatch,
+      grnBatch: grnBatch.trim() || `GRN-${new Date().getFullYear()}`,
       supplier: supplier || matchedSup?.name || 'WOWTEK Direct Import',
       supplierId: supplierId || matchedSup?.id,
-      warrantyPeriodMonths: warrantyMonths,
+      warrantyPeriodMonths: typeof warrantyMonths === 'number' ? warrantyMonths : 0,
     };
 
     onAddProduct(newProd);
-    setShowAddModal(false);
-    setSku('');
-    setName('');
+    handleCloseAddModal();
   };
 
   const handleSaveEditProduct = (e: React.FormEvent) => {
@@ -189,7 +211,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             <span>Scan Barcode</span>
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={handleOpenAddModal}
             className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -330,7 +352,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                       <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
                         <button
                           type="button"
-                          onClick={() => setShowAddModal(true)}
+                          onClick={handleOpenAddModal}
                           className="flex items-center gap-2 px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-colors"
                         >
                           <Plus className="w-4 h-4" />
@@ -714,8 +736,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
               <h3 className="text-sm font-semibold text-white">GRN Product Inward Receipt</h3>
               <button
-                onClick={() => setShowAddModal(false)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                type="button"
+                onClick={handleCloseAddModal}
+                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -767,9 +790,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <label className="block text-neutral-300 font-medium mb-1">Cost Price (LKR)</label>
                   <input
                     type="number"
+                    min="0"
                     required
                     value={costPrice}
-                    onChange={(e) => setCostPrice(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setCostPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -777,9 +802,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <label className="block text-neutral-300 font-medium mb-1">Selling Price (LKR)</label>
                   <input
                     type="number"
+                    min="0"
                     required
                     value={sellingPrice}
-                    onChange={(e) => setSellingPrice(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -790,8 +817,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <label className="block text-neutral-300 font-medium mb-1">Warehouse Stock</label>
                   <input
                     type="number"
+                    min="0"
                     value={stockWarehouse}
-                    onChange={(e) => setStockWarehouse(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setStockWarehouse(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -799,8 +828,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <label className="block text-neutral-300 font-medium mb-1">Store Front Stock</label>
                   <input
                     type="number"
+                    min="0"
                     value={stockStore}
-                    onChange={(e) => setStockStore(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setStockStore(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -813,6 +844,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     type="text"
                     value={grnBatch}
                     onChange={(e) => setGrnBatch(e.target.value)}
+                    placeholder="e.g. GRN-2026-OCT-021"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -820,8 +852,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   <label className="block text-neutral-300 font-medium mb-1">Warranty (Months)</label>
                   <input
                     type="number"
+                    min="0"
                     value={warrantyMonths}
-                    onChange={(e) => setWarrantyMonths(parseInt(e.target.value) || 12)}
+                    onChange={(e) => setWarrantyMonths(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                    placeholder="0"
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
                   />
                 </div>
@@ -839,6 +873,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     }}
                     className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
                   >
+                    <option value="">Select Supplier (Optional)...</option>
                     <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
                     {(safeSuppliers || []).map((s) => (
                       <option key={s.id} value={s.name}>
@@ -860,14 +895,14 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg"
+                  onClick={handleCloseAddModal}
+                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-sm"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-sm transition-colors"
                 >
                   Confirm GRN Receipt
                 </button>

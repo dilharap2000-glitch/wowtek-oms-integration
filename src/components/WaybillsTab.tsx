@@ -18,14 +18,17 @@ import {
   Zap,
   Trash2,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
-import { Order, TransExpressWaybill, WebhookEvent } from '@/types';
+import { Order, Product, TransExpressWaybill, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
+import { ThermalWaybillModal } from './ThermalWaybillModal';
 
 interface WaybillsTabProps {
   waybills: TransExpressWaybill[];
   orders?: Order[];
+  products?: Product[];
   webhookEvents?: WebhookEvent[];
   onUpdateWaybillStatus: (id: string, status: TransExpressWaybill['status']) => void;
   onMarkLabelPrinted: (id: string) => void;
@@ -38,6 +41,7 @@ interface WaybillsTabProps {
 export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   waybills,
   orders = [],
+  products = [],
   webhookEvents = [],
   onUpdateWaybillStatus,
   onMarkLabelPrinted,
@@ -137,6 +141,50 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
           <div className="text-[10px] text-neutral-400">Cash collection across riders</div>
         </div>
       </div>
+
+      {/* Courier Dispatch Exceptions Banner (if courier API rejected waybills) */}
+      {orders && orders.filter((o) => Boolean(o.waybillError)).length > 0 && (
+        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/60 space-y-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-red-300">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
+            <span>Courier Dispatch Exceptions ({orders.filter((o) => Boolean(o.waybillError)).length})</span>
+            <span className="text-[10px] font-normal text-red-300/80">· Real Trans Express API rejections</span>
+          </div>
+          <div className="space-y-1.5">
+            {orders
+              .filter((o) => Boolean(o.waybillError))
+              .map((ord) => (
+                <div
+                  key={ord.id}
+                  className="text-xs bg-neutral-900/90 p-3 rounded-lg border border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2 font-mono flex-wrap">
+                      <span className="font-bold text-white">{ord.invoiceNumber}</span>
+                      <span className="text-neutral-400">({ord.customerName})</span>
+                      <span className="text-neutral-500">· {ord.deliveryAddress}, {ord.city}</span>
+                    </div>
+                    <div className="text-[11px] text-red-300 font-mono flex items-center gap-1.5">
+                      <span className="font-semibold text-red-400">Rejected by Courier:</span>
+                      <span>{ord.waybillError}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                      Order: {ord.status}
+                    </span>
+                    <button
+                      onClick={() => setSelectedOrderForInvoice(ord)}
+                      className="px-2.5 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded text-[11px] font-medium transition-all"
+                    >
+                      View Order
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-neutral-900 border border-neutral-800">
@@ -258,14 +306,15 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handlePrintLabel(wb)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                             wb.labelPrinted
-                              ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
-                              : 'bg-purple-600 text-white hover:bg-purple-500'
+                              ? 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700 border border-neutral-700'
+                              : 'bg-purple-600 text-white hover:bg-purple-500 shadow-md shadow-purple-600/20'
                           }`}
+                          title="Print 100mm x 150mm Daraz-style 4x6 Thermal Label"
                         >
                           <Printer className="w-3.5 h-3.5" />
-                          <span>{wb.labelPrinted ? 'Reprint Label' : 'Print Label'}</span>
+                          <span>{wb.labelPrinted ? 'Reprint 4x6' : 'Print 4x6 Label'}</span>
                         </button>
 
                         <button
@@ -344,112 +393,15 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
         </div>
       </div>
 
-      {/* Print-Ready Trans Express Shipping Label Modal */}
+      {/* Dedicated Daraz-Style 100mm x 150mm (4x6) Thermal Waybill Modal */}
       {selectedWaybillForPrint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-semibold text-white">Trans Express Official Air Waybill</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print 4x6 Label</span>
-                </button>
-                <button
-                  onClick={() => setSelectedWaybillForPrint(null)}
-                  className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Authentic 4x6 Shipping Label */}
-            <div className="p-6 bg-neutral-950 flex justify-center">
-              <div className="w-full max-w-md bg-white text-black p-4 rounded border-2 border-black font-sans space-y-3">
-                {/* Header */}
-                <div className="flex justify-between items-center pb-2 border-b-2 border-black">
-                  <div>
-                    <div className="text-lg font-black tracking-tighter">TRANS EXPRESS</div>
-                    <div className="text-[10px] font-bold text-neutral-700">DOMESTIC LOGISTICS SRI LANKA</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="border-2 border-black px-2 py-0.5 text-xs font-black">
-                      {selectedWaybillForPrint.district.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Routing & Barcode */}
-                <div className="text-center py-1">
-                  <div className="font-mono text-sm font-black tracking-widest">
-                    {selectedWaybillForPrint.trackingNumber}
-                  </div>
-                  <div className="flex justify-center my-1">
-                    <svg viewBox="0 0 200 40" className="w-56 h-10">
-                      {Array.from({ length: 50 }).map((_, i) => (
-                        <rect
-                          key={i}
-                          x={i * 4}
-                          y={0}
-                          width={i % 3 === 0 ? 3 : 1.5}
-                          height={40}
-                          fill="#000"
-                        />
-                      ))}
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Recipient Details */}
-                <div className="border-t-2 border-b-2 border-black py-2 space-y-1 text-xs">
-                  <div className="text-[10px] uppercase font-bold text-neutral-600">DELIVER TO (CONSIGNEE):</div>
-                  <div className="font-bold text-sm">{selectedWaybillForPrint.recipientName}</div>
-                  <div className="font-medium text-neutral-800 leading-tight">
-                    {selectedWaybillForPrint.destination}
-                  </div>
-                  <div className="font-bold text-sm font-mono mt-1">
-                    TEL: {selectedWaybillForPrint.recipientPhone}
-                  </div>
-                </div>
-
-                {/* COD & Weight Box */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 border border-black text-center">
-                    <div className="text-[9px] uppercase font-bold">CASH ON DELIVERY (COD)</div>
-                    <div className="text-base font-black font-mono">
-                      {selectedWaybillForPrint.codAmount > 0
-                        ? `Rs. ${selectedWaybillForPrint.codAmount.toLocaleString()}`
-                        : 'ZERO COD (PAID)'}
-                    </div>
-                  </div>
-                  <div className="p-2 border border-black text-center">
-                    <div className="text-[9px] uppercase font-bold">PARCEL WEIGHT</div>
-                    <div className="text-base font-black font-mono">
-                      {selectedWaybillForPrint.weightKg} KG
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sender & Instructions */}
-                <div className="text-[10px] pt-1 text-neutral-800 space-y-0.5 border-t border-neutral-300">
-                  <div>
-                    <strong>Shipper:</strong> WOWTEK Pro Hub, Colombo 04 (+94 11 258 9000)
-                  </div>
-                  <div>
-                    <strong>Courier Notes:</strong> {selectedWaybillForPrint.courierNotes}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ThermalWaybillModal
+          waybill={selectedWaybillForPrint}
+          orders={orders}
+          products={products}
+          onClose={() => setSelectedWaybillForPrint(null)}
+          onMarkPrinted={(id) => onMarkLabelPrinted(id)}
+        />
       )}
 
       {/* Live WooCommerce Webhook Audit Log & Logistics Dispatch Stream */}

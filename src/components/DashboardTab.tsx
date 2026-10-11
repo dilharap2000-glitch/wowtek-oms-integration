@@ -15,14 +15,17 @@ import {
   Clock,
   RotateCcw,
   FileText,
+  Printer,
 } from 'lucide-react';
-import { Order, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent } from '@/types';
+import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
+import { ThermalWaybillModal } from './ThermalWaybillModal';
 
 interface DashboardTabProps {
   orders: Order[];
   waybills: TransExpressWaybill[];
+  products?: Product[];
   warranties: WarrantyRecord[];
   expenses: ExpenseItem[];
   webhookEvents?: WebhookEvent[];
@@ -36,6 +39,7 @@ interface DashboardTabProps {
 export const DashboardTab: React.FC<DashboardTabProps> = ({
   orders,
   waybills,
+  products = [],
   warranties,
   expenses,
   webhookEvents = [],
@@ -46,6 +50,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onTriggerTestOrder,
 }) => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = React.useState<Order | null>(null);
+  const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = React.useState<Order | null>(null);
 
   // Defensive array bindings
   const safeOrders = orders || [];
@@ -354,7 +359,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 ) : (
                   (safeOrders || []).slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-neutral-850/50 transition-colors">
-                      <td className="py-3 font-mono font-medium text-white">{order.invoiceNumber}</td>
+                      <td className="py-3 font-mono font-medium text-white">
+                        <div>{order.invoiceNumber}</div>
+                        {order.waybillNumber ? (
+                          <div className="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
+                            <Truck className="w-2.5 h-2.5" />
+                            <span>TX: {order.waybillNumber}</span>
+                          </div>
+                        ) : order.waybillError ? (
+                          <div
+                            className="text-[10px] text-red-400 font-mono flex items-center gap-1 mt-0.5 truncate max-w-[120px]"
+                            title={order.waybillError}
+                          >
+                            <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
+                            <span className="truncate">Courier Error</span>
+                          </div>
+                        ) : null}
+                      </td>
                       <td className="py-3">
                         <div className="text-white font-medium">{order.channelName}</div>
                         <div className="text-[10px] text-purple-300 font-mono">
@@ -382,14 +403,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                         Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 text-center">
-                        <button
-                          onClick={() => setSelectedOrderForInvoice(order)}
-                          className="px-2 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-md transition-all inline-flex items-center gap-1 text-[11px] font-medium"
-                          title="View & Print A4 Warranty Invoice"
-                        >
-                          <FileText className="w-3 h-3" />
-                          <span>A4 Invoice</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedOrderForInvoice(order)}
+                            className="px-2 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-md transition-all inline-flex items-center gap-1 text-[11px] font-medium"
+                            title="View & Print A4 Warranty Invoice"
+                          >
+                            <FileText className="w-3 h-3" />
+                            <span>A4</span>
+                          </button>
+
+                          <button
+                            onClick={() => setSelectedOrderForThermalPrint(order)}
+                            className="px-2 py-1 text-emerald-300 hover:text-white bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 rounded-md transition-all inline-flex items-center gap-1 text-[11px] font-medium"
+                            title="Print 100mm x 150mm Daraz-Style 4x6 Thermal Shipping Waybill"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>4x6 Label</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -416,6 +448,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <A4WarrantyInvoiceModal
           order={selectedOrderForInvoice}
           onClose={() => setSelectedOrderForInvoice(null)}
+          products={products}
+        />
+      )}
+
+      {/* 4x6 Daraz-Style Thermal Shipping Waybill Modal */}
+      {selectedOrderForThermalPrint && (
+        <ThermalWaybillModal
+          order={selectedOrderForThermalPrint}
+          orders={orders}
+          waybills={waybills}
+          products={products}
+          onClose={() => setSelectedOrderForThermalPrint(null)}
         />
       )}
     </div>

@@ -468,7 +468,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({ apiConfig, onS
           </div>
 
           <div className="p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg text-[10px] text-neutral-400 mt-3">
-            Waybill tracking numbers (TX-CMB-...) and 4x6" shipping barcodes are generated automatically.
+            Waybill tracking numbers (TX-CMB-...) and 4x6-inch shipping barcodes are generated automatically.
           </div>
         </div>
 

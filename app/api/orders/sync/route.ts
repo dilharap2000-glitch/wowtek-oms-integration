@@ -20,6 +20,8 @@ import {
   saveServerWebhookEvent,
 } from '@/lib/serverStore';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Normalizes Sri Lankan phone numbers
  */
@@ -114,14 +116,110 @@ export async function GET(req: NextRequest) {
 
           const grossTotal = parseFloat(wcOrder.total) || items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
           const costOfGoods = items.reduce((s, i) => s + i.costPrice * i.quantity, 0);
-          const trackingNumber = `TE-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          // Trans Express Single Auto Live API Call
+          const transExpressClientToken = (
+            process.env.TRANS_EXPRESS_CLIENT_TOKEN ||
+            process.env.TRANS_EXPRESS_API_KEY ||
+            config.transExpressApiKey ||
+            ''
+          ).trim();
+
+          const isCod = wcOrder.payment_method?.includes('cod');
+          const orderDescription = (wcOrder.line_items || []).map((li: any) => `${li.name} (x${li.quantity})`).join(', ') || 'WooCommerce Order';
+
+          const transExpressPayload = {
+            order_no: String(wcOrder.id),
+            customer_name: customerName,
+            address: `${deliveryAddress}, ${city}`.trim(),
+            description: orderDescription,
+            phone_no: customerPhone,
+            phone_no2: '',
+            cod: isCod ? grossTotal : 0,
+            city_id: Number(shipping.city_id || billing.city_id || 864),
+            note: wcOrder.customer_note || 'WOWTEK Polled Order',
+          };
+
+          let realWaybill: TransExpressWaybill | null = null;
+          let realTrackingNumber: string | null = null;
+          let realWaybillId: string | null = null;
+          let transExpressError: string | null = null;
+          let transExpressApiResponse: any = null;
+
+          try {
+            console.log('[Orders Sync API] Live Trans Express Call for order:', wcOrder.id);
+            const teController = new AbortController();
+            const teTimeoutId = setTimeout(() => teController.abort(), 8000);
+
+            const teRes = await fetch('https://portal.transexpress.lk/api/orders/upload/single-auto', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${transExpressClientToken}`,
+              },
+              body: JSON.stringify(transExpressPayload),
+              signal: teController.signal,
+            });
+
+            clearTimeout(teTimeoutId);
+            const teText = await teRes.text();
+            console.log(`[Orders Sync API] Trans Express Response HTTP ${teRes.status}:`, teText);
+
+            try {
+              transExpressApiResponse = JSON.parse(teText);
+            } catch {
+              transExpressApiResponse = { rawBody: teText };
+            }
+
+            if (teRes.ok) {
+              const resData = transExpressApiResponse?.data || transExpressApiResponse;
+              const returnedTracking =
+                resData?.tracking_number ||
+                resData?.tracking_no ||
+                resData?.waybill_number ||
+                resData?.waybill_no ||
+                resData?.barcode ||
+                transExpressApiResponse?.tracking_number ||
+                transExpressApiResponse?.tracking_no;
+
+              if (returnedTracking) {
+                realTrackingNumber = String(returnedTracking);
+                realWaybillId = String(resData?.waybill_id || resData?.id || `wb-${realTrackingNumber}`);
+                realWaybill = {
+                  id: realWaybillId,
+                  orderId: `ord-wc-${wcOrder.id}`,
+                  trackingNumber: realTrackingNumber,
+                  recipientName: customerName,
+                  recipientPhone: customerPhone,
+                  destination: `${deliveryAddress}, ${city}`,
+                  district: 'Colombo',
+                  codAmount: isCod ? grossTotal : 0,
+                  weightKg: 1.2,
+                  status: 'Queued',
+                  bookingDate: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
+                    [],
+                    { hour: '2-digit', minute: '2-digit' }
+                  )}`,
+                  courierNotes: `Synced from WooCommerce Store #${wcOrder.id}. Live Trans Express (${realTrackingNumber})`,
+                  labelPrinted: false,
+                };
+              } else {
+                transExpressError = `Trans Express HTTP ${teRes.status}: Missing tracking number`;
+              }
+            } else {
+              transExpressError = `Trans Express HTTP ${teRes.status}: ${teText.slice(0, 200)}`;
+            }
+          } catch (teErr: any) {
+            transExpressError = `Trans Express Error: ${teErr?.message || 'Connection failed'}`;
+          }
 
           const newOrder: Order = {
             id: `ord-wc-${wcOrder.id}-${Date.now().toString().slice(-4)}`,
             invoiceNumber,
             channel: 'woocommerce',
             channelName: 'WooCommerce Store',
-            paymentGateway: wcOrder.payment_method?.includes('cod') ? 'cash_cod' : 'card_online',
+            paymentGateway: isCod ? 'cash_cod' : 'card_online',
             paymentGatewayName: wcOrder.payment_method_title || 'Online Payment',
             customerName,
             customerPhone,
@@ -138,38 +236,21 @@ export async function GET(req: NextRequest) {
             grossTotal,
             platformFeePercent: 0,
             platformFeeAmount: 0,
-            gatewayFeePercent: wcOrder.payment_method?.includes('cod') ? 0 : 3,
-            gatewayFeeAmount: wcOrder.payment_method?.includes('cod') ? 0 : Math.round(grossTotal * 0.03),
+            gatewayFeePercent: isCod ? 0 : 3,
+            gatewayFeeAmount: isCod ? 0 : Math.round(grossTotal * 0.03),
             courierFee: 400,
             costOfGoods,
             netProfit: grossTotal - costOfGoods - 400,
             status: wcOrder.status === 'completed' ? 'Completed' : 'Processing',
             createdAt: wcOrder.date_created || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            waybillGenerated: true,
-            waybillNumber: trackingNumber,
+            waybillGenerated: Boolean(realWaybill),
+            waybillNumber: realTrackingNumber || undefined,
+            waybillId: realWaybillId || undefined,
+            transExpressTrackingNumber: realTrackingNumber || undefined,
+            waybillError: transExpressError || undefined,
             smsConfirmationSent: true,
-            notes: `Synced via WooCommerce REST API polling.`,
-          };
-
-          // Trans Express Waybill with TE-XXXX code
-          const waybill: TransExpressWaybill = {
-            id: `wb-${Date.now().toString().slice(-4)}`,
-            orderId: newOrder.id,
-            trackingNumber,
-            recipientName: newOrder.customerName,
-            recipientPhone: newOrder.customerPhone,
-            destination: `${newOrder.deliveryAddress}, ${newOrder.city}`,
-            district: 'Colombo',
-            codAmount: newOrder.paymentGateway === 'cash_cod' ? newOrder.grossTotal : 0,
-            weightKg: 1.2,
-            status: 'Queued',
-            bookingDate: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
-              [],
-              { hour: '2-digit', minute: '2-digit' }
-            )}`,
-            courierNotes: `Synced from WooCommerce Store #${wcOrder.id}`,
-            labelPrinted: false,
+            notes: `Synced via WooCommerce REST API polling.${transExpressError ? ` [Courier: ${transExpressError}]` : ''}`,
           };
 
           // Audit Log Event
@@ -182,9 +263,11 @@ export async function GET(req: NextRequest) {
             customerName: newOrder.customerName,
             customerPhone: newOrder.customerPhone,
             amount: newOrder.grossTotal,
-            status: 'success',
-            waybillId: waybill.id,
-            waybillNumber: trackingNumber,
+            status: realWaybill ? 'success' : 'failed',
+            waybillId: realWaybill?.id,
+            waybillNumber: realTrackingNumber || undefined,
+            waybillError: transExpressError || undefined,
+            transExpressResponse: transExpressApiResponse,
             smsSent: true,
             smsGateway: 'SMSlenz',
             rawPayload: wcOrder,
@@ -194,15 +277,10 @@ export async function GET(req: NextRequest) {
           try {
             const mongoConn = await connectToMongoDB();
             if (mongoConn) {
-              await Promise.all([
+              const mongoOps: Promise<any>[] = [
                 mongoConn.db.collection('orders').updateOne(
                   { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }] },
                   { $set: newOrder },
-                  { upsert: true }
-                ),
-                mongoConn.db.collection('waybills').updateOne(
-                  { $or: [{ id: waybill.id }, { trackingNumber: waybill.trackingNumber }] },
-                  { $set: waybill },
                   { upsert: true }
                 ),
                 mongoConn.db.collection('webhook_events').updateOne(
@@ -210,7 +288,19 @@ export async function GET(req: NextRequest) {
                   { $set: evt },
                   { upsert: true }
                 ),
-              ]);
+              ];
+
+              if (realWaybill) {
+                mongoOps.push(
+                  mongoConn.db.collection('waybills').updateOne(
+                    { $or: [{ id: realWaybill.id }, { trackingNumber: realWaybill.trackingNumber }] },
+                    { $set: realWaybill },
+                    { upsert: true }
+                  )
+                );
+              }
+
+              await Promise.all(mongoOps);
 
               if (Array.isArray(newOrder.items)) {
                 for (const item of newOrder.items) {
@@ -226,11 +316,15 @@ export async function GET(req: NextRequest) {
           }
 
           saveServerOrder(newOrder);
-          saveServerWaybill(waybill);
           saveServerWebhookEvent(evt);
           await saveOrder(newOrder);
-          await saveWaybill(waybill);
           await saveWebhookEvent(evt);
+
+          if (realWaybill) {
+            saveServerWaybill(realWaybill);
+            await saveWaybill(realWaybill);
+          }
+
           newlyImported.push(newOrder);
         }
 

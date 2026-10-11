@@ -63,6 +63,7 @@ export interface Order {
   waybillNumber?: string;
   waybillId?: string;
   transExpressTrackingNumber?: string;
+  waybillError?: string;
   notes?: string;
   isPosSale?: boolean;
   returnedAt?: string;
@@ -254,6 +255,8 @@ export interface WebhookEvent {
   orderStatus?: string;
   waybillId?: string;
   waybillNumber?: string;
+  waybillError?: string;
+  transExpressResponse?: any;
   smsSent?: boolean;
   smsMessageId?: string;
   smsGateway?: string;

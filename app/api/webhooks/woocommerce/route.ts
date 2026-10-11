@@ -426,24 +426,13 @@ export async function POST(req: NextRequest) {
     // AUTO-EXECUTION PIPELINE STEP 1: Trans Express Single Auto Waybill API
     // Endpoint: POST https://portal.transexpress.lk/api/orders/upload/single-auto
     // -------------------------------------------------------------------------
-    const transExpressClientToken =
+    const transExpressClientToken = (
       process.env.TRANS_EXPRESS_CLIENT_TOKEN ||
       process.env.TRANS_EXPRESS_API_KEY ||
       apiConfig.transExpressApiKey ||
-      'tx_live_e9914bca88172c';
+      ''
+    ).trim();
 
-    // Build the payload mapping exactly as documented:
-    // {
-    //   "order_no": String(order.id),
-    //   "customer_name": `${order.billing.first_name} ${order.billing.last_name}`,
-    //   "address": `${order.shipping.address_1}, ${order.shipping.city}`,
-    //   "description": order.line_items.map(i => `${i.name} (x${i.quantity})`).join(', '),
-    //   "phone_no": order.billing.phone,
-    //   "phone_no2": order.shipping.phone || "",
-    //   "cod": Number(order.total),
-    //   "city_id": Number(order.shipping.city_id || order.billing.city_id || 864),
-    //   "note": order.customer_note || "WOWTEK Automated Order"
-    // }
     const orderDescription =
       Array.isArray(rawOrderObj.line_items) && rawOrderObj.line_items.length > 0
         ? rawOrderObj.line_items.map((i: any) => `${i.name || 'Item'} (x${i.quantity || 1})`).join(', ')
@@ -456,26 +445,34 @@ export async function POST(req: NextRequest) {
       864
     );
 
+    const isCod = paymentGateway === 'cash_cod' || rawPayment.includes('cod') || rawPayment.includes('cash');
+
     const transExpressPayload = {
       order_no: String(rawOrderObj.id || wcOrderId),
       customer_name: `${billing.first_name || shipping.first_name || 'Customer'} ${billing.last_name || shipping.last_name || ''}`.trim(),
-      address: `${shipping.address_1 || billing.address_1 || deliveryAddress}, ${shipping.city || billing.city || city}`,
+      address: `${shipping.address_1 || billing.address_1 || deliveryAddress}, ${shipping.city || billing.city || city}`.trim(),
       description: orderDescription,
       phone_no: billing.phone || customerPhone,
       phone_no2: shipping.phone || '',
-      cod: Number(rawOrderObj.total || grossTotal),
+      cod: isCod ? Number(rawOrderObj.total || grossTotal) : 0,
       city_id: shippingCityId,
       note: rawOrderObj.customer_note || 'WOWTEK Automated Order',
     };
 
-    let trackingNumber = `TE-${Math.floor(1000 + Math.random() * 9000)}`;
-    let waybillId = `wb-${Date.now().toString().slice(-4)}`;
+    let realWaybill: TransExpressWaybill | null = null;
+    let realTrackingNumber: string | null = null;
+    let realWaybillId: string | null = null;
     let transExpressApiDispatched = false;
     let transExpressApiResponse: any = null;
+    let transExpressError: string | null = null;
 
     try {
+      console.log('[Trans Express Auto API] Initiating live POST request to: https://portal.transexpress.lk/api/orders/upload/single-auto');
+      console.log('[Trans Express Auto API] Auth Token configured:', Boolean(transExpressClientToken));
+      console.log('[Trans Express Auto API] Payload:', JSON.stringify(transExpressPayload, null, 2));
+
       const teController = new AbortController();
-      const teTimeoutId = setTimeout(() => teController.abort(), 7000);
+      const teTimeoutId = setTimeout(() => teController.abort(), 10000);
 
       const teRes = await fetch('https://portal.transexpress.lk/api/orders/upload/single-auto', {
         method: 'POST',
@@ -490,69 +487,88 @@ export async function POST(req: NextRequest) {
 
       clearTimeout(teTimeoutId);
 
-      if (teRes.ok) {
-        transExpressApiResponse = await teRes.json();
-        transExpressApiDispatched = true;
+      const teResponseText = await teRes.text();
+      console.log(`[Trans Express Auto API] Response HTTP ${teRes.status} (${teRes.statusText}):`, teResponseText);
 
+      try {
+        transExpressApiResponse = JSON.parse(teResponseText);
+      } catch {
+        transExpressApiResponse = { rawBody: teResponseText };
+      }
+
+      if (teRes.ok) {
+        const resData = transExpressApiResponse?.data || transExpressApiResponse;
         const returnedTracking =
-          transExpressApiResponse.tracking_number ||
-          transExpressApiResponse.tracking_no ||
-          transExpressApiResponse.waybill_number ||
-          transExpressApiResponse.waybill_no ||
-          transExpressApiResponse.data?.tracking_number ||
-          transExpressApiResponse.data?.tracking_no ||
-          transExpressApiResponse.data?.waybill_number ||
-          transExpressApiResponse.data?.waybill_no ||
-          transExpressApiResponse.waybill_id ||
-          transExpressApiResponse.data?.waybill_id;
+          resData?.tracking_number ||
+          resData?.tracking_no ||
+          resData?.waybill_number ||
+          resData?.waybill_no ||
+          resData?.waybill_id ||
+          resData?.barcode ||
+          transExpressApiResponse?.tracking_number ||
+          transExpressApiResponse?.tracking_no ||
+          transExpressApiResponse?.waybill_number ||
+          transExpressApiResponse?.waybill_no ||
+          transExpressApiResponse?.waybill_id;
 
         if (returnedTracking) {
-          trackingNumber = String(returnedTracking);
-        }
+          realTrackingNumber = String(returnedTracking);
+          realWaybillId = String(
+            resData?.waybill_id ||
+            resData?.data?.waybill_id ||
+            resData?.id ||
+            transExpressApiResponse?.waybill_id ||
+            `wb-${realTrackingNumber}`
+          );
+          transExpressApiDispatched = true;
 
-        const returnedWaybillId =
-          transExpressApiResponse.waybill_id ||
-          transExpressApiResponse.data?.waybill_id ||
-          transExpressApiResponse.id ||
-          transExpressApiResponse.data?.id;
-
-        if (returnedWaybillId) {
-          waybillId = String(returnedWaybillId);
+          realWaybill = {
+            id: realWaybillId,
+            orderId: newOrderId,
+            trackingNumber: realTrackingNumber,
+            recipientName: customerName,
+            recipientPhone: customerPhone,
+            destination: `${deliveryAddress}, ${city}`,
+            district: city.toLowerCase().includes('kandy')
+              ? 'Kandy'
+              : city.toLowerCase().includes('galle')
+              ? 'Galle'
+              : city.toLowerCase().includes('gampaha')
+              ? 'Gampaha'
+              : 'Colombo',
+            codAmount: isCod ? grossTotal : 0,
+            weightKg: 1.2,
+            status: 'Queued',
+            bookingDate: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
+              [],
+              { hour: '2-digit', minute: '2-digit' }
+            )}`,
+            courierNotes: `Live Trans Express Barcode Waybill (${realTrackingNumber}). WooCommerce Order #${wcOrderId}. ${paymentGatewayName}`,
+            labelPrinted: false,
+          };
+        } else {
+          transExpressError = `Trans Express HTTP ${teRes.status}: Response succeeded but no tracking/waybill number was found: ${teResponseText.slice(0, 300)}`;
+          console.warn('[Trans Express Auto API] Missing tracking in response:', teResponseText);
         }
       } else {
-        const errText = await teRes.text();
-        console.warn(`[Trans Express Auto API] HTTP ${teRes.status}:`, errText);
+        const errorDetail =
+          transExpressApiResponse?.message ||
+          transExpressApiResponse?.error ||
+          transExpressApiResponse?.errors ||
+          teResponseText ||
+          `HTTP ${teRes.status} Error`;
+
+        transExpressError = `Trans Express HTTP ${teRes.status}: ${
+          typeof errorDetail === 'object' ? JSON.stringify(errorDetail) : errorDetail
+        }`;
+        console.error('[Trans Express Auto API Rejected]:', transExpressError);
       }
     } catch (teErr: any) {
-      console.warn('[Trans Express Auto API] Gateway call notice:', teErr?.message);
+      transExpressError = `Trans Express Network Failure: ${teErr?.message || 'Connection timeout or unresolvable endpoint'}`;
+      console.error('[Trans Express Auto API Exception]:', teErr?.message);
     }
 
-    const newWaybill: TransExpressWaybill = {
-      id: waybillId,
-      orderId: newOrderId,
-      trackingNumber,
-      recipientName: customerName,
-      recipientPhone: customerPhone,
-      destination: `${deliveryAddress}, ${city}`,
-      district: city.toLowerCase().includes('kandy')
-        ? 'Kandy'
-        : city.toLowerCase().includes('galle')
-        ? 'Galle'
-        : city.toLowerCase().includes('gampaha')
-        ? 'Gampaha'
-        : 'Colombo',
-      codAmount: paymentGateway === 'cash_cod' ? grossTotal : 0,
-      weightKg: 1.2,
-      status: 'Queued',
-      bookingDate: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
-        [],
-        { hour: '2-digit', minute: '2-digit' }
-      )}`,
-      courierNotes: `Auto-manifested from WooCommerce Order #${wcOrderId}. ${paymentGatewayName}${transExpressApiDispatched ? ' · Trans Express Live Gateway Verified' : ''}`,
-      labelPrinted: false,
-    };
-
-    // 4. Construct Order with Trans Express Tracking Number & Waybill ID directly saved
+    // 4. Construct Order with verified Live Waybill or clean rejection details (NO mock fallback)
     const newOrder: Order = {
       id: newOrderId,
       invoiceNumber,
@@ -576,21 +592,24 @@ export async function POST(req: NextRequest) {
       status: orderStatus,
       createdAt: rawOrderObj.date_created || receivedAt,
       updatedAt: receivedAt,
-      waybillGenerated: true,
-      waybillNumber: trackingNumber,
-      waybillId: waybillId,
-      transExpressTrackingNumber: trackingNumber,
+      waybillGenerated: Boolean(realWaybill),
+      waybillNumber: realTrackingNumber || undefined,
+      waybillId: realWaybillId || undefined,
+      transExpressTrackingNumber: realTrackingNumber || undefined,
+      waybillError: transExpressError || undefined,
       smsConfirmationSent: false,
-      notes: `Live WooCommerce Order #${wcOrderId}. Event: ${topicHeader}. ${sigCheck.reason}. ${
-        rawOrderObj.customer_note || ''
-      }`,
+      notes: `Live WooCommerce Order #${wcOrderId}. Event: ${topicHeader}. ${sigCheck.reason}.${
+        transExpressError ? ` [Trans Express Courier Error: ${transExpressError}]` : ' [Trans Express API Waybill Generated]'
+      } ${rawOrderObj.customer_note || ''}`.trim(),
     };
 
     // -------------------------------------------------------------------------
     // AUTO-EXECUTION PIPELINE STEP 2: SMSlenz Customer Confirmation Dispatch
     // -------------------------------------------------------------------------
     const formattedContact = normalizeContact(customerPhone);
-    const smsMessage = `WOWTEK PRO: Thank you ${customerName}! Your order #${wcOrderId} (Rs. ${grossTotal.toLocaleString()}) has been confirmed. Trans Express Waybill: ${trackingNumber}. Helpline: 011 258 9000.`;
+    const smsMessage = realTrackingNumber
+      ? `WOWTEK PRO: Thank you ${customerName}! Your order #${wcOrderId} (Rs. ${grossTotal.toLocaleString()}) has been confirmed. Trans Express Waybill: ${realTrackingNumber}. Helpline: 0779673004.`
+      : `WOWTEK PRO: Thank you ${customerName}! Your order #${wcOrderId} (Rs. ${grossTotal.toLocaleString()}) has been received & is being prepared. Helpline: 0779673004.`;
 
     let smsSent = false;
     let smsMessageId = `SMSLZ-WC-${Date.now()}`;
@@ -636,18 +655,26 @@ export async function POST(req: NextRequest) {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
         mongoDbName = mongoConn.db.databaseName;
-        await Promise.all([
+        const mongoOps: Promise<any>[] = [
           mongoConn.db.collection('orders').updateOne(
             { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }] },
             { $set: newOrder },
             { upsert: true }
           ),
-          mongoConn.db.collection('waybills').updateOne(
-            { $or: [{ id: newWaybill.id }, { trackingNumber: newWaybill.trackingNumber }] },
-            { $set: newWaybill },
-            { upsert: true }
-          ),
-        ]);
+        ];
+
+        // ONLY persist waybill to MongoDB if realWaybill was successfully returned by Trans Express
+        if (realWaybill) {
+          mongoOps.push(
+            mongoConn.db.collection('waybills').updateOne(
+              { $or: [{ id: realWaybill.id }, { trackingNumber: realWaybill.trackingNumber }] },
+              { $set: realWaybill },
+              { upsert: true }
+            )
+          );
+        }
+
+        await Promise.all(mongoOps);
 
         // Decrement stock in MongoDB products collection
         if (Array.isArray(newOrder.items)) {
@@ -665,9 +692,13 @@ export async function POST(req: NextRequest) {
     }
 
     saveServerOrder(newOrder);
-    saveServerWaybill(newWaybill);
     await saveOrder(newOrder);
-    await saveWaybill(newWaybill);
+
+    // ONLY save to serverStore and local cache if realWaybill exists
+    if (realWaybill) {
+      saveServerWaybill(realWaybill);
+      await saveWaybill(realWaybill);
+    }
 
     // -------------------------------------------------------------------------
     // STEP 4: RECORD INCOMING WEBHOOK AUDIT EVENT DIRECTLY TO ATLAS & STORE
@@ -681,14 +712,18 @@ export async function POST(req: NextRequest) {
       customerName: newOrder.customerName,
       customerPhone: newOrder.customerPhone,
       amount: newOrder.grossTotal,
-      status: 'success',
-      waybillId: newWaybill.id,
-      waybillNumber: trackingNumber,
+      status: realWaybill ? 'success' : 'failed',
+      orderStatus: newOrder.status,
+      waybillId: realWaybill?.id,
+      waybillNumber: realTrackingNumber || undefined,
+      waybillError: transExpressError || undefined,
+      transExpressResponse: transExpressApiResponse,
       smsSent,
       smsMessageId,
       smsGateway: 'SMSlenz',
       rawPayload: rawOrderObj,
       receivedAt,
+      errorMessage: transExpressError || undefined,
     };
 
     if (atlasConnected) {
@@ -713,42 +748,57 @@ export async function POST(req: NextRequest) {
     broadcastLiveUpdate({
       type: 'new_order_webhook',
       order: newOrder,
-      waybill: newWaybill,
+      waybill: realWaybill,
       event: webhookEvent,
       timestamp: receivedAt,
     });
-    broadcastLiveUpdate({
-      type: 'waybill_saved',
-      waybill: newWaybill,
-      timestamp: receivedAt,
-    });
+
+    if (realWaybill) {
+      broadcastLiveUpdate({
+        type: 'waybill_saved',
+        waybill: realWaybill,
+        timestamp: receivedAt,
+      });
+    }
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          'Live WooCommerce Webhook processed successfully. Order persisted, Trans Express waybill generated, and SMS dispatched.',
+        message: realWaybill
+          ? 'Live WooCommerce Webhook processed successfully. Order persisted, Trans Express waybill generated, and SMS dispatched.'
+          : `Live WooCommerce Webhook received & order persisted. Note: Courier rejected or failed to generate waybill: ${transExpressError}`,
         order: {
           id: newOrder.id,
           invoiceNumber: newOrder.invoiceNumber,
           status: newOrder.status,
           grossTotal: newOrder.grossTotal,
           customerName: newOrder.customerName,
-          waybillNumber: newOrder.waybillNumber,
-          waybillId: newOrder.waybillId,
-          transExpressTrackingNumber: newOrder.transExpressTrackingNumber,
+          waybillGenerated: Boolean(realWaybill),
+          waybillNumber: realTrackingNumber || null,
+          waybillId: realWaybillId || null,
+          transExpressTrackingNumber: realTrackingNumber || null,
+          waybillError: transExpressError || null,
         },
         pipeline: {
-          transExpressWaybill: {
-            id: newWaybill.id,
-            trackingNumber,
-            waybillId: newWaybill.id,
-            code: trackingNumber,
-            codAmount: newWaybill.codAmount,
-            status: newWaybill.status,
-            apiDispatched: transExpressApiDispatched,
-            gatewayEndpoint: 'https://portal.transexpress.lk/api/orders/upload/single-auto',
-          },
+          transExpressWaybill: realWaybill
+            ? {
+                success: true,
+                id: realWaybill.id,
+                trackingNumber: realTrackingNumber,
+                code: realTrackingNumber,
+                codAmount: realWaybill.codAmount,
+                status: realWaybill.status,
+                apiDispatched: true,
+                gatewayEndpoint: 'https://portal.transexpress.lk/api/orders/upload/single-auto',
+                response: transExpressApiResponse,
+              }
+            : {
+                success: false,
+                apiDispatched: false,
+                error: transExpressError,
+                gatewayEndpoint: 'https://portal.transexpress.lk/api/orders/upload/single-auto',
+                response: transExpressApiResponse,
+              },
           smslenz: {
             dispatched: smsSent,
             recipient: formattedContact,

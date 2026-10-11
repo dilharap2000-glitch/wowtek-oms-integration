@@ -346,31 +346,6 @@ export default function WowtekProApp() {
     const updatedProducts = await getProducts();
     setProducts(updatedProducts);
 
-    // Auto-create Trans Express Waybill if website order
-    if (newOrder.channel === 'woocommerce') {
-      const trackingNumber = `TE-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newWaybill: TransExpressWaybill = {
-        id: `wb-${Date.now().toString().slice(-4)}`,
-        orderId: newOrder.id,
-        trackingNumber,
-        recipientName: newOrder.customerName,
-        recipientPhone: newOrder.customerPhone,
-        destination: `${newOrder.deliveryAddress}, ${newOrder.city}`,
-        district: 'Colombo',
-        codAmount: newOrder.paymentGateway === 'cash_cod' ? newOrder.grossTotal : 0,
-        weightKg: 1.2,
-        status: 'Queued',
-        bookingDate: `${new Date().toLocaleDateString('en-GB')} ${new Date().toLocaleTimeString(
-          [],
-          { hour: '2-digit', minute: '2-digit' }
-        )}`,
-        courierNotes: `Auto-manifested from WooCommerce. ${newOrder.paymentGatewayName}`,
-        labelPrinted: false,
-      };
-
-      setWaybills((prev) => [newWaybill, ...prev]);
-      await saveWaybill(newWaybill);
-    }
   };
 
   const handleUpdateOrder = async (id: string, updates: Partial<Order>) => {
@@ -763,6 +738,7 @@ export default function WowtekProApp() {
               <DashboardTab
                 orders={orders}
                 waybills={waybills}
+                products={products}
                 warranties={warranties}
                 expenses={expenses}
                 webhookEvents={webhookEvents}
@@ -816,6 +792,7 @@ export default function WowtekProApp() {
               <WaybillsTab
                 waybills={waybills}
                 orders={orders}
+                products={products}
                 webhookEvents={webhookEvents}
                 onUpdateWaybillStatus={handleUpdateWaybillStatus}
                 onMarkLabelPrinted={handleMarkLabelPrinted}

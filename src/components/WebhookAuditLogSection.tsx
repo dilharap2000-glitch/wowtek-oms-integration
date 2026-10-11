@@ -371,7 +371,23 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                             <Truck className="w-3 h-3 text-emerald-400" />
                             <span>{evt.waybillNumber}</span>
                           </span>
-                          <span className="text-[9px] text-neutral-400 mt-0.5 font-mono">Auto Manifested</span>
+                          <span className="text-[9px] text-emerald-400 mt-0.5 font-mono">Live API Waybill</span>
+                        </div>
+                      ) : evt.waybillError ? (
+                        <div className="inline-flex flex-col items-center max-w-[150px]">
+                          <span
+                            className="px-2 py-0.5 rounded bg-red-950/80 border border-red-800 text-red-300 font-mono text-[10px] flex items-center gap-1"
+                            title={evt.waybillError}
+                          >
+                            <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                            <span>Courier Rejected</span>
+                          </span>
+                          <span
+                            className="text-[9px] text-red-400 mt-0.5 font-mono truncate max-w-[140px] text-center"
+                            title={evt.waybillError}
+                          >
+                            {evt.waybillError}
+                          </span>
                         </div>
                       ) : isSkipped ? (
                         <div className="inline-flex flex-col items-center">
@@ -468,6 +484,21 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                 <span>{copiedPayload ? 'Copied JSON!' : 'Copy Raw Payload'}</span>
               </button>
             </div>
+
+            {selectedEventForPayload.waybillError && (
+              <div className="px-4 py-2.5 bg-red-950/70 border-b border-red-900/80 flex items-start gap-2.5 text-xs text-red-200">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-red-300">Trans Express Courier Gateway Rejection:</div>
+                  <div className="text-red-200 font-mono text-[11px] mt-0.5">{selectedEventForPayload.waybillError}</div>
+                  {selectedEventForPayload.transExpressResponse && (
+                    <div className="mt-1 text-[10px] text-neutral-400 font-mono">
+                      API Response: {typeof selectedEventForPayload.transExpressResponse === 'object' ? JSON.stringify(selectedEventForPayload.transExpressResponse) : String(selectedEventForPayload.transExpressResponse)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {selectedEventForPayload.status === 'skipped' && (
               <div className="px-4 py-2 bg-amber-950/60 border-b border-amber-900/60 flex items-center gap-2 text-xs text-amber-300">
