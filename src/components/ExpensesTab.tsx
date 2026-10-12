@@ -39,18 +39,28 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
   const safeOrders = orders || [];
   const safeExpenses = expenses || [];
 
-  // Financial calculations
+  // Filter verified orders strictly (PREVENT FAKE PROFIT DISPLAY)
+  const verifiedOrders = safeOrders.filter(
+    (o) => o && !o.hasUnregisteredItems && o.profitStatus !== 'Pending / Inventory Not Found' && o.status !== 'Returned'
+  );
+  const pendingOrdersCount = safeOrders.filter(
+    (o) => o && (o.hasUnregisteredItems || o.profitStatus === 'Pending / Inventory Not Found')
+  ).length;
+
+  // Financial calculations based on real database records
   const totalGrossRevenue = safeOrders.reduce((sum, o) => sum + (o?.grossTotal || 0), 0);
-  const totalCogs = safeOrders.reduce((sum, o) => sum + (o?.costOfGoods || 0), 0);
-  const totalCommissions = safeOrders.reduce(
+  const totalCogs = verifiedOrders.reduce((sum, o) => sum + (o?.costOfGoods || 0), 0);
+  const totalExpenses = safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
+
+  // Net Business Operating Profit: verified gross minus verified COGS, commissions, courier, and ledger expenses
+  const verifiedGross = verifiedOrders.reduce((sum, o) => sum + (o?.grossTotal || 0), 0);
+  const verifiedCommissions = verifiedOrders.reduce(
     (sum, o) => sum + (o?.platformFeeAmount || 0) + (o?.gatewayFeeAmount || 0),
     0
   );
-  const totalCourierFees = safeOrders.reduce((sum, o) => sum + (o?.courierFee || 0), 0);
-  const totalExpenses = safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
+  const verifiedCourierFees = verifiedOrders.reduce((sum, o) => sum + (o?.courierFee || 0), 0);
 
-  // Net Business Operating Profit
-  const netBusinessProfit = totalGrossRevenue - totalCogs - totalCommissions - totalCourierFees - totalExpenses;
+  const netBusinessProfit = verifiedGross - totalCogs - verifiedCommissions - verifiedCourierFees - totalExpenses;
 
   // Channel breakdown
   const wcGross = safeOrders.filter((o) => o?.channel === 'woocommerce').reduce((s, o) => s + (o?.grossTotal || 0), 0);
@@ -126,7 +136,13 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
           <div className="text-2xl font-bold font-mono tabular-nums text-neutral-300">
             Rs. {totalCogs.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">Direct stock import unit cost</div>
+          <div className="text-[11px] text-neutral-400 mt-2">
+            {pendingOrdersCount > 0 ? (
+              <span className="text-amber-400 font-mono">Verified records ({pendingOrdersCount} pending)</span>
+            ) : (
+              'Direct verified stock import cost'
+            )}
+          </div>
         </div>
 
         <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
@@ -146,7 +162,13 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
           <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
             Rs. {netBusinessProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">After all commissions & logged costs</div>
+          <div className="text-[11px] text-neutral-400 mt-2">
+            {pendingOrdersCount > 0 ? (
+              <span className="text-amber-400 font-mono">Real verified records only</span>
+            ) : (
+              'After all commissions & logged costs'
+            )}
+          </div>
         </div>
       </div>
 

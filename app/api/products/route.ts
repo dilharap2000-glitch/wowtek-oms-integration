@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { Product } from '@/types';
+import { resolvePendingBacklogOrders } from '@/lib/inventoryBacklog';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Invalid product payload' }, { status: 400 });
     }
 
+    let resolvedProduct = product;
+    let resolvedOrdersCount = 0;
+
     try {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
@@ -34,12 +38,23 @@ export async function POST(req: NextRequest) {
           { $set: product },
           { upsert: true }
         );
+
+        // AUTO-DEDUCTION FOR PENDING/BACKLOG INVOICES ON NEW GRN RESTOCK
+        if ((product.stockStore > 0 || product.stockWarehouse > 0) && product.costPrice > 0) {
+          const backlogRes = await resolvePendingBacklogOrders(product, { mongoClient: mongoConn });
+          resolvedProduct = backlogRes.product;
+          resolvedOrdersCount = backlogRes.resolvedOrders.length;
+        }
       }
     } catch (err: any) {
       console.warn('[Products API POST] MongoDB write error:', err.message);
     }
 
-    return NextResponse.json({ success: true, product });
+    return NextResponse.json({
+      success: true,
+      product: resolvedProduct,
+      backlogResolvedCount: resolvedOrdersCount,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -53,6 +68,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'id and updates are required' }, { status: 400 });
     }
 
+    let resolvedCount = 0;
+
     try {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
@@ -60,12 +77,25 @@ export async function PUT(req: NextRequest) {
           { $or: [{ id }, { sku: id }] },
           { $set: updates }
         );
+
+        // Fetch updated product to verify stock and resolve backlog
+        const updatedDoc = await mongoConn.db.collection('products').findOne({
+          $or: [{ id }, { sku: id }],
+        });
+
+        if (updatedDoc) {
+          const { _id, ...cleanProd } = updatedDoc as any;
+          if ((cleanProd.stockStore > 0 || cleanProd.stockWarehouse > 0) && cleanProd.costPrice > 0) {
+            const backlogRes = await resolvePendingBacklogOrders(cleanProd, { mongoClient: mongoConn });
+            resolvedCount = backlogRes.resolvedOrders.length;
+          }
+        }
       }
     } catch (err: any) {
       console.warn('[Products API PUT] MongoDB update error:', err.message);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, backlogResolvedCount: resolvedCount });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

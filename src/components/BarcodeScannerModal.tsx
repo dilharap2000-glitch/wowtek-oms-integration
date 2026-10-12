@@ -167,7 +167,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           code,
           name: `Custom Scanned Item (${code.slice(-6)})`,
           price: 1500,
-          costPrice: 1050,
+          costPrice: 0,
           saveToInventory: true,
         });
       }
@@ -554,23 +554,42 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[10px] text-neutral-400 mb-0.5">Selling Price (Rs.)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={unknownItemPrompt.price}
-                    onChange={(e) => {
-                      const val = Number(e.target.value) || 0;
-                      setUnknownItemPrompt({
-                        ...unknownItemPrompt,
-                        price: val,
-                        costPrice: Math.round(val * 0.7),
-                      });
-                    }}
-                    className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
-                    required
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-0.5">Selling Price (Rs.)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={unknownItemPrompt.price}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setUnknownItemPrompt({
+                          ...unknownItemPrompt,
+                          price: val,
+                        });
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-neutral-400 mb-0.5">Cost Price / COGS (Rs.)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={unknownItemPrompt.costPrice || ''}
+                      placeholder="0 (Unregistered)"
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setUnknownItemPrompt({
+                          ...unknownItemPrompt,
+                          costPrice: val,
+                        });
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
                 </div>
               </div>
 

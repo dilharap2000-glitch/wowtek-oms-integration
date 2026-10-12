@@ -20,15 +20,40 @@ import {
   Store,
   Send,
   AlertCircle,
+  Link2,
+  Plus,
+  Trash2,
+  Search,
+  Sparkles,
+  Layers,
+  ArrowRight,
+  X,
 } from 'lucide-react';
-import { ApiIntegrationConfig, SmsSendResponse } from '@/types';
+import { ApiIntegrationConfig, SmsSendResponse, Product, ProductAlias } from '@/types';
+import {
+  findBestProductMatch,
+  extractCoreKeywords,
+  COMMON_FILLER_WORDS,
+  DEFAULT_PRODUCT_ALIASES,
+} from '@/lib/productMatching';
 
 interface IntegrationsTabProps {
   apiConfig: ApiIntegrationConfig;
   onSaveConfig: (config: ApiIntegrationConfig) => void;
+  products?: Product[];
+  aliases?: ProductAlias[];
+  onSaveAlias?: (alias: ProductAlias) => Promise<any> | void;
+  onDeleteAlias?: (id: string) => Promise<any> | void;
 }
 
-export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({ apiConfig, onSaveConfig }) => {
+export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
+  apiConfig,
+  onSaveConfig,
+  products = [],
+  aliases = [],
+  onSaveAlias,
+  onDeleteAlias,
+}) => {
   const [config, setConfig] = useState<ApiIntegrationConfig>({
     ...apiConfig,
     smsUserId: apiConfig.smsUserId || '588',
@@ -43,6 +68,58 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({ apiConfig, onS
   const [testSmsMessage, setTestSmsMessage] = useState('WOWTEK PRO: Test SMS dispatch via SMSlenz Sri Lanka API gateway.');
   const [smsTestSending, setSmsTestSending] = useState(false);
   const [smsTestResult, setSmsTestResult] = useState<SmsSendResponse | null>(null);
+
+  // Multi-Channel Alias Mapping Hub State
+  const activeAliases = aliases.length > 0 ? aliases : DEFAULT_PRODUCT_ALIASES;
+  const [showAddAliasModal, setShowAddAliasModal] = useState(false);
+  const [aliasChannel, setAliasChannel] = useState<'all' | 'woocommerce' | 'pickme' | 'ubereats' | 'pos'>('all');
+  const [aliasExternalTitle, setAliasExternalTitle] = useState('');
+  const [aliasTargetSku, setAliasTargetSku] = useState(products[0]?.sku || 'WT-ANK-R50I');
+  const [aliasNotes, setAliasNotes] = useState('');
+  const [aliasNotification, setAliasNotification] = useState<string | null>(null);
+
+  // Live Matching Sandbox State
+  const [sandboxTitle, setSandboxTitle] = useState('Soundcore anker r50i True wireless earbuds');
+  const [sandboxChannel, setSandboxChannel] = useState('woocommerce');
+
+  const handleAddAlias = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aliasExternalTitle.trim() || !aliasTargetSku || !onSaveAlias) return;
+
+    const targetProduct = products.find((p) => p.sku === aliasTargetSku);
+    const newAlias: ProductAlias = {
+      id: `alias-${Date.now().toString().slice(-4)}`,
+      channel: aliasChannel,
+      externalTitle: aliasExternalTitle.trim(),
+      targetSku: aliasTargetSku,
+      targetProductName: targetProduct?.name || '',
+      notes: aliasNotes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    await onSaveAlias(newAlias);
+    setShowAddAliasModal(false);
+    setAliasExternalTitle('');
+    setAliasNotes('');
+    setAliasNotification(`Alias mapped: "${newAlias.externalTitle}" -> ${newAlias.targetSku}`);
+    setTimeout(() => setAliasNotification(null), 4000);
+  };
+
+  const handleDeleteAlias = async (id: string) => {
+    if (onDeleteAlias) {
+      await onDeleteAlias(id);
+      setAliasNotification('Alias mapping removed.');
+      setTimeout(() => setAliasNotification(null), 3000);
+    }
+  };
+
+  // Evaluate Sandbox Live Match
+  const sandboxKeywords = extractCoreKeywords(sandboxTitle);
+  const sandboxMatch = findBestProductMatch(
+    { externalName: sandboxTitle, channel: sandboxChannel },
+    products,
+    activeAliases
+  );
 
   const toggleShow = (key: string) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -673,6 +750,281 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({ apiConfig, onS
           </div>
         </div>
       </form>
+
+      {/* MULTI-CHANNEL PRODUCT NAME & SKU MATCHING HUB */}
+      <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+              <Link2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-white">
+                  Multi-Channel SKU Linking & Product Alias Mapping Hub
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800">
+                  {activeAliases.length} Active Mappings
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Resolve title variations across channels (e.g. WooCommerce &ldquo;Soundcore anker r50i True wireless earbuds&rdquo; vs Uber Eats &ldquo;Anker r50i earbuds&rdquo;) to internal Inventory SKUs with 100% deduction accuracy.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowAddAliasModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors shadow-sm self-start sm:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Map New Channel Product Title</span>
+          </button>
+        </div>
+
+        {aliasNotification && (
+          <div className="p-3 bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{aliasNotification}</span>
+          </div>
+        )}
+
+        {/* LIVE KEYWORD & FUZZY MATCHING TESTER / SANDBOX */}
+        <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Smart Keyword & Fuzzy Matching Live Sandbox</span>
+            </div>
+            <span className="text-[10px] font-mono text-neutral-500">
+              Algorithm: Stopword Filtering + Core Model & Brand Token Intersection
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="sm:col-span-2 flex gap-2">
+              <input
+                type="text"
+                value={sandboxTitle}
+                onChange={(e) => setSandboxTitle(e.target.value)}
+                placeholder="Test external product name (e.g. Anker r50i earbuds)..."
+                className="flex-1 px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white font-mono text-xs"
+              />
+              <select
+                value={sandboxChannel}
+                onChange={(e) => setSandboxChannel(e.target.value)}
+                className="px-2.5 py-1.5 bg-neutral-900 border border-neutral-700 rounded-lg text-white text-xs"
+              >
+                <option value="woocommerce">WooCommerce</option>
+                <option value="ubereats">Uber Eats</option>
+                <option value="pickme">PickMe</option>
+                <option value="pos">POS</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-1 flex items-center gap-2 text-xs">
+              <span className="text-neutral-400">Try sample:</span>
+              <button
+                type="button"
+                onClick={() => setSandboxTitle('Anker r50i earbuds')}
+                className="px-2 py-1 rounded bg-neutral-900 hover:bg-neutral-800 text-[11px] text-purple-300 font-mono"
+              >
+                Uber Eats: &ldquo;Anker r50i earbuds&rdquo;
+              </button>
+            </div>
+          </div>
+
+          {/* Sandbox Analysis Result Card */}
+          <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-lg text-xs space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className="text-neutral-400">Extracted Core Model/Brand Tokens:</span>
+                <span className="font-mono text-purple-300 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800">
+                  [{sandboxKeywords.join(', ') || 'none'}]
+                </span>
+              </div>
+              <div className="text-neutral-500">
+                Stripped common filler words: &ldquo;True&rdquo;, &ldquo;wireless&rdquo;, &ldquo;earbuds&rdquo;
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-neutral-800/80">
+              <div className="flex items-center gap-2">
+                <span className="text-neutral-400">Match Target:</span>
+                {sandboxMatch.matchedProduct ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
+                      {sandboxMatch.matchedProduct.sku}
+                    </span>
+                    <span className="text-white font-medium">{sandboxMatch.matchedProduct.name}</span>
+                  </div>
+                ) : (
+                  <span className="text-amber-400 font-mono">No match found (Unregistered)</span>
+                )}
+              </div>
+
+              {sandboxMatch.matchedProduct && (
+                <div className="flex items-center gap-2 text-[11px] font-mono">
+                  <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                    Confidence: {(sandboxMatch.matchScore * 100).toFixed(0)}%
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
+                    Reason: {sandboxMatch.matchReason}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Active Alias Mappings Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-neutral-800 text-neutral-400 font-medium">
+                <th className="pb-2.5">External Channel Product Title</th>
+                <th className="pb-2.5">Channel</th>
+                <th className="pb-2.5">Target Inventory SKU & Product</th>
+                <th className="pb-2.5">Notes</th>
+                <th className="pb-2.5 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-850">
+              {activeAliases.map((alias) => (
+                <tr key={alias.id} className="hover:bg-neutral-850/30 transition-colors">
+                  <td className="py-3 font-medium text-white max-w-sm">
+                    &ldquo;{alias.externalTitle}&rdquo;
+                  </td>
+                  <td className="py-3">
+                    <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono bg-neutral-950 border border-neutral-800 text-purple-300">
+                      {alias.channel}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    <div className="font-mono font-semibold text-emerald-400">{alias.targetSku}</div>
+                    <div className="text-[11px] text-neutral-400 max-w-xs">{alias.targetProductName}</div>
+                  </td>
+                  <td className="py-3 text-neutral-400 text-[11px]">
+                    {alias.notes || '—'}
+                  </td>
+                  <td className="py-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAlias(alias.id)}
+                      className="p-1.5 text-neutral-400 hover:text-red-400 bg-neutral-800 hover:bg-neutral-750 rounded-lg transition-colors"
+                      title="Delete Alias Mapping"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ADD ALIAS MAPPING MODAL */}
+      {showAddAliasModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+              <div className="flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-purple-400" />
+                <h3 className="text-sm font-semibold text-white">
+                  Add Multi-Channel Product Alias Mapping
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddAliasModal(false)}
+                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAlias} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">Channel Association</label>
+                <select
+                  value={aliasChannel}
+                  onChange={(e: any) => setAliasChannel(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                >
+                  <option value="all">All Channels (Universal)</option>
+                  <option value="woocommerce">WooCommerce Web Store</option>
+                  <option value="ubereats">Uber Eats Retail</option>
+                  <option value="pickme">PickMe Market</option>
+                  <option value="pos">POS Terminal</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">
+                  External Channel Product Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={aliasExternalTitle}
+                  onChange={(e) => setAliasExternalTitle(e.target.value)}
+                  placeholder="e.g. Soundcore anker r50i True wireless earbuds"
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                />
+                <span className="text-[10px] text-neutral-500 mt-1 block">
+                  Paste the exact or partial name used on WooCommerce, PickMe, or Uber Eats
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">
+                  Target Inventory Product / SKU
+                </label>
+                <select
+                  value={aliasTargetSku}
+                  onChange={(e) => setAliasTargetSku(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                >
+                  {products.map((p) => (
+                    <option key={p.id} value={p.sku}>
+                      {p.sku} — {p.name} (Stock: {p.stockStore + p.stockWarehouse})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">Notes (Optional)</label>
+                <input
+                  type="text"
+                  value={aliasNotes}
+                  onChange={(e) => setAliasNotes(e.target.value)}
+                  placeholder="e.g. Resolves variation between Uber Eats and WooCommerce"
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAliasModal(false)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                >
+                  Save Alias Mapping
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

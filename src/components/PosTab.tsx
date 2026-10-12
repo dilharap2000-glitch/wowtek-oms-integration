@@ -105,7 +105,20 @@ export const PosTab: React.FC<PosTabProps> = ({
 
   const platformFeeAmount = Math.round((grossTotal * activePlatform.feePercent) / 100);
   const gatewayFeeAmount = Math.round((grossTotal * activeGateway.feePercent) / 100);
-  const netProfit = grossTotal - platformFeeAmount - gatewayFeeAmount - courierFee - totalCostOfGoods;
+
+  const hasUnregisteredInCart = safeCart.some((item) => {
+    const prod = products.find(
+      (p) =>
+        p.sku.toLowerCase() === item.sku.toLowerCase() ||
+        (item.barcode && p.barcode && p.barcode.toLowerCase() === item.barcode.toLowerCase()) ||
+        p.name.toLowerCase() === item.name.toLowerCase()
+    );
+    return !prod || !prod.costPrice || prod.costPrice <= 0 || !item.costPrice || item.costPrice <= 0;
+  });
+
+  const netProfit = hasUnregisteredInCart
+    ? 0
+    : grossTotal - platformFeeAmount - gatewayFeeAmount - courierFee - totalCostOfGoods;
 
   // Add product to cart by barcode or SKU
   const handleAddProductToCart = (prod: Product) => {
@@ -172,7 +185,7 @@ export const PosTab: React.FC<PosTabProps> = ({
           name: item.name,
           quantity: 1,
           unitPrice: item.sellingPrice,
-          costPrice: item.costPrice || Math.round(item.sellingPrice * 0.7),
+          costPrice: typeof item.costPrice === 'number' && item.costPrice > 0 ? item.costPrice : 0,
         },
       ];
     });
@@ -185,7 +198,7 @@ export const PosTab: React.FC<PosTabProps> = ({
         barcode: item.barcode,
         name: item.name,
         category: 'Scanned Items',
-        costPrice: item.costPrice || Math.round(item.sellingPrice * 0.7),
+        costPrice: typeof item.costPrice === 'number' && item.costPrice > 0 ? item.costPrice : 0,
         sellingPrice: item.sellingPrice,
         stockWarehouse: 10,
         stockStore: 5,
@@ -228,6 +241,16 @@ export const PosTab: React.FC<PosTabProps> = ({
       1000 + Math.random() * 9000
     )}`;
 
+    const hasUnregistered = safeCart.some((item) => {
+      const prod = products.find(
+        (p) =>
+          p.sku.toLowerCase() === item.sku.toLowerCase() ||
+          (item.barcode && p.barcode && p.barcode.toLowerCase() === item.barcode.toLowerCase()) ||
+          p.name.toLowerCase() === item.name.toLowerCase()
+      );
+      return !prod || !prod.costPrice || prod.costPrice <= 0 || !item.costPrice || item.costPrice <= 0;
+    });
+
     const newOrder: Order = {
       id: `ord-${Date.now().toString().slice(-4)}`,
       invoiceNumber: invoiceNum,
@@ -247,13 +270,16 @@ export const PosTab: React.FC<PosTabProps> = ({
       gatewayFeeAmount,
       courierFee,
       costOfGoods: totalCostOfGoods,
-      netProfit,
+      netProfit: hasUnregistered ? 0 : netProfit,
+      profitStatus: hasUnregistered ? 'Pending / Inventory Not Found' : 'Calculated',
+      hasUnregisteredItems: hasUnregistered,
+      unregisteredItemsCount: hasUnregistered ? safeCart.filter((item) => !products.some((p) => p.sku === item.sku && p.costPrice > 0)).length : 0,
       status: 'Completed',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       waybillGenerated: false,
       isPosSale: true,
-      notes: `POS sale processed via ${activeGateway.name} (${activeGateway.feePercent}% fee).`,
+      notes: `POS sale processed via ${activeGateway.name} (${activeGateway.feePercent}% fee).${hasUnregistered ? ' [Contains unregistered items: profit pending inventory valuation]' : ''}`,
     };
 
     onCreateOrder(newOrder);
@@ -611,10 +637,24 @@ export const PosTab: React.FC<PosTabProps> = ({
                   <span>Cost of Goods (COGS):</span>
                   <span>-Rs. {totalCostOfGoods.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-neutral-800">
-                  <span>Net Estimated Profit:</span>
-                  <span>Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
+                {hasUnregisteredInCart ? (
+                  <div className="pt-1.5 pb-1 border-t border-neutral-800">
+                    <div className="flex justify-between items-center text-amber-400">
+                      <span className="font-semibold text-[11px]">Net Profit:</span>
+                      <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
+                        Pending / Inventory Not Found
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-amber-300/80 mt-1">
+                      Cart contains unregistered items with missing cost price. Arbitrary profit suppressed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-neutral-800">
+                    <span>Net Estimated Profit:</span>
+                    <span>Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
               </div>
 
               <button
@@ -748,8 +788,16 @@ export const PosTab: React.FC<PosTabProps> = ({
                           Rs. {order.grossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
 
-                        <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-emerald-400">
-                          Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold">
+                          {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
+                            <span className="inline-block text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap">
+                              Pending / Inventory Not Found
+                            </span>
+                          ) : (
+                            <span className="text-emerald-400">
+                              Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-4 text-center">

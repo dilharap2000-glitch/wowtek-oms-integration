@@ -16,6 +16,10 @@ import {
   RotateCcw,
   FileText,
   Printer,
+  PlusCircle,
+  CheckCircle2,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
@@ -34,6 +38,14 @@ interface DashboardTabProps {
   onRefreshWebhookEvents?: () => void;
   onClearWebhookEvents?: () => void;
   onTriggerTestOrder?: () => Promise<void>;
+  onRestockProduct?: (
+    sku: string,
+    addedStore: number,
+    addedWarehouse: number,
+    costPrice?: number,
+    grnBatch?: string,
+    supplier?: string
+  ) => Promise<any>;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -48,9 +60,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onRefreshWebhookEvents,
   onClearWebhookEvents,
   onTriggerTestOrder,
+  onRestockProduct,
 }) => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = React.useState<Order | null>(null);
   const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = React.useState<Order | null>(null);
+
+  // Quick Restock state from backlog
+  const [quickRestockItem, setQuickRestockItem] = React.useState<{
+    sku: string;
+    name: string;
+    suggestedCost: number;
+  } | null>(null);
+  const [restockStoreQty, setRestockStoreQty] = React.useState(10);
+  const [restockWarehouseQty, setRestockWarehouseQty] = React.useState(0);
+  const [restockCostPrice, setRestockCostPrice] = React.useState<number | ''>(4200);
+  const [restockBatch, setRestockBatch] = React.useState(`GRN-${new Date().getFullYear()}-RESTOCK`);
+  const [restockSupplier, setRestockSupplier] = React.useState('WOWTEK Direct Import');
+  const [restockLoading, setRestockLoading] = React.useState(false);
+  const [restockSuccessMsg, setRestockSuccessMsg] = React.useState<string | null>(null);
 
   // Defensive array bindings
   const safeOrders = orders || [];
@@ -59,12 +86,63 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const safeExpenses = expenses || [];
   const safeWebhookEvents = webhookEvents || [];
 
-  // Financial computations
+  // Financial computations (PREVENT FAKE PROFIT DISPLAY)
   const totalGrossRevenue = safeOrders
     .filter((o) => o && o.status !== 'Returned')
     .reduce((sum, o) => sum + (o?.grossTotal || 0), 0);
 
-  const totalNetProfit = safeOrders.reduce((sum, o) => sum + (o?.netProfit || 0), 0);
+  // Strictly compute Net Profit from verified orders only
+  const verifiedProfitOrders = safeOrders.filter(
+    (o) => o && o.status !== 'Returned' && !o.hasUnregisteredItems && o.profitStatus !== 'Pending / Inventory Not Found'
+  );
+  const totalNetProfit = verifiedProfitOrders.reduce((sum, o) => sum + (o?.netProfit || 0), 0);
+
+  const pendingProfitOrdersCount = safeOrders.filter(
+    (o) => o && (o.hasUnregisteredItems || o.profitStatus === 'Pending / Inventory Not Found')
+  ).length;
+
+  const pendingBacklogOrders = safeOrders.filter(
+    (o) =>
+      o &&
+      (o.hasUnregisteredItems === true ||
+        o.profitStatus === 'Pending / Inventory Not Found' ||
+        o.status === 'Pending')
+  );
+
+  const handleOpenQuickRestock = (item: { sku: string; name: string; suggestedCost: number }) => {
+    setQuickRestockItem(item);
+    setRestockStoreQty(10);
+    setRestockWarehouseQty(5);
+    setRestockCostPrice(item.suggestedCost > 0 ? item.suggestedCost : 4200);
+    setRestockBatch(`GRN-${new Date().getFullYear()}-OCT-${Math.floor(100 + Math.random() * 900)}`);
+  };
+
+  const handleExecuteRestock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickRestockItem || !onRestockProduct) return;
+    setRestockLoading(true);
+    try {
+      const res = await onRestockProduct(
+        quickRestockItem.sku,
+        restockStoreQty,
+        restockWarehouseQty,
+        typeof restockCostPrice === 'number' ? restockCostPrice : 0,
+        restockBatch,
+        restockSupplier
+      );
+      setQuickRestockItem(null);
+      setRestockSuccessMsg(
+        res?.message ||
+          `GRN Restock processed for ${quickRestockItem.sku}! Pending orders auto-deducted and moved to active with verified profits.`
+      );
+      setTimeout(() => setRestockSuccessMsg(null), 6000);
+    } catch (err: any) {
+      console.error('Restock error:', err);
+    } finally {
+      setRestockLoading(false);
+    }
+  };
+
   const totalExpenses = safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
   const totalCommissionsDeducted = safeOrders.reduce(
     (sum, o) => sum + (o?.platformFeeAmount || 0) + (o?.gatewayFeeAmount || 0),
@@ -155,12 +233,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
             Rs. {totalNetProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="flex items-center justify-between mt-3 text-xs text-neutral-400 pt-2 border-t border-neutral-800/80">
-            <span>After COGS & Dynamic Fees</span>
-            <span className="text-neutral-300 font-mono">
-              {((totalNetProfit / (totalGrossRevenue || 1)) * 100).toFixed(1)}% margin
-            </span>
-          </div>
+          {pendingProfitOrdersCount > 0 ? (
+            <div className="mt-2 pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-amber-400 flex items-center gap-1 font-mono">
+                <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                <span>{pendingProfitOrdersCount} pending valuation</span>
+              </span>
+              <span className="text-neutral-500 font-mono text-[10px]">Real records only</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between mt-3 text-xs text-neutral-400 pt-2 border-t border-neutral-800/80">
+              <span>After Verified COGS</span>
+              <span className="text-neutral-300 font-mono">
+                {((totalNetProfit / (totalGrossRevenue || 1)) * 100).toFixed(1)}% margin
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Courier Queue */}
@@ -209,6 +297,131 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* RESTOCK SUCCESS TOAST BANNER */}
+      {restockSuccessMsg && (
+        <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 text-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span className="font-medium">{restockSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setRestockSuccessMsg(null)}
+            className="text-neutral-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* PENDING INVENTORY BACKLOG QUEUE (AUTO-DEDUCTION ENGINE) */}
+      {pendingBacklogOrders.length > 0 && (
+        <div className="p-5 rounded-xl bg-neutral-900 border border-amber-800/60 shadow-md space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-neutral-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-white">
+                    Pending / Inventory Not Found Backlog Queue
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    {pendingBacklogOrders.length} Backlog Orders
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  Orders holding unregistered items or out-of-stock SKUs. When a new GRN / restock occurs, stock will be automatically deducted, warnings cleared, and verified Net Profit updated instantly.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onNavigateTab('products')}
+              className="self-start sm:self-auto text-xs text-purple-400 hover:text-purple-300 font-medium"
+            >
+              Open Inventory & GRN →
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-neutral-800 text-neutral-400 font-medium">
+                  <th className="pb-2">Invoice No</th>
+                  <th className="pb-2">Channel</th>
+                  <th className="pb-2">Customer</th>
+                  <th className="pb-2">Backlog Items Waiting for Stock</th>
+                  <th className="pb-2 text-right">Gross Total</th>
+                  <th className="pb-2 text-center">Quick Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-800/60">
+                {pendingBacklogOrders.map((order) => {
+                  const unregItems = (order.items || []).filter(
+                    (it) => !it.isRegistered || it.costPrice <= 0
+                  );
+                  const displayItems = unregItems.length > 0 ? unregItems : order.items || [];
+
+                  return (
+                    <tr key={order.id} className="hover:bg-neutral-850/30 transition-colors">
+                      <td className="py-2.5 font-mono text-purple-300 font-semibold">
+                        {order.invoiceNumber}
+                      </td>
+                      <td className="py-2.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono bg-neutral-950 border border-neutral-800 text-neutral-300">
+                          {order.channel}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-neutral-300">
+                        <div>{order.customerName}</div>
+                        <div className="text-[10px] text-neutral-500 font-mono">{order.customerPhone}</div>
+                      </td>
+                      <td className="py-2.5 space-y-1">
+                        {displayItems.map((it, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-amber-300 font-medium text-[11px]">
+                              {it.sku || 'UNREGISTERED'}
+                            </span>
+                            <span className="text-neutral-400 text-[11px]">
+                              &ldquo;{it.name}&rdquo; ({it.quantity} qty)
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-400 border border-amber-800">
+                              Awaiting GRN
+                            </span>
+                          </div>
+                        ))}
+                      </td>
+                      <td className="py-2.5 text-right font-mono text-white font-medium">
+                        Rs. {(order.grossTotal || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 text-center">
+                        {displayItems[0] && (
+                          <button
+                            onClick={() =>
+                              handleOpenQuickRestock({
+                                sku: displayItems[0].sku || 'WT-RESTOCK',
+                                name: displayItems[0].name,
+                                suggestedCost: displayItems[0].costPrice || 0,
+                              })
+                            }
+                            className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 hover:text-white rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-colors"
+                            title="Add stock via Inward GRN to automatically resolve this backlog order"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            <span>Inward Restock</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Channel Performance & Recent Invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -399,8 +612,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           {order.status}
                         </span>
                       </td>
-                      <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
-                        Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      <td className="py-3 text-right font-mono tabular-nums font-semibold">
+                        {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                            Pending / Inventory Not Found
+                          </span>
+                        ) : (
+                          <span className="text-emerald-400">
+                            Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
@@ -461,6 +682,134 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           products={products}
           onClose={() => setSelectedOrderForThermalPrint(null)}
         />
+      )}
+      {/* QUICK INWARD GRN RESTOCK MODAL */}
+      {quickRestockItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Inward GRN Restock & Auto-Deduction
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Auto-deducts pending backlog orders waiting for this SKU
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setQuickRestockItem(null)}
+                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteRestock} className="p-5 space-y-4 text-xs">
+              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
+                <div className="text-[11px] text-neutral-400 font-medium">Target Backlog Product:</div>
+                <div className="font-semibold text-white text-sm">{quickRestockItem.name}</div>
+                <div className="text-[11px] font-mono text-purple-300">
+                  Target SKU: <strong>{quickRestockItem.sku}</strong>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Store Stock (Inward Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={restockStoreQty}
+                    onChange={(e) => setRestockStoreQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Warehouse Stock (Inward Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={restockWarehouseQty}
+                    onChange={(e) => setRestockWarehouseQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Landed Cost Price (COGS)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={restockCostPrice}
+                    onChange={(e) => setRestockCostPrice(parseInt(e.target.value) || '')}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">GRN Batch Ref</label>
+                  <input
+                    type="text"
+                    required
+                    value={restockBatch}
+                    onChange={(e) => setRestockBatch(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">Inward Supplier</label>
+                <input
+                  type="text"
+                  value={restockSupplier}
+                  onChange={(e) => setRestockSupplier(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                />
+              </div>
+
+              <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-[11px] text-purple-300">
+                ⚡ <strong>Automated Auto-Deduction Engine:</strong> Upon receiving this GRN, all pending orders waiting for this SKU will have required stock auto-deducted, &ldquo;Inventory Not Found&rdquo; warning cleared, and verified Net Operating Profit calculated in real time!
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickRestockItem(null)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={restockLoading}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  {restockLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>Receive GRN & Auto-Deduct Backlog</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

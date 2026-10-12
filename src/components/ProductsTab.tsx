@@ -19,26 +19,40 @@ import {
   Package,
   Sparkles,
   Building2,
+  PlusCircle,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
-import { Product, Supplier } from '@/types';
+import { Product, Supplier, Order } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 
 interface ProductsTabProps {
   products: Product[];
+  orders?: Order[];
   suppliers?: Supplier[];
   onAddProduct: (product: Product) => void;
   onUpdateProduct?: (id: string, updates: Partial<Product>) => void;
   onDeleteProduct?: (id: string) => void;
   onLoadSampleProducts?: () => void;
+  onRestockProduct?: (
+    sku: string,
+    addedStore: number,
+    addedWarehouse: number,
+    costPrice?: number,
+    grnBatch?: string,
+    supplier?: string
+  ) => Promise<any>;
 }
 
 export const ProductsTab: React.FC<ProductsTabProps> = ({
   products,
+  orders = [],
   suppliers = [],
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
   onLoadSampleProducts,
+  onRestockProduct,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('all');
@@ -47,6 +61,76 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Inward Restock (GRN) Modal State
+  const [restockProductTarget, setRestockProductTarget] = useState<Product | null>(null);
+  const [inwardStoreQty, setInwardStoreQty] = useState(10);
+  const [inwardWarehouseQty, setInwardWarehouseQty] = useState(5);
+  const [inwardCostPrice, setInwardCostPrice] = useState<number | ''>('');
+  const [inwardBatch, setInwardBatch] = useState('');
+  const [inwardSupplier, setInwardSupplier] = useState('');
+  const [restockSubmitting, setRestockSubmitting] = useState(false);
+  const [restockToast, setRestockToast] = useState<string | null>(null);
+
+  const handleOpenRestock = (p: Product) => {
+    setRestockProductTarget(p);
+    const relatedOrders = (orders || []).filter(
+      (o) =>
+        (o.hasUnregisteredItems ||
+          o.profitStatus === 'Pending / Inventory Not Found' ||
+          o.status === 'Pending') &&
+        (o.items || []).some(
+          (it) =>
+            (it.sku && it.sku.toUpperCase() === p.sku.toUpperCase()) ||
+            (it.name && it.name.toLowerCase().includes(p.name.toLowerCase())) ||
+            (p.name && p.name.toLowerCase().includes(it.name.toLowerCase()))
+        )
+    );
+    const neededQty = relatedOrders.reduce((sum, o) => {
+      const match = (o.items || []).filter(
+        (it) =>
+          (it.sku && it.sku.toUpperCase() === p.sku.toUpperCase()) ||
+          (it.name && it.name.toLowerCase().includes(p.name.toLowerCase())) ||
+          (p.name && p.name.toLowerCase().includes(it.name.toLowerCase()))
+      );
+      return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
+    }, 0);
+
+    setInwardStoreQty(Math.max(10, neededQty + 5));
+    setInwardWarehouseQty(5);
+    setInwardCostPrice(p.costPrice || 0);
+    setInwardBatch(`GRN-${new Date().getFullYear()}-OCT-${Math.floor(100 + Math.random() * 900)}`);
+    setInwardSupplier(p.supplier || 'WOWTEK Direct Import');
+  };
+
+  const handleExecuteInwardRestock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!restockProductTarget || !onRestockProduct) return;
+    setRestockSubmitting(true);
+    try {
+      const res = await onRestockProduct(
+        restockProductTarget.sku,
+        inwardStoreQty,
+        inwardWarehouseQty,
+        typeof inwardCostPrice === 'number' ? inwardCostPrice : 0,
+        inwardBatch,
+        inwardSupplier
+      );
+      setRestockProductTarget(null);
+      const unitsDeducted = res?.totalUnitsDeducted || 0;
+      const resolvedCount = res?.resolvedOrders?.length || 0;
+      const customMsg =
+        resolvedCount > 0
+          ? `Auto-deducted ${unitsDeducted} units for ${resolvedCount} backlog order(s) on restock of ${restockProductTarget.sku}! Net Operating Profits verified and orders moved to active.`
+          : `Inward GRN Restock saved for ${restockProductTarget.sku}. Stock updated: +${inwardStoreQty + inwardWarehouseQty} units.`;
+      setRestockToast(res?.message || customMsg);
+      setTimeout(() => setRestockToast(null), 7000);
+    } catch (err: any) {
+      console.error('Restock error:', err);
+    } finally {
+      setRestockSubmitting(false);
+    }
+  };
 
   // New product form (clean default values, reset on open/close/submit)
   const [sku, setSku] = useState('');
@@ -181,6 +265,21 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {restockToast && (
+        <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 text-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <span className="font-medium">{restockToast}</span>
+          </div>
+          <button
+            onClick={() => setRestockToast(null)}
+            className="text-neutral-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -388,6 +487,30 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     ? 'bg-purple-500'
                     : 'bg-amber-500';
 
+                const waitingOrders = (orders || []).filter(
+                  (o) =>
+                    (o.hasUnregisteredItems ||
+                      o.profitStatus === 'Pending / Inventory Not Found' ||
+                      o.status === 'Pending') &&
+                    (o.items || []).some(
+                      (it) =>
+                        (it.sku && it.sku.toUpperCase() === p.sku.toUpperCase()) ||
+                        (it.name && it.name.toLowerCase().includes(p.name.toLowerCase())) ||
+                        (p.name && p.name.toLowerCase().includes(it.name.toLowerCase()))
+                    )
+                );
+
+                const waitingUnits = waitingOrders.reduce((sum, o) => {
+                  const match = (o.items || []).filter(
+                    (it) =>
+                      (!it.isRegistered || it.costPrice <= 0 || o.hasUnregisteredItems || o.status === 'Pending') &&
+                      ((it.sku && it.sku.toUpperCase() === p.sku.toUpperCase()) ||
+                        (it.name && it.name.toLowerCase().includes(p.name.toLowerCase())) ||
+                        (p.name && p.name.toLowerCase().includes(it.name.toLowerCase())))
+                  );
+                  return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
+                }, 0);
+
                 return (
                   <tr key={p.id} className="hover:bg-neutral-850/40 transition-colors">
                     <td className="py-3 px-4">
@@ -398,11 +521,21 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     <td className="py-3 px-4">
                       <div className="font-medium text-white max-w-xs">{p.name}</div>
                       <div className="text-[11px] text-neutral-400">{p.category}</div>
-                      <div className="flex items-center gap-1.5 mt-1">
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-purple-300 flex items-center gap-1">
                           <Building2 className="w-3 h-3 text-purple-400" />
                           <span className="truncate max-w-[170px]">{p.supplier || 'WOWTEK Direct Import'}</span>
                         </span>
+                        {waitingOrders.length > 0 && (
+                          <button
+                            onClick={() => handleOpenRestock(p)}
+                            className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                            title={`Click to Inward Restock: ${waitingOrders.length} backlog order(s) waiting for ${waitingUnits} unit(s). Inward stock will auto-deduct and verify net profits.`}
+                          >
+                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            <span>{waitingOrders.length} Backlog Waiting ({waitingUnits} pcs)</span>
+                          </button>
+                        )}
                       </div>
                     </td>
 
@@ -443,6 +576,17 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
+                        {onRestockProduct && (
+                          <button
+                            onClick={() => handleOpenRestock(p)}
+                            className="p-1.5 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-800/80 text-emerald-300 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-[11px] font-medium"
+                            title="Inward Restock (GRN Receipt) & Auto-Deduct Backlog"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="hidden xl:inline">GRN</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setSelectedProductForBarcode(p)}
                           className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg transition-colors"
@@ -905,6 +1049,178 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                   className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-sm transition-colors"
                 >
                   Confirm GRN Receipt
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* INWARD GRN RESTOCK MODAL */}
+      {restockProductTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Inward GRN Restock & Backlog Auto-Deduction
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Add new inward stock batch and resolve any pending invoices
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRestockProductTarget(null)}
+                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteInwardRestock} className="p-5 space-y-4 text-xs">
+              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
+                <div className="text-[11px] text-neutral-400">Restocking Product:</div>
+                <div className="font-semibold text-white text-sm">{restockProductTarget.name}</div>
+                <div className="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-neutral-900">
+                  <span className="text-purple-300">SKU: {restockProductTarget.sku}</span>
+                  <span className="text-neutral-400">
+                    Current Held: W:{restockProductTarget.stockWarehouse} · S:{restockProductTarget.stockStore}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Store Stock (Inward Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={inwardStoreQty}
+                    onChange={(e) => setInwardStoreQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Warehouse Stock (Inward Qty)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={inwardWarehouseQty}
+                    onChange={(e) => setInwardWarehouseQty(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">
+                    Landed Cost Price (COGS)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={inwardCostPrice}
+                    onChange={(e) => setInwardCostPrice(parseInt(e.target.value) || '')}
+                    placeholder="e.g. 4200"
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-neutral-300 font-medium mb-1">GRN Batch Ref</label>
+                  <input
+                    type="text"
+                    required
+                    value={inwardBatch}
+                    onChange={(e) => setInwardBatch(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-neutral-300 font-medium mb-1">Supplier / Inward Source</label>
+                <input
+                  type="text"
+                  value={inwardSupplier}
+                  onChange={(e) => setInwardSupplier(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                />
+              </div>
+
+              {(() => {
+                const targetWaiting = (orders || []).filter(
+                  (o) =>
+                    (o.hasUnregisteredItems ||
+                      o.profitStatus === 'Pending / Inventory Not Found' ||
+                      o.status === 'Pending') &&
+                    (o.items || []).some(
+                      (it) =>
+                        (it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
+                        (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
+                        (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase()))
+                    )
+                );
+                const targetNeededUnits = targetWaiting.reduce((sum, o) => {
+                  const match = (o.items || []).filter(
+                    (it) =>
+                      (!it.isRegistered || it.costPrice <= 0 || o.hasUnregisteredItems || o.status === 'Pending') &&
+                      ((it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
+                        (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
+                        (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase())))
+                  );
+                  return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
+                }, 0);
+
+                if (targetWaiting.length > 0) {
+                  return (
+                    <div className="p-3 bg-amber-950/70 border border-amber-600/70 rounded-xl text-[11px] text-amber-200 space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span>{targetWaiting.length} Pending Backlog Order(s) Waiting ({targetNeededUnits} pcs needed)</span>
+                      </div>
+                      <div className="text-[10px] text-amber-300/80">
+                        Upon confirming GRN, required stock will be immediately deducted, warnings cleared, and verified Net Operating Profits computed.
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-[11px] text-purple-300">
+                ⚡ <strong>Auto-Deduction Engine:</strong> Any pending orders waiting for SKU <strong>{restockProductTarget.sku}</strong> will automatically have stock deducted, accurate COGS and Net Operating Profit computed, and be moved to active status!
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRestockProductTarget(null)}
+                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={restockSubmitting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  {restockSubmitting ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>Confirm Inward GRN Restock</span>
                 </button>
               </div>
             </form>

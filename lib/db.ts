@@ -1,6 +1,7 @@
 import {
   Order,
   Product,
+  ProductAlias,
   TransExpressWaybill,
   WarrantyRecord,
   ExpenseItem,
@@ -12,6 +13,7 @@ import {
   SupplierRmaClaim,
   WebhookEvent,
 } from '@/types';
+import { findBestProductMatch, DEFAULT_PRODUCT_ALIASES } from '@/lib/productMatching';
 
 // ---------------------------------------------------------------------------
 // Default Configurations for Dynamic Platform & Payment Gateway Fees
@@ -71,6 +73,7 @@ interface MockDatabaseState {
   suppliers: Supplier[];
   rmaClaims: SupplierRmaClaim[];
   webhookEvents: WebhookEvent[];
+  aliases: ProductAlias[];
 }
 
 const STORAGE_KEY = 'wowtek_pos_v2_store';
@@ -93,6 +96,7 @@ export function initMockDb(): MockDatabaseState {
           suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
           rmaClaims: Array.isArray(parsed.rmaClaims) ? parsed.rmaClaims : [],
           webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [],
+          aliases: Array.isArray(parsed.aliases) ? parsed.aliases : [...DEFAULT_PRODUCT_ALIASES],
         };
       }
     } catch {}
@@ -112,6 +116,7 @@ export function initMockDb(): MockDatabaseState {
       suppliers: [],
       rmaClaims: [],
       webhookEvents: [],
+      aliases: [...DEFAULT_PRODUCT_ALIASES],
     };
   }
   return g._wowtekMockDb;
@@ -254,6 +259,86 @@ export async function getOrders(): Promise<Order[]> {
 
 export async function saveOrder(order: Order): Promise<Order> {
   const mock = initMockDb();
+
+  // STRICT INVENTORY VALIDATION & COST CHECK:
+  // Validate items against product catalog
+  let hasUnregistered = false;
+  let unregCount = 0;
+  let verifiedCogs = 0;
+
+  if (Array.isArray(order.items)) {
+    order.items.forEach((item) => {
+      // SMART PRODUCT NAME & SKU MATCHING:
+      // Priority 1: SKU Linking, Priority 2: Barcode, Priority 3: Alias Mapping, Priority 4: Exact Title, Priority 5: Keyword & Fuzzy Matching
+      const matchRes = findBestProductMatch(
+        {
+          externalName: item.name,
+          externalSku: item.sku,
+          externalBarcode: item.barcode,
+          channel: order.channel,
+        },
+        mock.products,
+        mock.aliases
+      );
+
+      const prod = matchRes.matchedProduct;
+      const availableStock = prod ? (prod.stockStore || 0) + (prod.stockWarehouse || 0) : 0;
+
+      if (prod && availableStock >= item.quantity) {
+        // Deduct stock only when product actually exists and has sufficient stock
+        if (prod.stockStore >= item.quantity) {
+          prod.stockStore -= item.quantity;
+        } else {
+          const remaining = item.quantity - prod.stockStore;
+          prod.stockStore = 0;
+          prod.stockWarehouse = Math.max(0, prod.stockWarehouse - remaining);
+        }
+
+        const realCost =
+          typeof prod.costPrice === 'number' && prod.costPrice > 0
+            ? prod.costPrice
+            : (typeof item.costPrice === 'number' && item.costPrice > 0 ? item.costPrice : 0);
+
+        item.sku = prod.sku;
+        item.barcode = prod.barcode || item.barcode;
+        item.costPrice = realCost;
+        item.isRegistered = realCost > 0;
+        verifiedCogs += realCost * item.quantity;
+
+        if (realCost <= 0) {
+          hasUnregistered = true;
+          unregCount++;
+        }
+      } else {
+        // Item missing from inventory or OUT OF STOCK: do NOT deduct stock and queue in backlog!
+        hasUnregistered = true;
+        unregCount++;
+        item.costPrice = 0;
+        item.isRegistered = false;
+        if (prod) {
+          item.sku = prod.sku;
+        }
+      }
+    });
+  }
+
+  order.costOfGoods = verifiedCogs;
+  if (hasUnregistered) {
+    order.hasUnregisteredItems = true;
+    order.unregisteredItemsCount = unregCount;
+    order.profitStatus = 'Pending / Inventory Not Found';
+    order.netProfit = 0; // Prevent fake profit display
+    if (!order.status || order.status === 'Processing' || order.status === 'Completed') {
+      order.status = 'Pending';
+    }
+  } else {
+    order.hasUnregisteredItems = false;
+    order.unregisteredItemsCount = 0;
+    order.profitStatus = 'Calculated';
+    const totalFees = (order.platformFeeAmount || 0) + (order.gatewayFeeAmount || 0) + (order.courierFee || 0);
+    order.netProfit = Math.max(0, order.grossTotal - verifiedCogs - totalFees);
+  }
+
   const existingIdx = mock.orders.findIndex(
     (o) => o.id === order.id || o.invoiceNumber === order.invoiceNumber
   );
@@ -267,19 +352,6 @@ export async function saveOrder(order: Order): Promise<Order> {
     mock.orders.unshift(order);
   }
 
-  // Deduct stock in local state
-  order.items.forEach((item) => {
-    const prod = mock.products.find((p) => p.sku === item.sku);
-    if (prod) {
-      if (prod.stockStore >= item.quantity) {
-        prod.stockStore -= item.quantity;
-      } else {
-        const remaining = item.quantity - prod.stockStore;
-        prod.stockStore = 0;
-        prod.stockWarehouse = Math.max(0, prod.stockWarehouse - remaining);
-      }
-    }
-  });
   persistMockDb();
 
   if (typeof window !== 'undefined') {
@@ -379,6 +451,94 @@ export async function processOrderReturn(
 // ---------------------------------------------------------------------------
 // Product Inventory (Direct to /api/products)
 // ---------------------------------------------------------------------------
+
+function resolveMockBacklog(product: Product, mock: MockDatabaseState): Order[] {
+  let storeStock = product.stockStore || 0;
+  let warehouseStock = product.stockWarehouse || 0;
+  const resolved: Order[] = [];
+
+  mock.orders.forEach((order) => {
+    if (
+      !order.hasUnregisteredItems &&
+      order.profitStatus !== 'Pending / Inventory Not Found' &&
+      order.status !== 'Pending'
+    ) {
+      return;
+    }
+
+    let modified = false;
+    if (Array.isArray(order.items)) {
+      order.items.forEach((item) => {
+        if (item.isRegistered && item.costPrice > 0) return;
+
+        const matchRes = findBestProductMatch(
+          {
+            externalName: item.name,
+            externalSku: item.sku,
+            externalBarcode: item.barcode,
+            channel: order.channel,
+          },
+          [product],
+          mock.aliases
+        );
+
+        if (matchRes.matchedProduct || (item.sku && item.sku.toUpperCase() === product.sku.toUpperCase())) {
+          const reqQty = item.quantity || 1;
+          if (storeStock + warehouseStock > 0) {
+            if (storeStock >= reqQty) {
+              storeStock -= reqQty;
+            } else {
+              const rem = reqQty - storeStock;
+              storeStock = 0;
+              warehouseStock = Math.max(0, warehouseStock - rem);
+            }
+            item.sku = product.sku;
+            item.barcode = product.barcode || item.barcode;
+            item.costPrice = product.costPrice || 0;
+            item.isRegistered = true;
+            modified = true;
+          }
+        }
+      });
+    }
+
+    if (modified) {
+      const allRegistered = order.items.every((it) => it.isRegistered && it.costPrice > 0);
+      const verifiedCogs = order.items.reduce((s, it) => s + (it.costPrice || 0) * (it.quantity || 1), 0);
+      order.costOfGoods = verifiedCogs;
+
+      if (allRegistered) {
+        order.hasUnregisteredItems = false;
+        order.unregisteredItemsCount = 0;
+        order.profitStatus = 'Calculated';
+        const fees = (order.platformFeeAmount || 0) + (order.gatewayFeeAmount || 0) + (order.courierFee || 0);
+        order.netProfit = Math.max(0, order.grossTotal - verifiedCogs - fees);
+        if (order.status === 'Pending') {
+          order.status = 'Processing';
+        }
+        order.notes = [
+          order.notes,
+          `[Auto-Restocked] Stock auto-deducted for ${product.name} (SKU: ${product.sku}). Real Net Profit verified: Rs. ${order.netProfit.toLocaleString()}.`,
+        ]
+          .filter(Boolean)
+          .join(' | ');
+      } else {
+        const unregCount = order.items.filter((it) => !it.isRegistered || it.costPrice <= 0).length;
+        order.hasUnregisteredItems = true;
+        order.unregisteredItemsCount = unregCount;
+        order.profitStatus = 'Pending / Inventory Not Found';
+        order.netProfit = 0;
+      }
+      order.updatedAt = new Date().toISOString();
+      resolved.push(order);
+    }
+  });
+
+  product.stockStore = storeStock;
+  product.stockWarehouse = warehouseStock;
+  return resolved;
+}
+
 export async function getProducts(): Promise<Product[]> {
   if (typeof window !== 'undefined') {
     try {
@@ -405,15 +565,25 @@ export async function saveProduct(product: Product): Promise<Product> {
   } else {
     mock.products.unshift(product);
   }
+
+  // AUTO-DEDUCTION FOR PENDING/BACKLOG INVOICES ON NEW GRN / RESTOCK
+  if ((product.stockStore > 0 || product.stockWarehouse > 0) && product.costPrice > 0) {
+    resolveMockBacklog(product, mock);
+  }
+
   persistMockDb();
 
   if (typeof window !== 'undefined') {
     try {
-      await fetch('/api/products', {
+      const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(product),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.product) return data.product;
+      }
     } catch {}
   }
   return product;
@@ -424,6 +594,9 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
   const index = mock.products.findIndex((p) => p.id === id || p.sku === id);
   if (index !== -1) {
     mock.products[index] = { ...mock.products[index], ...updates };
+    if ((mock.products[index].stockStore > 0 || mock.products[index].stockWarehouse > 0) && mock.products[index].costPrice > 0) {
+      resolveMockBacklog(mock.products[index], mock);
+    }
     persistMockDb();
   }
 
@@ -451,6 +624,119 @@ export async function deleteProduct(id: string): Promise<boolean> {
     } catch {}
   }
   return mock.products.length < prevLen;
+}
+
+export async function restockProduct(
+  sku: string,
+  addedStore: number,
+  addedWarehouse: number,
+  costPrice?: number,
+  grnBatch?: string,
+  supplier?: string
+): Promise<{ success: boolean; product?: Product; resolvedOrders?: Order[]; message?: string }> {
+  const mock = initMockDb();
+  const prod = mock.products.find((p) => p.sku === sku);
+  if (!prod) {
+    return { success: false, message: `Product ${sku} not found` };
+  }
+
+  prod.stockStore = (prod.stockStore || 0) + (addedStore || 0);
+  prod.stockWarehouse = (prod.stockWarehouse || 0) + (addedWarehouse || 0);
+  if (typeof costPrice === 'number' && costPrice > 0) {
+    prod.costPrice = costPrice;
+  }
+  if (grnBatch) prod.grnBatch = grnBatch;
+  if (supplier) prod.supplier = supplier;
+
+  const resolvedOrders = resolveMockBacklog(prod, mock);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/products/restock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          success: true,
+          product: data.product || prod,
+          resolvedOrders: data.resolvedOrders || resolvedOrders,
+          message: data.message,
+        };
+      }
+    } catch {}
+  }
+
+  return {
+    success: true,
+    product: prod,
+    resolvedOrders,
+    message: `Restocked ${sku}. ${resolvedOrders.length} backlog order(s) auto-deducted and resolved!`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Product Alias & Channel SKU Mappings (Direct to /api/aliases)
+// ---------------------------------------------------------------------------
+export async function getProductAliases(): Promise<ProductAlias[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/aliases', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.aliases)) {
+          const mock = initMockDb();
+          mock.aliases = data.aliases;
+          persistMockDb();
+          return data.aliases;
+        }
+      }
+    } catch {}
+  }
+  return initMockDb().aliases;
+}
+
+export async function saveProductAlias(alias: ProductAlias): Promise<ProductAlias> {
+  const mock = initMockDb();
+  const existingIdx = mock.aliases.findIndex(
+    (a) =>
+      a.id === alias.id ||
+      (a.externalTitle.toLowerCase() === alias.externalTitle.toLowerCase() && a.channel === alias.channel)
+  );
+  if (existingIdx !== -1) {
+    mock.aliases[existingIdx] = alias;
+  } else {
+    mock.aliases.unshift(alias);
+  }
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/aliases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alias),
+      });
+    } catch {}
+  }
+  return alias;
+}
+
+export async function deleteProductAlias(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const prevLen = mock.aliases.length;
+  mock.aliases = mock.aliases.filter((a) => a.id !== id);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/aliases?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
+  return mock.aliases.length < prevLen;
 }
 
 // ---------------------------------------------------------------------------

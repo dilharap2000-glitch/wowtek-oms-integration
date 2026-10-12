@@ -17,10 +17,13 @@ import {
 import {
   Order,
   OrderItem,
+  Product,
+  ProductAlias,
   TransExpressWaybill,
   WebhookEvent,
   OrderStatus,
 } from '@/types';
+import { findBestProductMatch } from '@/lib/productMatching';
 
 export const dynamic = 'force-dynamic';
 
@@ -342,49 +345,93 @@ export async function POST(req: NextRequest) {
       'No. 142 Galle Road, Bambalapitiya';
     const city = shipping.city || billing.city || 'Colombo 04';
 
-    // 3. Extract Line Items
+    // 3. Extract Line Items & Strict Inventory Validation with Smart Product Matching
     const lineItemsRaw = rawOrderObj.line_items || [];
-    const catalog = await getProducts();
+    let catalog = await getProducts();
+    let aliases: ProductAlias[] = [];
+    try {
+      const mongoConn = await connectToMongoDB();
+      if (mongoConn) {
+        const [mongoProducts, mongoAliases] = await Promise.all([
+          mongoConn.db.collection('products').find({}).toArray().catch(() => []),
+          mongoConn.db.collection('product_aliases').find({}).toArray().catch(() => []),
+        ]);
+        if (mongoProducts && mongoProducts.length > 0) {
+          catalog = mongoProducts.map(({ _id, ...rest }) => rest as Product);
+        }
+        if (mongoAliases && mongoAliases.length > 0) {
+          aliases = mongoAliases.map(({ _id, ...rest }) => rest as ProductAlias);
+        }
+      }
+    } catch (e) {
+      console.warn('[Webhook] MongoDB catalog lookup fallback to getProducts():', e);
+    }
+
+    let hasUnregisteredItems = false;
+    let unregisteredItemsCount = 0;
 
     const items: OrderItem[] = lineItemsRaw.map((li: any) => {
-      const sku = li.sku || `WT-WC-${li.product_id || li.id || 'ITEM'}`;
-      const name = li.name || 'WooCommerce Product';
+      const sku = (li.sku || '').trim() || `WT-WC-${li.product_id || li.id || 'ITEM'}`;
+      const name = (li.name || 'WooCommerce Product').trim();
       const quantity = parseInt(li.quantity) || 1;
       const unitPrice = parseFloat(li.price || (li.total ? li.total / quantity : 0) || 0);
 
-      const matched = catalog.find(
-        (p) =>
-          p.sku.toLowerCase() === sku.toLowerCase() ||
-          p.name.toLowerCase() === name.toLowerCase()
+      // SMART PRODUCT NAME & SKU MATCHING ALGORITHM:
+      // Strips filler words ("True", "wireless", "earbuds") and matches core brand/model keywords (e.g., "Anker", "r50i")
+      // Prioritizes exact SKU linking and alias mappings
+      const matchResult = findBestProductMatch(
+        {
+          externalName: name,
+          externalSku: sku,
+          channel: 'woocommerce',
+        },
+        catalog,
+        aliases
       );
-      const costPrice = matched ? matched.costPrice : Math.round(unitPrice * 0.72);
+
+      const matched = matchResult.matchedProduct;
+
+      // STRICT INVENTORY VALIDATION & COST CHECK:
+      // If the item does not exist in inventory or has no valid Cost Price (COGS),
+      // do NOT assume a default or fake cost. Set COGS to 0 or flag the profit calculation as "Pending / Inventory Not Found".
+      const isRegistered = Boolean(matched && typeof matched.costPrice === 'number' && matched.costPrice > 0);
+      const costPrice = isRegistered ? (matched!.costPrice || 0) : 0;
+
+      if (!isRegistered) {
+        hasUnregisteredItems = true;
+        unregisteredItemsCount += 1;
+      }
 
       return {
-        sku,
+        sku: matched?.sku || sku,
         barcode: matched?.barcode || `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
         name,
         quantity,
         unitPrice,
         costPrice,
+        isRegistered,
       };
     });
 
     // Fallback if no items array
     if (items.length === 0) {
-      const fallbackTotal = parseFloat(rawOrderObj.total || 22800);
+      hasUnregisteredItems = true;
+      unregisteredItemsCount += 1;
+      const fallbackTotal = parseFloat(rawOrderObj.total || 0);
       items.push({
         sku: 'WT-WC-DIRECT',
         barcode: '4792038100142',
         name: rawOrderObj.item_name || 'WooCommerce Web Order Item',
         quantity: 1,
         unitPrice: fallbackTotal,
-        costPrice: Math.round(fallbackTotal * 0.72),
+        costPrice: 0,
+        isRegistered: false,
       });
     }
 
     const grossTotal =
       parseFloat(rawOrderObj.total) || items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-    const costOfGoods = items.reduce((s, i) => s + i.costPrice * i.quantity, 0);
+    const costOfGoods = items.reduce((s, i) => s + (i.costPrice || 0) * i.quantity, 0);
 
     // Payment Gateway mapping
     const rawPayment = (
@@ -417,7 +464,14 @@ export async function POST(req: NextRequest) {
     const gatewayFeeAmount = Math.round((grossTotal * gatewayFeePercent) / 100);
     const platformFeeAmount = 0; // 0% platform fee for owned WooCommerce store
     const courierFee = paymentGateway === 'cash_cod' ? 450 : 350;
-    const netProfit = grossTotal - costOfGoods - gatewayFeeAmount - platformFeeAmount;
+
+    // PREVENT FAKE PROFIT DISPLAY:
+    // If inventory stock is not deducted or item is missing from inventory, Net Operating Profit
+    // must NOT display arbitrary or mock calculated values. Set COGS to 0 or flag as Pending.
+    const profitStatus = hasUnregisteredItems ? 'Pending / Inventory Not Found' : 'Calculated';
+    const netProfit = hasUnregisteredItems
+      ? 0
+      : Math.round(grossTotal - costOfGoods - gatewayFeeAmount - platformFeeAmount - courierFee);
 
     const invoiceNumber = `WT-WC-${wcOrderId}`;
     const newOrderId = `ord-wc-${wcOrderId}-${Date.now().toString().slice(-4)}`;
@@ -589,6 +643,9 @@ export async function POST(req: NextRequest) {
       courierFee,
       costOfGoods,
       netProfit,
+      profitStatus,
+      hasUnregisteredItems,
+      unregisteredItemsCount,
       status: orderStatus,
       createdAt: rawOrderObj.date_created || receivedAt,
       updatedAt: receivedAt,
@@ -676,13 +733,28 @@ export async function POST(req: NextRequest) {
 
         await Promise.all(mongoOps);
 
-        // Decrement stock in MongoDB products collection
+        // REAL-TIME STOCK DEDUCTION:
+        // Ensure stock is only deducted from MongoDB inventory when the product actually exists and matches the order item.
         if (Array.isArray(newOrder.items)) {
           for (const item of newOrder.items) {
-            await mongoConn.db.collection('products').updateOne(
-              { sku: item.sku },
-              { $inc: { stockStore: -item.quantity } }
-            );
+            if (!item.sku) continue;
+            const existingProduct = await mongoConn.db.collection('products').findOne({
+              $or: [
+                { sku: item.sku },
+                ...(item.barcode ? [{ barcode: item.barcode }] : []),
+                { name: item.name },
+              ],
+            });
+
+            if (existingProduct) {
+              await mongoConn.db.collection('products').updateOne(
+                { _id: existingProduct._id },
+                { $inc: { stockStore: -item.quantity } }
+              );
+              console.log(`[Inventory] Deducted ${item.quantity} units for registered product: ${existingProduct.sku} (${existingProduct.name})`);
+            } else {
+              console.warn(`[Inventory] Skipped stock deduction: Item "${item.sku} - ${item.name}" is not registered in MongoDB inventory.`);
+            }
           }
         }
         atlasConnected = true;

@@ -10,9 +10,12 @@ import {
 import {
   Order,
   OrderItem,
+  Product,
+  ProductAlias,
   TransExpressWaybill,
   WebhookEvent,
 } from '@/types';
+import { findBestProductMatch } from '@/lib/productMatching';
 import { connectToMongoDB } from '@/lib/mongodb';
 import {
   saveServerOrder,
@@ -81,6 +84,26 @@ export async function GET(req: NextRequest) {
         const liveOrders = await upstreamRes.json();
         const newlyImported: any[] = [];
 
+        let catalog: Product[] = await getProducts();
+        let aliases: ProductAlias[] = [];
+        try {
+          const mongoConn = await connectToMongoDB();
+          if (mongoConn) {
+            const [mongoProducts, mongoAliases] = await Promise.all([
+              mongoConn.db.collection('products').find({}).toArray().catch(() => []),
+              mongoConn.db.collection('product_aliases').find({}).toArray().catch(() => []),
+            ]);
+            if (mongoProducts && mongoProducts.length > 0) {
+              catalog = mongoProducts.map(({ _id, ...rest }) => rest as Product);
+            }
+            if (mongoAliases && mongoAliases.length > 0) {
+              aliases = mongoAliases.map(({ _id, ...rest }) => rest as ProductAlias);
+            }
+          }
+        } catch (e) {
+          console.warn('[Sync] MongoDB catalog fetch error:', e);
+        }
+
         for (const wcOrder of liveOrders) {
           // STRICT FILTER: Accept ONLY confirmed 'processing' status orders.
           // Ignore any pending payment ('pending', 'on-hold') or cancelled orders.
@@ -105,17 +128,55 @@ export async function GET(req: NextRequest) {
           const deliveryAddress = shipping.address_1 || billing.address_1 || 'Colombo, Sri Lanka';
           const city = shipping.city || billing.city || 'Colombo';
 
-          const items: OrderItem[] = (wcOrder.line_items || []).map((li: any) => ({
-            sku: li.sku || `WT-WC-${li.product_id}`,
-            barcode: `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-            name: li.name,
-            quantity: parseInt(li.quantity) || 1,
-            unitPrice: parseFloat(li.price || li.total / li.quantity || 0),
-            costPrice: Math.round(parseFloat(li.price || li.total / li.quantity || 0) * 0.7),
-          }));
+          let hasUnregisteredItems = false;
+          let unregisteredItemsCount = 0;
+
+          const items: OrderItem[] = (wcOrder.line_items || []).map((li: any) => {
+            const sku = (li.sku || '').trim() || `WT-WC-${li.product_id}`;
+            const name = (li.name || 'WooCommerce Product').trim();
+            const quantity = parseInt(li.quantity) || 1;
+            const unitPrice = parseFloat(li.price || (li.total ? li.total / quantity : 0) || 0);
+
+            // SMART PRODUCT NAME & SKU MATCHING ALGORITHM:
+            const matchResult = findBestProductMatch(
+              {
+                externalName: name,
+                externalSku: sku,
+                channel: 'woocommerce',
+              },
+              catalog,
+              aliases
+            );
+
+            const matched = matchResult.matchedProduct;
+
+            // STRICT INVENTORY VALIDATION & COST CHECK:
+            const isRegistered = Boolean(matched && typeof matched.costPrice === 'number' && matched.costPrice > 0);
+            const costPrice = isRegistered ? (matched!.costPrice || 0) : 0;
+
+            if (!isRegistered) {
+              hasUnregisteredItems = true;
+              unregisteredItemsCount += 1;
+            }
+
+            return {
+              sku: matched?.sku || sku,
+              barcode: matched?.barcode || `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+              name,
+              quantity,
+              unitPrice,
+              costPrice,
+              isRegistered,
+            };
+          });
+
+          if (items.length === 0) {
+            hasUnregisteredItems = true;
+            unregisteredItemsCount += 1;
+          }
 
           const grossTotal = parseFloat(wcOrder.total) || items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-          const costOfGoods = items.reduce((s, i) => s + i.costPrice * i.quantity, 0);
+          const costOfGoods = items.reduce((s, i) => s + (i.costPrice || 0) * i.quantity, 0);
 
           // Trans Express Single Auto Live API Call
           const transExpressClientToken = (
@@ -231,7 +292,8 @@ export async function GET(req: NextRequest) {
               name: 'Imported Item',
               quantity: 1,
               unitPrice: grossTotal,
-              costPrice: Math.round(grossTotal * 0.7),
+              costPrice: 0,
+              isRegistered: false,
             }],
             grossTotal,
             platformFeePercent: 0,
@@ -240,7 +302,10 @@ export async function GET(req: NextRequest) {
             gatewayFeeAmount: isCod ? 0 : Math.round(grossTotal * 0.03),
             courierFee: 400,
             costOfGoods,
-            netProfit: grossTotal - costOfGoods - 400,
+            netProfit: hasUnregisteredItems ? 0 : Math.max(0, grossTotal - costOfGoods - 400 - (isCod ? 0 : Math.round(grossTotal * 0.03))),
+            profitStatus: hasUnregisteredItems ? 'Pending / Inventory Not Found' : 'Calculated',
+            hasUnregisteredItems,
+            unregisteredItemsCount,
             status: wcOrder.status === 'completed' ? 'Completed' : 'Processing',
             createdAt: wcOrder.date_created || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -302,12 +367,28 @@ export async function GET(req: NextRequest) {
 
               await Promise.all(mongoOps);
 
+              // REAL-TIME STOCK DEDUCTION:
+              // Ensure stock is only deducted from MongoDB inventory when the product actually exists and matches the order item.
               if (Array.isArray(newOrder.items)) {
                 for (const item of newOrder.items) {
-                  await mongoConn.db.collection('products').updateOne(
-                    { sku: item.sku },
-                    { $inc: { stockStore: -item.quantity } }
-                  );
+                  if (!item.sku) continue;
+                  const existingProduct = await mongoConn.db.collection('products').findOne({
+                    $or: [
+                      { sku: item.sku },
+                      ...(item.barcode ? [{ barcode: item.barcode }] : []),
+                      { name: item.name },
+                    ],
+                  });
+
+                  if (existingProduct) {
+                    await mongoConn.db.collection('products').updateOne(
+                      { _id: existingProduct._id },
+                      { $inc: { stockStore: -item.quantity } }
+                    );
+                    console.log(`[Sync] Deducted stock for registered product: ${existingProduct.sku} (${existingProduct.name})`);
+                  } else {
+                    console.warn(`[Sync] Skipped stock deduction: Item "${item.sku} - ${item.name}" is not registered in MongoDB inventory.`);
+                  }
                 }
               }
             }

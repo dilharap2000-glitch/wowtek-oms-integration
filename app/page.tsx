@@ -31,6 +31,7 @@ import {
   Supplier,
   SupplierRmaClaim,
   WebhookEvent,
+  ProductAlias,
 } from '@/types';
 
 import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
@@ -45,6 +46,10 @@ import {
   saveProduct,
   updateProduct,
   deleteProduct,
+  restockProduct,
+  getProductAliases,
+  saveProductAlias,
+  deleteProductAlias,
   getWaybills,
   saveWaybill,
   updateWaybill,
@@ -102,6 +107,7 @@ export default function WowtekProApp() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [rmaClaims, setRmaClaims] = useState<SupplierRmaClaim[]>([]);
   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
+  const [aliases, setAliases] = useState<ProductAlias[]>([]);
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -129,6 +135,7 @@ export default function WowtekProApp() {
           loadedSuppliers,
           loadedRmaClaims,
           loadedEvents,
+          loadedAliases,
           health,
         ] = await Promise.all([
           getOrders(),
@@ -142,6 +149,7 @@ export default function WowtekProApp() {
           getSuppliers(),
           getSupplierRmaClaims(),
           getWebhookEvents(),
+          getProductAliases(),
           checkDatabaseHealth(),
         ]);
 
@@ -156,6 +164,7 @@ export default function WowtekProApp() {
         setSuppliers(Array.isArray(loadedSuppliers) ? loadedSuppliers : []);
         setRmaClaims(Array.isArray(loadedRmaClaims) ? loadedRmaClaims : []);
         setWebhookEvents(Array.isArray(loadedEvents) ? loadedEvents : []);
+        setAliases(Array.isArray(loadedAliases) ? loadedAliases : []);
         setDbHealth({
           status: health.status === 'connected' ? 'connected' : 'fallback',
           latencyMs: health.latencyMs || 8,
@@ -371,10 +380,14 @@ export default function WowtekProApp() {
     }
   };
 
-  // Handlers for Products
+  // Handlers for Products & Auto-Restock Backlog
   const handleAddProduct = async (product: Product) => {
     setProducts((prev) => [product, ...prev]);
     await saveProduct(product);
+    // Refresh products and orders to reflect auto-deductions from backlog
+    const [refreshedProds, refreshedOrders] = await Promise.all([getProducts(), getOrders()]);
+    setProducts(refreshedProds);
+    setOrders(refreshedOrders);
   };
 
   const handleUpdateProduct = async (id: string, updates: Partial<Product>) => {
@@ -382,6 +395,37 @@ export default function WowtekProApp() {
     if (updated) {
       setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
     }
+    const [refreshedProds, refreshedOrders] = await Promise.all([getProducts(), getOrders()]);
+    setProducts(refreshedProds);
+    setOrders(refreshedOrders);
+  };
+
+  const handleRestockProduct = async (
+    sku: string,
+    addedStore: number,
+    addedWarehouse: number,
+    costPrice?: number,
+    grnBatch?: string,
+    supplier?: string
+  ) => {
+    const res = await restockProduct(sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier);
+    const [refreshedProds, refreshedOrders] = await Promise.all([getProducts(), getOrders()]);
+    setProducts(refreshedProds);
+    setOrders(refreshedOrders);
+    return res;
+  };
+
+  // Handlers for Multi-Channel Product Aliases
+  const handleSaveAlias = async (alias: ProductAlias) => {
+    await saveProductAlias(alias);
+    const refreshed = await getProductAliases();
+    setAliases(refreshed);
+  };
+
+  const handleDeleteAlias = async (id: string) => {
+    await deleteProductAlias(id);
+    const refreshed = await getProductAliases();
+    setAliases(refreshed);
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -747,6 +791,7 @@ export default function WowtekProApp() {
                 onRefreshWebhookEvents={handleRefreshWebhookEvents}
                 onClearWebhookEvents={handleClearWebhookEvents}
                 onTriggerTestOrder={handleTriggerTestOrder}
+                onRestockProduct={handleRestockProduct}
               />
             )}
 
@@ -768,11 +813,13 @@ export default function WowtekProApp() {
             {activeTab === 'products' && (
               <ProductsTab
                 products={products}
+                orders={orders}
                 suppliers={suppliers}
                 onAddProduct={handleAddProduct}
                 onUpdateProduct={handleUpdateProduct}
                 onDeleteProduct={handleDeleteProduct}
                 onLoadSampleProducts={handleLoadSampleProducts}
+                onRestockProduct={handleRestockProduct}
               />
             )}
 
@@ -823,7 +870,14 @@ export default function WowtekProApp() {
             )}
 
             {activeTab === 'integrations' && apiConfig && (
-              <IntegrationsTab apiConfig={apiConfig} onSaveConfig={handleSaveApiConfig} />
+              <IntegrationsTab
+                apiConfig={apiConfig}
+                onSaveConfig={handleSaveApiConfig}
+                products={products}
+                aliases={aliases}
+                onSaveAlias={handleSaveAlias}
+                onDeleteAlias={handleDeleteAlias}
+              />
             )}
 
             {activeTab === 'settings' && (

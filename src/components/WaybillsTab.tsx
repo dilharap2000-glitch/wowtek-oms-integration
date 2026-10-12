@@ -329,42 +329,53 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
                             if (matchedOrder) {
                               setSelectedOrderForInvoice(matchedOrder);
                             } else {
-                              setSelectedOrderForInvoice({
-                                id: wb.orderId || wb.id,
-                                invoiceNumber: `WT-WC-${wb.id.slice(-5)}`,
-                                channel: 'woocommerce',
-                                channelName: 'WooCommerce Store',
-                                paymentGateway: wb.codAmount > 0 ? 'cash_cod' : 'card_online',
-                                paymentGatewayName: wb.codAmount > 0 ? 'Cash on Delivery (COD)' : 'Prepaid / Online Card',
-                                customerName: wb.recipientName,
-                                customerPhone: wb.recipientPhone,
-                                deliveryAddress: wb.destination,
-                                city: wb.district,
-                                items: [
-                                  {
-                                    sku: 'WT-WC-PKG',
-                                    barcode: wb.trackingNumber,
-                                    name: wb.courierNotes || 'E-Commerce Package Order',
-                                    quantity: 1,
-                                    unitPrice: wb.codAmount || 0,
-                                    costPrice: Math.round((wb.codAmount || 0) * 0.75),
-                                  },
-                                ],
-                                grossTotal: wb.codAmount || 0,
-                                platformFeePercent: 0,
-                                platformFeeAmount: 0,
-                                gatewayFeePercent: 0,
-                                gatewayFeeAmount: 0,
-                                courierFee: 450,
-                                costOfGoods: Math.round((wb.codAmount || 0) * 0.75),
-                                netProfit: Math.round((wb.codAmount || 0) * 0.25),
-                                status: 'Processing',
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                                waybillGenerated: true,
-                                waybillNumber: wb.trackingNumber,
-                                transExpressTrackingNumber: wb.trackingNumber,
-                              });
+                                const matchedProd = products.find(
+                                  (p) =>
+                                    (wb.courierNotes && p.name.toLowerCase().includes(wb.courierNotes.toLowerCase())) ||
+                                    p.barcode === wb.trackingNumber
+                                );
+                                const validCost = matchedProd && matchedProd.costPrice > 0 ? matchedProd.costPrice : 0;
+                                const isRegistered = Boolean(matchedProd && matchedProd.costPrice > 0);
+
+                                setSelectedOrderForInvoice({
+                                  id: wb.orderId || wb.id,
+                                  invoiceNumber: `WT-WC-${wb.id.slice(-5)}`,
+                                  channel: 'woocommerce',
+                                  channelName: 'WooCommerce Store',
+                                  paymentGateway: wb.codAmount > 0 ? 'cash_cod' : 'card_online',
+                                  paymentGatewayName: wb.codAmount > 0 ? 'Cash on Delivery (COD)' : 'Prepaid / Online Card',
+                                  customerName: wb.recipientName,
+                                  customerPhone: wb.recipientPhone,
+                                  deliveryAddress: wb.destination,
+                                  city: wb.district,
+                                  items: [
+                                    {
+                                      sku: matchedProd?.sku || 'WT-WC-PKG',
+                                      barcode: wb.trackingNumber,
+                                      name: wb.courierNotes || 'E-Commerce Package Order',
+                                      quantity: 1,
+                                      unitPrice: wb.codAmount || 0,
+                                      costPrice: validCost,
+                                      isRegistered,
+                                    },
+                                  ],
+                                  grossTotal: wb.codAmount || 0,
+                                  platformFeePercent: 0,
+                                  platformFeeAmount: 0,
+                                  gatewayFeePercent: 0,
+                                  gatewayFeeAmount: 0,
+                                  courierFee: 450,
+                                  costOfGoods: validCost,
+                                  netProfit: isRegistered ? Math.max(0, (wb.codAmount || 0) - validCost - 450) : 0,
+                                  profitStatus: isRegistered ? 'Calculated' : 'Pending / Inventory Not Found',
+                                  hasUnregisteredItems: !isRegistered,
+                                  status: 'Processing',
+                                  createdAt: new Date().toISOString(),
+                                  updatedAt: new Date().toISOString(),
+                                  waybillGenerated: true,
+                                  waybillNumber: wb.trackingNumber,
+                                  transExpressTrackingNumber: wb.trackingNumber,
+                                });
                             }
                           }}
                           className="px-2 py-1.5 rounded-lg text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 transition-colors flex items-center gap-1 text-xs font-medium"

@@ -16,6 +16,19 @@ export interface PaymentGatewayConfig {
   active: boolean;
 }
 
+export type ProfitCalculationStatus = 'Calculated' | 'Pending / Inventory Not Found';
+
+export interface ProductAlias {
+  id: string;
+  channel: 'all' | 'woocommerce' | 'pickme' | 'ubereats' | 'pos';
+  externalTitle: string;
+  targetSku: string;
+  targetProductName?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface OrderItem {
   sku: string;
   barcode: string;
@@ -23,6 +36,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   costPrice: number;
+  isRegistered?: boolean;
   returned?: boolean;
   returnedQty?: number;
 }
@@ -56,6 +70,9 @@ export interface Order {
   courierFee: number;
   costOfGoods: number;
   netProfit: number;
+  profitStatus?: ProfitCalculationStatus;
+  hasUnregisteredItems?: boolean;
+  unregisteredItemsCount?: number;
   status: OrderStatus;
   createdAt: string;
   updatedAt: string;
