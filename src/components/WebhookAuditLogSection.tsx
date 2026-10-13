@@ -295,16 +295,25 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                         <span>{timeStr}</span>
                         <span className="text-neutral-500 text-[10px]">({dateStr})</span>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                         <span
                           className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
                             evt.source === 'woocommerce'
                               ? 'bg-purple-950/70 text-purple-300 border-purple-800'
+                              : evt.source === 'pickme'
+                              ? 'bg-amber-950/70 text-amber-300 border-amber-800'
+                              : evt.source === 'ubereats'
+                              ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800'
                               : 'bg-neutral-800 text-neutral-300 border-neutral-700'
                           }`}
                         >
                           {evt.source}
                         </span>
+                        {evt.branchName && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-950 text-amber-300/90 border border-neutral-800">
+                            📍 {evt.branchName}
+                          </span>
+                        )}
                         <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[120px]">
                           {evt.event}
                         </span>

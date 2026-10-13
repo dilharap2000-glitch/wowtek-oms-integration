@@ -157,7 +157,7 @@ export async function resolvePendingBacklogOrders(
         const requiredQty = item.quantity || 1;
         const totalAvailableStock = currentStoreStock + currentWarehouseStock;
 
-        if (totalAvailableStock > 0) {
+        if (totalAvailableStock >= requiredQty) {
           // Deduct from stockStore first, then stockWarehouse
           if (currentStoreStock >= requiredQty) {
             currentStoreStock -= requiredQty;

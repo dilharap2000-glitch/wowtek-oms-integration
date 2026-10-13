@@ -41,6 +41,21 @@ export interface OrderItem {
   returnedQty?: number;
 }
 
+export interface StoreMapping {
+  id: string;
+  platform: 'ubereats' | 'pickme';
+  externalStoreId: string;
+  externalStoreName: string;
+  branchName: string;
+  address?: string;
+  city?: string;
+  phone?: string;
+  commissionFeePercent?: number; // Custom platform commission override for this branch
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type OrderStatus =
   | 'Pending'
   | 'Processing'
@@ -55,6 +70,10 @@ export interface Order {
   invoiceNumber: string;
   channel: string; // e.g. 'woocommerce' | 'pickme' | 'ubereats' | 'pos'
   channelName: string;
+  storeId?: string; // e.g. 'store-pkm-bambalapitiya'
+  storeName?: string; // e.g. 'WOWTEK Bambalapitiya Flagship'
+  branchName?: string; // e.g. 'Bambalapitiya'
+  externalStoreId?: string; // e.g. 'MERCH-PKM-COL-4491'
   paymentGateway: string; // e.g. 'cash_cod' | 'payzy' | 'koko' | 'mintpay' | 'card_online'
   paymentGatewayName: string;
   customerName: string;
@@ -264,6 +283,9 @@ export interface WebhookEvent {
   event: string; // e.g. 'order.created' | 'order.updated'
   orderId?: string;
   invoiceNumber?: string;
+  storeId?: string;
+  storeName?: string;
+  branchName?: string;
   customerName?: string;
   customerPhone?: string;
   amount?: number;

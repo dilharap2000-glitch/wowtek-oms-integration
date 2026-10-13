@@ -21,7 +21,7 @@ import {
   X,
   RefreshCw,
 } from 'lucide-react';
-import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent } from '@/types';
+import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, WebhookEvent, StoreMapping } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
@@ -34,6 +34,7 @@ interface DashboardTabProps {
   expenses: ExpenseItem[];
   webhookEvents?: WebhookEvent[];
   dbStatus: { status: 'connected' | 'fallback'; latencyMs: number; database: string };
+  stores?: StoreMapping[];
   onNavigateTab: (tab: string) => void;
   onRefreshWebhookEvents?: () => void;
   onClearWebhookEvents?: () => void;
@@ -56,6 +57,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   expenses,
   webhookEvents = [],
   dbStatus,
+  stores = [],
   onNavigateTab,
   onRefreshWebhookEvents,
   onClearWebhookEvents,
@@ -462,6 +464,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                     <span className="font-medium text-white">PickMe Market (20%)</span>
+                    {stores.filter((s) => s.platform === 'pickme').length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800">
+                        {stores.filter((s) => s.platform === 'pickme' && s.isActive !== false).length} Branches
+                      </span>
+                    )}
                   </div>
                   <span className="text-neutral-400 font-mono">{(pkmOrders || []).length} orders</span>
                 </div>
@@ -481,6 +488,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span className="font-medium text-white">Uber Eats Retail (15.4%)</span>
+                    {stores.filter((s) => s.platform === 'ubereats').length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                        {stores.filter((s) => s.platform === 'ubereats' && s.isActive !== false).length} Branches
+                      </span>
+                    )}
                   </div>
                   <span className="text-neutral-400 font-mono">{(ubrOrders || []).length} orders</span>
                 </div>
@@ -590,9 +602,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                         ) : null}
                       </td>
                       <td className="py-3">
-                        <div className="text-white font-medium">{order.channelName}</div>
-                        <div className="text-[10px] text-purple-300 font-mono">
-                          {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-white font-medium">{order.channelName}</span>
+                          {order.branchName && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-950/70 border border-purple-800 text-purple-300">
+                              📍 {order.branchName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-neutral-400 font-mono">
+                          <span className="text-purple-300">
+                            {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                          </span>
+                          {order.externalStoreId && (
+                            <span className="text-neutral-500">
+                              · {order.externalStoreId}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3">

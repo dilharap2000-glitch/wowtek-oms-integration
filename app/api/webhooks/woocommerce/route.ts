@@ -390,11 +390,19 @@ export async function POST(req: NextRequest) {
       );
 
       const matched = matchResult.matchedProduct;
+      const availableStock = matched
+        ? (matched.stockStore || 0) + (matched.stockWarehouse || 0)
+        : 0;
 
       // STRICT INVENTORY VALIDATION & COST CHECK:
-      // If the item does not exist in inventory or has no valid Cost Price (COGS),
-      // do NOT assume a default or fake cost. Set COGS to 0 or flag the profit calculation as "Pending / Inventory Not Found".
-      const isRegistered = Boolean(matched && typeof matched.costPrice === 'number' && matched.costPrice > 0);
+      // If the item does not exist, has no valid Cost Price (COGS), or has insufficient stock,
+      // it enters the pending/backlog queue with "Pending / Inventory Not Found" until a GRN restock arrives.
+      const isRegistered = Boolean(
+        matched &&
+        typeof matched.costPrice === 'number' &&
+        matched.costPrice > 0 &&
+        availableStock >= quantity
+      );
       const costPrice = isRegistered ? (matched!.costPrice || 0) : 0;
 
       if (!isRegistered) {
@@ -465,13 +473,14 @@ export async function POST(req: NextRequest) {
     const platformFeeAmount = 0; // 0% platform fee for owned WooCommerce store
     const courierFee = paymentGateway === 'cash_cod' ? 450 : 350;
 
-    // PREVENT FAKE PROFIT DISPLAY:
+    // PREVENT FAKE PROFIT DISPLAY & QUEUE OUT-OF-STOCK INVOICES:
     // If inventory stock is not deducted or item is missing from inventory, Net Operating Profit
-    // must NOT display arbitrary or mock calculated values. Set COGS to 0 or flag as Pending.
+    // must NOT display arbitrary or mock calculated values. Set COGS to 0 and flag as Pending in backlog queue.
     const profitStatus = hasUnregisteredItems ? 'Pending / Inventory Not Found' : 'Calculated';
     const netProfit = hasUnregisteredItems
       ? 0
       : Math.round(grossTotal - costOfGoods - gatewayFeeAmount - platformFeeAmount - courierFee);
+    const finalOrderStatus: OrderStatus = hasUnregisteredItems ? 'Pending' : orderStatus;
 
     const invoiceNumber = `WT-WC-${wcOrderId}`;
     const newOrderId = `ord-wc-${wcOrderId}-${Date.now().toString().slice(-4)}`;
@@ -646,7 +655,7 @@ export async function POST(req: NextRequest) {
       profitStatus,
       hasUnregisteredItems,
       unregisteredItemsCount,
-      status: orderStatus,
+      status: finalOrderStatus,
       createdAt: rawOrderObj.date_created || receivedAt,
       updatedAt: receivedAt,
       waybillGenerated: Boolean(realWaybill),
@@ -737,7 +746,7 @@ export async function POST(req: NextRequest) {
         // Ensure stock is only deducted from MongoDB inventory when the product actually exists and matches the order item.
         if (Array.isArray(newOrder.items)) {
           for (const item of newOrder.items) {
-            if (!item.sku) continue;
+            if (!item.sku || !item.isRegistered || item.costPrice <= 0) continue;
             const existingProduct = await mongoConn.db.collection('products').findOne({
               $or: [
                 { sku: item.sku },

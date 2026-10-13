@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerStore, saveServerOrder, clearServerWebhookEvents } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { Order, TransExpressWaybill, WebhookEvent } from '@/types';
+import { Order, TransExpressWaybill, WebhookEvent, StoreMapping, Product } from '@/types';
+import { DEFAULT_STORE_MAPPINGS } from '@/lib/storeMappings';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,8 @@ export async function GET() {
   let atlasOrders: Order[] = [];
   let atlasWaybills: TransExpressWaybill[] = [];
   let atlasEvents: WebhookEvent[] = [];
+  let atlasStores: StoreMapping[] = [];
+  let atlasProducts: Product[] = [];
 
   try {
     const mongoConn = await connectToMongoDB();
@@ -26,7 +29,7 @@ export async function GET() {
       mongoDbName = mongoConn.db.databaseName;
 
       // Query live collections directly from MongoDB Atlas
-      const [orderDocs, waybillDocs, eventDocs] = await Promise.all([
+      const [orderDocs, waybillDocs, eventDocs, storeDocs, productDocs] = await Promise.all([
         mongoConn.db
           .collection('orders')
           .find({})
@@ -48,11 +51,27 @@ export async function GET() {
           .limit(50)
           .toArray()
           .catch(() => []),
+        mongoConn.db
+          .collection('store_mappings')
+          .find({})
+          .toArray()
+          .catch(() => []),
+        mongoConn.db
+          .collection('products')
+          .find({})
+          .toArray()
+          .catch(() => []),
       ]);
 
       atlasOrders = orderDocs.map(({ _id, ...rest }) => rest as Order);
       atlasWaybills = waybillDocs.map(({ _id, ...rest }) => rest as TransExpressWaybill);
       atlasEvents = eventDocs.map(({ _id, ...rest }) => rest as WebhookEvent);
+      if (storeDocs && storeDocs.length > 0) {
+        atlasStores = storeDocs.map(({ _id, ...rest }) => rest as StoreMapping);
+      }
+      if (productDocs && productDocs.length > 0) {
+        atlasProducts = productDocs.map(({ _id, ...rest }) => rest as Product);
+      }
     }
   } catch {
     // MongoDB offline or unconfigured
@@ -63,6 +82,7 @@ export async function GET() {
   const finalOrders = atlasConnected ? atlasOrders : store.orders;
   const finalWaybills = atlasConnected ? atlasWaybills : store.waybills;
   const finalEvents = atlasConnected ? atlasEvents : store.webhookEvents;
+  const finalStores = atlasStores.length > 0 ? atlasStores : DEFAULT_STORE_MAPPINGS;
 
   return NextResponse.json(
     {
@@ -75,6 +95,8 @@ export async function GET() {
       orders: finalOrders,
       waybills: finalWaybills,
       webhookEvents: finalEvents,
+      stores: finalStores,
+      products: atlasProducts,
       lastUpdated: store.lastUpdated,
       listenerActive: true,
       webhookSecret: 'WOWTEK-WC-Webhook-2026-9X7Kl42',

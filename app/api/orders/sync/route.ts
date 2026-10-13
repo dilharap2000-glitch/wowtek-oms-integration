@@ -442,11 +442,91 @@ export async function POST(req: NextRequest) {
     const receivedAt = new Date().toISOString();
 
     if (action === 'simulate_test_order' || body.simulate === true) {
+      const platform = (body.platform || 'woocommerce').toLowerCase();
       const testOrderId = Math.floor(10000 + Math.random() * 90000);
       const testPhone = body.customerPhone || '0778912345';
       const customerName = body.customerName || 'Kasun Wickramasinghe';
       const totalAmount = body.total || 22800;
 
+      if (platform === 'pickme') {
+        const branchId = body.branchId || body.storeId || 'BR-BAMBALAPITIYA-01';
+        const pickmePayload = {
+          order_id: testOrderId,
+          branch_id: branchId,
+          merchant_id: 'MERCH-PKM-COL-4491',
+          branch_name: body.branchName || 'Bambalapitiya Flagship',
+          total: totalAmount,
+          currency: 'LKR',
+          created_at: receivedAt,
+          customer: {
+            name: customerName,
+            phone: testPhone,
+          },
+          delivery_address: 'No. 88 Bauddhaloka Mawatha, Colombo 04',
+          items: [
+            {
+              id: 'pkm-it-01',
+              name: body.productName || 'Soundcore anker r50i True wireless earbuds',
+              sku: body.sku || 'WT-ANK-R50I',
+              quantity: 1,
+              price: totalAmount,
+            },
+          ],
+        };
+
+        const res = await fetch(`${req.nextUrl.origin}/api/webhooks/pickme?branch_id=${encodeURIComponent(branchId)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-pickme-branch-id': branchId,
+          },
+          body: JSON.stringify(pickmePayload),
+        });
+
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+
+      if (platform === 'ubereats') {
+        const storeId = body.storeId || body.externalStoreId || 'eats-store-srilanka-0914';
+        const uberPayload = {
+          order_id: testOrderId,
+          store_id: storeId,
+          store_name: body.storeName || 'WOWTEK Electronics - Colombo 03',
+          branch_name: body.branchName || 'Bambalapitiya / Col 03',
+          total: totalAmount,
+          currency: 'LKR',
+          created_at: receivedAt,
+          customer: {
+            name: customerName,
+            phone: testPhone,
+          },
+          delivery_address: 'No. 24 Alfred House Gardens, Colombo 03',
+          items: [
+            {
+              id: 'ubr-it-01',
+              title: body.productName || 'Anker r50i earbuds',
+              sku: body.sku || 'WT-ANK-R50I',
+              quantity: 1,
+              price: totalAmount,
+            },
+          ],
+        };
+
+        const res = await fetch(`${req.nextUrl.origin}/api/webhooks/ubereats?store_id=${encodeURIComponent(storeId)}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-uber-store-id': storeId,
+          },
+          body: JSON.stringify(uberPayload),
+        });
+
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+
+      // Default: WooCommerce
       const testPayload = {
         id: testOrderId,
         status: body.status || 'processing',

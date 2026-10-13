@@ -32,6 +32,7 @@ import {
   SupplierRmaClaim,
   WebhookEvent,
   ProductAlias,
+  StoreMapping,
 } from '@/types';
 
 import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
@@ -50,6 +51,9 @@ import {
   getProductAliases,
   saveProductAlias,
   deleteProductAlias,
+  getStoreMappings,
+  saveStoreMapping,
+  deleteStoreMapping,
   getWaybills,
   saveWaybill,
   updateWaybill,
@@ -108,6 +112,7 @@ export default function WowtekProApp() {
   const [rmaClaims, setRmaClaims] = useState<SupplierRmaClaim[]>([]);
   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
   const [aliases, setAliases] = useState<ProductAlias[]>([]);
+  const [stores, setStores] = useState<StoreMapping[]>([]);
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -136,6 +141,7 @@ export default function WowtekProApp() {
           loadedRmaClaims,
           loadedEvents,
           loadedAliases,
+          loadedStores,
           health,
         ] = await Promise.all([
           getOrders(),
@@ -150,6 +156,7 @@ export default function WowtekProApp() {
           getSupplierRmaClaims(),
           getWebhookEvents(),
           getProductAliases(),
+          getStoreMappings(),
           checkDatabaseHealth(),
         ]);
 
@@ -165,6 +172,7 @@ export default function WowtekProApp() {
         setRmaClaims(Array.isArray(loadedRmaClaims) ? loadedRmaClaims : []);
         setWebhookEvents(Array.isArray(loadedEvents) ? loadedEvents : []);
         setAliases(Array.isArray(loadedAliases) ? loadedAliases : []);
+        setStores(Array.isArray(loadedStores) ? loadedStores : []);
         setDbHealth({
           status: health.status === 'connected' ? 'connected' : 'fallback',
           latencyMs: health.latencyMs || 8,
@@ -190,6 +198,9 @@ export default function WowtekProApp() {
           }
           if (Array.isArray(liveData.webhookEvents)) {
             setWebhookEvents(liveData.webhookEvents);
+          }
+          if (Array.isArray(liveData.stores)) {
+            setStores(liveData.stores);
           }
           if (liveData.dbStatus) {
             setDbHealth({
@@ -298,6 +309,14 @@ export default function WowtekProApp() {
 
           if (Array.isArray(data.orders)) {
             setOrders(data.orders);
+          }
+
+          if (Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products);
+          }
+
+          if (Array.isArray(data.stores) && data.stores.length > 0) {
+            setStores(data.stores);
           }
 
           if (Array.isArray(data.waybills)) {
@@ -409,6 +428,13 @@ export default function WowtekProApp() {
     supplier?: string
   ) => {
     const res = await restockProduct(sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier);
+    if (res?.resolvedOrders && res.resolvedOrders.length > 0) {
+      const resolvedMap = new Map(res.resolvedOrders.map((o) => [o.id, o]));
+      setOrders((prev) => prev.map((o) => resolvedMap.get(o.id) || o));
+    }
+    if (res?.product) {
+      setProducts((prev) => prev.map((p) => (p.sku === res.product!.sku ? res.product! : p)));
+    }
     const [refreshedProds, refreshedOrders] = await Promise.all([getProducts(), getOrders()]);
     setProducts(refreshedProds);
     setOrders(refreshedOrders);
@@ -426,6 +452,19 @@ export default function WowtekProApp() {
     await deleteProductAlias(id);
     const refreshed = await getProductAliases();
     setAliases(refreshed);
+  };
+
+  // Handlers for Multi-Store Branch Mappings (Uber Eats & PickMe)
+  const handleSaveStore = async (store: StoreMapping) => {
+    await saveStoreMapping(store);
+    const refreshed = await getStoreMappings();
+    setStores(refreshed);
+  };
+
+  const handleDeleteStore = async (id: string) => {
+    await deleteStoreMapping(id);
+    const refreshed = await getStoreMappings();
+    setStores(refreshed);
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -787,6 +826,7 @@ export default function WowtekProApp() {
                 expenses={expenses}
                 webhookEvents={webhookEvents}
                 dbStatus={dbHealth}
+                stores={stores}
                 onNavigateTab={(tab) => setActiveTab(tab)}
                 onRefreshWebhookEvents={handleRefreshWebhookEvents}
                 onClearWebhookEvents={handleClearWebhookEvents}
@@ -875,8 +915,11 @@ export default function WowtekProApp() {
                 onSaveConfig={handleSaveApiConfig}
                 products={products}
                 aliases={aliases}
+                stores={stores}
                 onSaveAlias={handleSaveAlias}
                 onDeleteAlias={handleDeleteAlias}
+                onSaveStore={handleSaveStore}
+                onDeleteStore={handleDeleteStore}
               />
             )}
 

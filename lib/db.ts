@@ -2,6 +2,7 @@ import {
   Order,
   Product,
   ProductAlias,
+  StoreMapping,
   TransExpressWaybill,
   WarrantyRecord,
   ExpenseItem,
@@ -14,6 +15,7 @@ import {
   WebhookEvent,
 } from '@/types';
 import { findBestProductMatch, DEFAULT_PRODUCT_ALIASES } from '@/lib/productMatching';
+import { DEFAULT_STORE_MAPPINGS } from '@/lib/storeMappings';
 
 // ---------------------------------------------------------------------------
 // Default Configurations for Dynamic Platform & Payment Gateway Fees
@@ -74,6 +76,7 @@ interface MockDatabaseState {
   rmaClaims: SupplierRmaClaim[];
   webhookEvents: WebhookEvent[];
   aliases: ProductAlias[];
+  stores: StoreMapping[];
 }
 
 const STORAGE_KEY = 'wowtek_pos_v2_store';
@@ -97,6 +100,7 @@ export function initMockDb(): MockDatabaseState {
           rmaClaims: Array.isArray(parsed.rmaClaims) ? parsed.rmaClaims : [],
           webhookEvents: Array.isArray(parsed.webhookEvents) ? parsed.webhookEvents : [],
           aliases: Array.isArray(parsed.aliases) ? parsed.aliases : [...DEFAULT_PRODUCT_ALIASES],
+          stores: Array.isArray(parsed.stores) ? parsed.stores : [...DEFAULT_STORE_MAPPINGS],
         };
       }
     } catch {}
@@ -117,6 +121,7 @@ export function initMockDb(): MockDatabaseState {
       rmaClaims: [],
       webhookEvents: [],
       aliases: [...DEFAULT_PRODUCT_ALIASES],
+      stores: [...DEFAULT_STORE_MAPPINGS],
     };
   }
   return g._wowtekMockDb;
@@ -484,7 +489,7 @@ function resolveMockBacklog(product: Product, mock: MockDatabaseState): Order[] 
 
         if (matchRes.matchedProduct || (item.sku && item.sku.toUpperCase() === product.sku.toUpperCase())) {
           const reqQty = item.quantity || 1;
-          if (storeStock + warehouseStock > 0) {
+          if (storeStock + warehouseStock >= reqQty) {
             if (storeStock >= reqQty) {
               storeStock -= reqQty;
             } else {
@@ -737,6 +742,67 @@ export async function deleteProductAlias(id: string): Promise<boolean> {
     } catch {}
   }
   return mock.aliases.length < prevLen;
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Store Branch Mappings for Uber Eats & PickMe (Direct to /api/stores)
+// ---------------------------------------------------------------------------
+export async function getStoreMappings(): Promise<StoreMapping[]> {
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/stores', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.stores) && data.stores.length > 0) {
+          const mock = initMockDb();
+          mock.stores = data.stores;
+          persistMockDb();
+          return data.stores;
+        }
+      }
+    } catch {}
+  }
+  return initMockDb().stores;
+}
+
+export async function saveStoreMapping(store: StoreMapping): Promise<StoreMapping> {
+  const mock = initMockDb();
+  const existingIdx = mock.stores.findIndex(
+    (s) =>
+      s.id === store.id ||
+      (s.externalStoreId.toLowerCase() === store.externalStoreId.toLowerCase() && s.platform === store.platform)
+  );
+  if (existingIdx !== -1) {
+    mock.stores[existingIdx] = { ...mock.stores[existingIdx], ...store, updatedAt: new Date().toISOString() };
+  } else {
+    mock.stores.unshift(store);
+  }
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/stores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(store),
+      });
+    } catch {}
+  }
+  return store;
+}
+
+export async function deleteStoreMapping(id: string): Promise<boolean> {
+  const mock = initMockDb();
+  const prevLen = mock.stores.length;
+  mock.stores = mock.stores.filter((s) => s.id !== id);
+  persistMockDb();
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch(`/api/stores?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch {}
+  }
+  return mock.stores.length < prevLen;
 }
 
 // ---------------------------------------------------------------------------

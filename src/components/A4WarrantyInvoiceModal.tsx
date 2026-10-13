@@ -324,6 +324,14 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                         {order.status}
                       </span>
                     </div>
+                    {order.branchName && (
+                      <div className="flex justify-between">
+                        <span className="text-neutral-500">Branch / Shop:</span>
+                        <span className="font-semibold text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200">
+                          {order.branchName}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-neutral-500">Payment Gateway:</span>
                       <span className="font-mono text-neutral-800">{order.paymentGatewayName}</span>
