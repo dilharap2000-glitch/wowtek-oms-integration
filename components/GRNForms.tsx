@@ -220,10 +220,11 @@ export interface RestockGRNFormProps {
   product: any;
   suppliers?: Array<SupplierOption | { name: string }>;
   onRestock: (data: {
+    id?: string;
+    productId?: string;
     sku: string;
     skuCode?: string;
     barcode?: string;
-    productId?: string;
     restockQty: number;
     costPrice: number;
     supplier: string;
@@ -261,14 +262,15 @@ export function RestockGRNForm({
   const handleRestockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onRestock({
+      id: product?._id || product?.id,
+      productId: product?._id || product?.id,
       sku: product?.sku || product?.skuCode || '',
       skuCode: product?.skuCode || product?.sku || '',
       barcode: product?.barcode,
-      productId: product?.id || product?._id,
       restockQty: Number(restockQty) || 0,
       costPrice: Number(costPrice) || 0,
       supplier: selectedSupplier,
-      batchRef: `GRN-${new Date().toISOString().slice(0, 10)}-${Math.floor(100 + Math.random() * 900)}`,
+      batchRef: `GRN-${Date.now()}`,
     });
   };
 
