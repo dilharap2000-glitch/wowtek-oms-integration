@@ -101,6 +101,14 @@ export async function connectToMongoDB(retries = 3): Promise<CachedConnection | 
   return null;
 }
 
+export async function connectToDatabase(retries = 3): Promise<{ client: MongoClient; db: Db }> {
+  const conn = await connectToMongoDB(retries);
+  if (!conn) {
+    throw new Error('Database connection offline');
+  }
+  return { client: conn.client, db: conn.db };
+}
+
 export function resetMongoCache() {
   global._mongoCachedConnection = undefined;
   global._mongoClientPromise = undefined;

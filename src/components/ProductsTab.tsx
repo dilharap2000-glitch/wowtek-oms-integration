@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Product, Supplier, Order } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { AddProductGRNForm, RestockGRNForm } from './ProductGRNForms';
 
 interface ProductsTabProps {
   products: Product[];
@@ -225,6 +226,33 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
     onAddProduct(newProd);
     handleCloseAddModal();
+  };
+
+  const handleAddProductFromGRNForm = (formData: any) => {
+    const matchedSup = suppliers.find((s) => s.name === formData.supplier);
+    const newProd: Product = {
+      id: `prod-${Date.now().toString().slice(-4)}`,
+      sku: (formData.skuCode || `WT-${Date.now().toString().slice(-5)}`).toUpperCase().trim(),
+      barcode: `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      name: (formData.productTitle || '').trim(),
+      category: formData.category || 'Mobile Accessories',
+      costPrice: Number(formData.costPrice) || 0,
+      sellingPrice: Number(formData.sellingPrice) || 0,
+      stockWarehouse: 0, // Warehouse removed, Store Stock only as requested
+      stockStore: Number(formData.stockQuantity) || 0,
+      stockReserved: 0,
+      grnBatch: `GRN-${new Date().getFullYear()}-OCT-${Math.floor(100 + Math.random() * 900)}`,
+      supplier: formData.supplier || matchedSup?.name || 'WOWTEK Direct Import',
+      supplierId: matchedSup?.id,
+      warrantyPeriodMonths: Number(formData.warrantyMonths) || 0,
+    };
+
+    onAddProduct(newProd);
+    setShowAddModal(false);
+    setRestockToast(
+      `Product ${newProd.sku} (${newProd.name}) added to Store Front! GRN Inward logged & pending backlog orders auto-checked.`
+    );
+    setTimeout(() => setRestockToast(null), 7000);
   };
 
   const handleSaveEditProduct = (e: React.FormEvent) => {
@@ -873,357 +901,99 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
         </div>
       )}
 
-      {/* Add Product Modal */}
+      {/* Add Product Modal (Store Only GRN Form) */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <h3 className="text-sm font-semibold text-white">GRN Product Inward Receipt</h3>
-              <button
-                type="button"
-                onClick={handleCloseAddModal}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddProduct} className="p-5 space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">SKU Code</label>
-                  <input
-                    type="text"
-                    required
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    placeholder="WT-GPU-RTX4060"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono uppercase"
-                  />
-                </div>
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                  >
-                    <option value="Computer Components">Computer Components</option>
-                    <option value="Peripherals">Peripherals</option>
-                    <option value="Mobile Accessories">Mobile Accessories</option>
-                    <option value="Monitors & Displays">Monitors & Displays</option>
-                    <option value="Networking & Storage">Networking & Storage</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-neutral-300 font-medium mb-1">Product Title</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. ASUS TUF Gaming GeForce RTX 4060 8GB"
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Cost Price (LKR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Selling Price (LKR)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Warehouse Stock</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={stockWarehouse}
-                    onChange={(e) => setStockWarehouse(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Store Front Stock</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={stockStore}
-                    onChange={(e) => setStockStore(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">GRN Batch Number</label>
-                  <input
-                    type="text"
-                    value={grnBatch}
-                    onChange={(e) => setGrnBatch(e.target.value)}
-                    placeholder="e.g. GRN-2026-OCT-021"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Warranty (Months)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={warrantyMonths}
-                    onChange={(e) => setWarrantyMonths(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                    placeholder="0"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-neutral-300 font-medium mb-1">Primary Supplier / Distributor</label>
-                {suppliers.length > 0 ? (
-                  <select
-                    value={supplier}
-                    onChange={(e) => {
-                      setSupplier(e.target.value);
-                      const sel = suppliers.find((s) => s.name === e.target.value);
-                      setSupplierId(sel?.id || '');
-                    }}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                  >
-                    <option value="">Select Supplier (Optional)...</option>
-                    <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
-                    {(safeSuppliers || []).map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name} ({s.paymentTerms})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    placeholder="e.g. Singer Digital / Chama Computers"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                  />
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={handleCloseAddModal}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg shadow-sm transition-colors"
-                >
-                  Confirm GRN Receipt
-                </button>
-              </div>
-            </form>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-xl">
+            <AddProductGRNForm
+              suppliers={safeSuppliers.map((s) => ({
+                name: s.name,
+                paymentTerm: s.paymentTerms,
+                paymentTerms: s.paymentTerms,
+              }))}
+              onsubmit={handleAddProductFromGRNForm}
+              onCancel={handleCloseAddModal}
+            />
           </div>
         </div>
       )}
 
-      {/* INWARD GRN RESTOCK MODAL */}
+      {/* INWARD GRN RESTOCK MODAL (Store Only + Backlog Auto-Deduction) */}
       {restockProductTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-emerald-400" />
-                <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    Inward GRN Restock & Backlog Auto-Deduction
-                  </h3>
-                  <p className="text-[11px] text-neutral-400">
-                    Add new inward stock batch and resolve any pending invoices
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setRestockProductTarget(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleExecuteInwardRestock} className="p-5 space-y-4 text-xs">
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
-                <div className="text-[11px] text-neutral-400">Restocking Product:</div>
-                <div className="font-semibold text-white text-sm">{restockProductTarget.name}</div>
-                <div className="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-neutral-900">
-                  <span className="text-purple-300">SKU: {restockProductTarget.sku}</span>
-                  <span className="text-neutral-400">
-                    Current Held: W:{restockProductTarget.stockWarehouse} · S:{restockProductTarget.stockStore}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Store Stock (Inward Qty)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={inwardStoreQty}
-                    onChange={(e) => setInwardStoreQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Warehouse Stock (Inward Qty)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={inwardWarehouseQty}
-                    onChange={(e) => setInwardWarehouseQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Landed Cost Price (COGS)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={inwardCostPrice}
-                    onChange={(e) => setInwardCostPrice(parseInt(e.target.value) || '')}
-                    placeholder="e.g. 4200"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">GRN Batch Ref</label>
-                  <input
-                    type="text"
-                    required
-                    value={inwardBatch}
-                    onChange={(e) => setInwardBatch(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-neutral-300 font-medium mb-1">Supplier / Inward Source</label>
-                <input
-                  type="text"
-                  value={inwardSupplier}
-                  onChange={(e) => setInwardSupplier(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
-                />
-              </div>
-
-              {(() => {
-                const targetWaiting = (orders || []).filter(
-                  (o) =>
-                    (o.hasUnregisteredItems ||
-                      o.profitStatus === 'Pending / Inventory Not Found' ||
-                      o.status === 'Pending') &&
-                    (o.items || []).some(
-                      (it) =>
-                        (it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
-                        (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
-                        (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase()))
-                    )
-                );
-                const targetNeededUnits = targetWaiting.reduce((sum, o) => {
-                  const match = (o.items || []).filter(
+          <div className="w-full max-w-xl">
+            {(() => {
+              const targetWaiting = (orders || []).filter(
+                (o) =>
+                  (o.hasUnregisteredItems ||
+                    o.profitStatus === 'Pending / Inventory Not Found' ||
+                    o.status === 'Pending') &&
+                  (o.items || []).some(
                     (it) =>
-                      (!it.isRegistered || it.costPrice <= 0 || o.hasUnregisteredItems || o.status === 'Pending') &&
-                      ((it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
-                        (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
-                        (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase())))
-                  );
-                  return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
-                }, 0);
+                      (it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
+                      (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
+                      (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase()))
+                  )
+              );
+              const targetNeededUnits = targetWaiting.reduce((sum, o) => {
+                const match = (o.items || []).filter(
+                  (it) =>
+                    (!it.isRegistered || it.costPrice <= 0 || o.hasUnregisteredItems || o.status === 'Pending') &&
+                    ((it.sku && it.sku.toUpperCase() === restockProductTarget.sku.toUpperCase()) ||
+                      (it.name && it.name.toLowerCase().includes(restockProductTarget.name.toLowerCase())) ||
+                      (restockProductTarget.name && restockProductTarget.name.toLowerCase().includes(it.name.toLowerCase())))
+                );
+                return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
+              }, 0);
 
-                if (targetWaiting.length > 0) {
-                  return (
-                    <div className="p-3 bg-amber-950/70 border border-amber-600/70 rounded-xl text-[11px] text-amber-200 space-y-1">
-                      <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-                        <AlertTriangle className="w-4 h-4 text-amber-400" />
-                        <span>{targetWaiting.length} Pending Backlog Order(s) Waiting ({targetNeededUnits} pcs needed)</span>
-                      </div>
-                      <div className="text-[10px] text-amber-300/80">
-                        Upon confirming GRN, required stock will be immediately deducted, warnings cleared, and verified Net Operating Profits computed.
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-[11px] text-purple-300">
-                ⚡ <strong>Auto-Deduction Engine:</strong> Any pending orders waiting for SKU <strong>{restockProductTarget.sku}</strong> will automatically have stock deducted, accurate COGS and Net Operating Profit computed, and be moved to active status!
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRestockProductTarget(null)}
-                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={restockSubmitting}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-                >
-                  {restockSubmitting ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  <span>Confirm Inward GRN Restock</span>
-                </button>
-              </div>
-            </form>
+              return (
+                <RestockGRNForm
+                  product={{
+                    sku: restockProductTarget.sku,
+                    title: restockProductTarget.name,
+                    name: restockProductTarget.name,
+                    costPrice: restockProductTarget.costPrice,
+                    currentStoreStock: restockProductTarget.stockStore,
+                    supplier: restockProductTarget.supplier,
+                  }}
+                  suppliers={safeSuppliers.map((s) => ({
+                    name: s.name,
+                    paymentTerm: s.paymentTerms,
+                    paymentTerms: s.paymentTerms,
+                  }))}
+                  pendingWaitingCount={targetWaiting.length}
+                  pendingNeededUnits={targetNeededUnits}
+                  onRestock={async (data) => {
+                    if (!onRestockProduct) return;
+                    setRestockSubmitting(true);
+                    try {
+                      const res = await onRestockProduct(
+                        data.sku,
+                        data.restockQty,
+                        0, // Store Stock only (Warehouse removed as requested)
+                        data.costPrice,
+                        data.batchRef,
+                        data.supplier
+                      );
+                      setRestockProductTarget(null);
+                      const unitsDeducted = res?.totalUnitsDeducted || 0;
+                      const resolvedCount = res?.resolvedOrders?.length || 0;
+                      const customMsg =
+                        resolvedCount > 0
+                          ? `Auto-deducted ${unitsDeducted} units for ${resolvedCount} backlog order(s) on restock of ${data.sku}! Net Operating Profits verified and orders moved to active.`
+                          : `Inward GRN Restock saved for ${data.sku}. Store Stock updated: +${data.restockQty} units.`;
+                      setRestockToast(res?.message || customMsg);
+                      setTimeout(() => setRestockToast(null), 7000);
+                    } catch (err: any) {
+                      console.error('Restock error:', err);
+                    } finally {
+                      setRestockSubmitting(false);
+                    }
+                  }}
+                  onCancel={() => setRestockProductTarget(null)}
+                />
+              );
+            })()}
           </div>
         </div>
       )}

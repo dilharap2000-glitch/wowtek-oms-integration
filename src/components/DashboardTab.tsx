@@ -25,6 +25,7 @@ import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, Webho
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
+import { RestockGRNForm } from './ProductGRNForms';
 
 interface DashboardTabProps {
   orders: Order[];
@@ -709,131 +710,81 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           onClose={() => setSelectedOrderForThermalPrint(null)}
         />
       )}
-      {/* QUICK INWARD GRN RESTOCK MODAL */}
+      {/* QUICK INWARD RESTOCK MODAL (BACKLOG AUTO-DEDUCTION) */}
       {quickRestockItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-emerald-400" />
-                <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    Inward GRN Restock & Auto-Deduction
-                  </h3>
-                  <p className="text-[11px] text-neutral-400">
-                    Auto-deducts pending backlog orders waiting for this SKU
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setQuickRestockItem(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+          <div className="w-full max-w-xl">
+            {(() => {
+              const targetWaiting = safeOrders.filter(
+                (o) =>
+                  (o.hasUnregisteredItems ||
+                    o.profitStatus === 'Pending / Inventory Not Found' ||
+                    o.status === 'Pending') &&
+                  (o.items || []).some(
+                    (it) =>
+                      (it.sku && it.sku.toUpperCase() === quickRestockItem.sku.toUpperCase()) ||
+                      (it.name && it.name.toLowerCase().includes(quickRestockItem.name.toLowerCase())) ||
+                      (quickRestockItem.name && quickRestockItem.name.toLowerCase().includes(it.name.toLowerCase()))
+                  )
+              );
+              const targetNeededUnits = targetWaiting.reduce((sum, o) => {
+                const match = (o.items || []).filter(
+                  (it) =>
+                    (!it.isRegistered || it.costPrice <= 0 || o.hasUnregisteredItems || o.status === 'Pending') &&
+                    ((it.sku && it.sku.toUpperCase() === quickRestockItem.sku.toUpperCase()) ||
+                      (it.name && it.name.toLowerCase().includes(quickRestockItem.name.toLowerCase())) ||
+                      (quickRestockItem.name && quickRestockItem.name.toLowerCase().includes(it.name.toLowerCase())))
+                );
+                return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
+              }, 0);
 
-            <form onSubmit={handleExecuteRestock} className="p-5 space-y-4 text-xs">
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
-                <div className="text-[11px] text-neutral-400 font-medium">Target Backlog Product:</div>
-                <div className="font-semibold text-white text-sm">{quickRestockItem.name}</div>
-                <div className="text-[11px] font-mono text-purple-300">
-                  Target SKU: <strong>{quickRestockItem.sku}</strong>
-                </div>
-              </div>
+              const currentStoreHeld =
+                products.find((p) => p.sku.toUpperCase() === quickRestockItem.sku.toUpperCase())?.stockStore || 0;
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Store Stock (Inward Qty)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={restockStoreQty}
-                    onChange={(e) => setRestockStoreQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Warehouse Stock (Inward Qty)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={restockWarehouseQty}
-                    onChange={(e) => setRestockWarehouseQty(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    Landed Cost Price (COGS)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={restockCostPrice}
-                    onChange={(e) => setRestockCostPrice(parseInt(e.target.value) || '')}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">GRN Batch Ref</label>
-                  <input
-                    type="text"
-                    required
-                    value={restockBatch}
-                    onChange={(e) => setRestockBatch(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-neutral-300 font-medium mb-1">Inward Supplier</label>
-                <input
-                  type="text"
-                  value={restockSupplier}
-                  onChange={(e) => setRestockSupplier(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+              return (
+                <RestockGRNForm
+                  product={{
+                    sku: quickRestockItem.sku,
+                    title: quickRestockItem.name,
+                    name: quickRestockItem.name,
+                    costPrice: quickRestockItem.suggestedCost,
+                    currentStoreStock: currentStoreHeld,
+                  }}
+                  suppliers={[
+                    { name: 'WOWTEK Direct Import' },
+                    { name: 'Singer Digital Sri Lanka' },
+                    { name: 'Chama Computers Colombo' },
+                  ]}
+                  pendingWaitingCount={targetWaiting.length}
+                  pendingNeededUnits={targetNeededUnits}
+                  onRestock={async (data) => {
+                    if (!onRestockProduct) return;
+                    setRestockLoading(true);
+                    try {
+                      const res = await onRestockProduct(
+                        data.sku,
+                        data.restockQty,
+                        0, // Store stock only
+                        data.costPrice,
+                        data.batchRef,
+                        data.supplier
+                      );
+                      setQuickRestockItem(null);
+                      setRestockSuccessMsg(
+                        res?.message ||
+                          `GRN Restock processed for ${data.sku}! Pending backlog orders auto-deducted and moved to active with verified profits.`
+                      );
+                      setTimeout(() => setRestockSuccessMsg(null), 6000);
+                    } catch (err: any) {
+                      console.error('Restock error:', err);
+                    } finally {
+                      setRestockLoading(false);
+                    }
+                  }}
+                  onCancel={() => setQuickRestockItem(null)}
                 />
-              </div>
-
-              <div className="p-3 bg-purple-950/40 border border-purple-800/40 rounded-xl text-[11px] text-purple-300">
-                ⚡ <strong>Automated Auto-Deduction Engine:</strong> Upon receiving this GRN, all pending orders waiting for this SKU will have required stock auto-deducted, &ldquo;Inventory Not Found&rdquo; warning cleared, and verified Net Operating Profit calculated in real time!
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setQuickRestockItem(null)}
-                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={restockLoading}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-                >
-                  {restockLoading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-4 h-4" />
-                  )}
-                  <span>Receive GRN & Auto-Deduct Backlog</span>
-                </button>
-              </div>
-            </form>
+              );
+            })()}
           </div>
         </div>
       )}

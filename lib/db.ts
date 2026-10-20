@@ -661,7 +661,16 @@ export async function restockProduct(
       const res = await fetch('/api/products/restock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier }),
+        body: JSON.stringify({
+          sku,
+          restockQty: addedStore,
+          addedStore,
+          addedWarehouse,
+          costPrice,
+          batchRef: grnBatch,
+          grnBatch,
+          supplier,
+        }),
       });
       if (res.ok) {
         const data = await res.json();
