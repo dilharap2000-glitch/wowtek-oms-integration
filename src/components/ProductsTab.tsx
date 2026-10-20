@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 import { Product, Supplier, Order } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
-import { AddProductGRNForm, RestockGRNForm } from './ProductGRNForms';
+import { BarcodeModal } from '@/components/BarcodeModal';
+import { AddProductGRNForm, RestockGRNForm } from '@/components/GRNForms';
 
 interface ProductsTabProps {
   products: Product[];
@@ -58,7 +59,6 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null);
-  const [barcodePrintCount, setBarcodePrintCount] = useState(12);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -174,13 +174,13 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const safeProducts = products || [];
   const safeSuppliers = suppliers || [];
 
-  // Inventory Valuation Metrics
+  // Inventory Valuation Metrics (Standardized to Store Stock exclusively)
   const totalCostValue = safeProducts.reduce(
-    (sum, p) => sum + ((p?.stockWarehouse || 0) + (p?.stockStore || 0)) * (p?.costPrice || 0),
+    (sum, p) => sum + (p?.storeStock ?? p?.stockStore ?? p?.stockQuantity ?? 0) * (p?.costPrice || 0),
     0
   );
   const totalRetailValue = safeProducts.reduce(
-    (sum, p) => sum + ((p?.stockWarehouse || 0) + (p?.stockStore || 0)) * (p?.sellingPrice || 0),
+    (sum, p) => sum + (p?.storeStock ?? p?.stockStore ?? p?.stockQuantity ?? 0) * (p?.sellingPrice || 0),
     0
   );
   const potentialProfit = totalRetailValue - totalCostValue;
@@ -462,7 +462,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 <th className="py-3 px-4 font-medium text-right">Cost Price</th>
                 <th className="py-3 px-4 font-medium text-right">Selling Price</th>
                 <th className="py-3 px-4 font-medium w-48">Profit Margin Bar</th>
-                <th className="py-3 px-4 font-medium text-center">Stock (Whse / Store)</th>
+                <th className="py-3 px-4 font-medium text-center">Store Stock</th>
                 <th className="py-3 px-4 font-medium text-center">Actions</th>
               </tr>
             </thead>
@@ -591,13 +591,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-1.5 text-center font-mono">
-                        <span className="px-2 py-0.5 rounded bg-neutral-950 border border-neutral-800 text-neutral-300">
-                          W: <strong className="text-white">{p.stockWarehouse}</strong>
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-purple-950/60 border border-purple-800 text-purple-300">
-                          S: <strong className="text-white">{p.stockStore}</strong>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex items-center justify-center font-mono">
+                        <span className="px-2.5 py-1 rounded-lg bg-pink-950/60 border border-pink-800 text-pink-300 font-bold text-xs">
+                          {p.storeStock ?? p.stockStore ?? p.stockQuantity ?? 0} pcs
                         </span>
                       </div>
                     </td>
@@ -670,88 +667,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
       {/* Barcode Print Modal */}
       {selectedProductForBarcode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <div className="flex items-center gap-2">
-                <Barcode className="w-5 h-5 text-purple-400" />
-                <h3 className="text-sm font-semibold text-white">
-                  Bulk Barcode & GRN Label Generator
-                </h3>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-xs text-neutral-400">
-                  <span>Count:</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={barcodePrintCount}
-                    onChange={(e) => setBarcodePrintCount(parseInt(e.target.value) || 1)}
-                    className="w-14 px-1.5 py-0.5 bg-neutral-950 border border-neutral-700 rounded text-center text-white font-mono"
-                  />
-                </div>
-                <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Sheet</span>
-                </button>
-                <button
-                  onClick={() => setSelectedProductForBarcode(null)}
-                  className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 max-h-[75vh] overflow-y-auto bg-neutral-950">
-              <div className="text-xs text-neutral-400 mb-3 flex items-center justify-between">
-                <span>Thermal Sticker Preview: 50mm × 30mm standard retail barcode sticker</span>
-                <span className="font-mono text-purple-400">
-                  {selectedProductForBarcode.sku}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {Array.from({ length: barcodePrintCount }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="p-3 bg-white text-black rounded-lg border border-neutral-300 shadow-sm flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start text-[9px] font-bold tracking-tight text-neutral-800">
-                        <span>WOWTEK PRO</span>
-                        <span className="font-mono">{selectedProductForBarcode.grnBatch}</span>
-                      </div>
-                      <div className="text-[10px] font-semibold line-clamp-1 mt-0.5 text-neutral-900">
-                        {selectedProductForBarcode.name}
-                      </div>
-                    </div>
-
-                    <div className="my-1.5">
-                      {renderSvgBarcode(selectedProductForBarcode.barcode)}
-                      <div className="text-center font-mono text-[10px] tracking-widest text-neutral-700 mt-0.5">
-                        {selectedProductForBarcode.barcode}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between border-t border-neutral-300 pt-1 text-[10px]">
-                      <span className="font-mono text-neutral-600 font-semibold">
-                        {selectedProductForBarcode.sku}
-                      </span>
-                      <span className="font-bold text-neutral-950 font-mono">
-                        Rs. {selectedProductForBarcode.sellingPrice.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <BarcodeModal
+          product={selectedProductForBarcode}
+          onClose={() => setSelectedProductForBarcode(null)}
+        />
       )}
 
       {/* Edit Product Modal */}
@@ -813,35 +732,23 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Warehouse Stock</label>
-                  <input
-                    type="number"
-                    value={editingProduct.stockWarehouse}
-                    onChange={(e) =>
-                      setEditingProduct({
-                        ...editingProduct,
-                        stockWarehouse: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Store Front Stock</label>
-                  <input
-                    type="number"
-                    value={editingProduct.stockStore}
-                    onChange={(e) =>
-                      setEditingProduct({
-                        ...editingProduct,
-                        stockStore: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
-                  />
-                </div>
+              <div>
+                <label className="block text-pink-400 font-medium mb-1">Store Front Stock</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editingProduct.storeStock ?? editingProduct.stockStore ?? 0}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10) || 0;
+                    setEditingProduct({
+                      ...editingProduct,
+                      storeStock: val,
+                      stockStore: val,
+                      stockWarehouse: 0,
+                    });
+                  }}
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-pink-700/60 rounded-lg text-white font-mono focus:border-pink-500 focus:outline-none"
+                />
               </div>
 
               <div>

@@ -25,7 +25,7 @@ import { Order, Product, TransExpressWaybill, WarrantyRecord, ExpenseItem, Webho
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
-import { RestockGRNForm } from './ProductGRNForms';
+import { RestockGRNForm } from '@/components/GRNForms';
 
 interface DashboardTabProps {
   orders: Order[];
@@ -738,8 +738,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 return sum + match.reduce((s, it) => s + (it.quantity || 1), 0);
               }, 0);
 
-              const currentStoreHeld =
-                products.find((p) => p.sku.toUpperCase() === quickRestockItem.sku.toUpperCase())?.stockStore || 0;
+              const currentProd = products.find((p) => p.sku.toUpperCase() === quickRestockItem.sku.toUpperCase());
+              const currentStoreHeld = currentProd?.storeStock ?? currentProd?.stockStore ?? currentProd?.stockQuantity ?? 0;
 
               return (
                 <RestockGRNForm

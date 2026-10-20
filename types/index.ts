@@ -153,18 +153,29 @@ export interface SupplierRmaClaim {
 export interface Product {
   id: string;
   sku: string;
+  skuCode?: string;
   barcode: string;
   name: string;
+  title?: string;
   category: string;
   costPrice: number;
   sellingPrice: number;
-  stockWarehouse: number;
+  storeStock?: number;
   stockStore: number;
-  stockReserved: number;
+  stockWarehouse?: number;
+  stockReserved?: number;
+  stockQuantity?: number;
   grnBatch: string;
+  lastBatchRef?: string;
   supplier: string;
   supplierId?: string;
-  warrantyPeriodMonths: number;
+  warrantyPeriodMonths?: number;
+  warrantyMonths?: number;
+  lastRestockedAt?: string | Date;
+  minThreshold?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TransExpressWaybill {

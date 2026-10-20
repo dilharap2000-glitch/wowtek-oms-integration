@@ -33,14 +33,19 @@ export async function POST(req: NextRequest) {
     try {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
+        const effectiveStoreStock = Number(product.storeStock ?? product.stockStore ?? product.stockQuantity ?? 0);
+        product.storeStock = effectiveStoreStock;
+        product.stockStore = effectiveStoreStock;
+        product.stockWarehouse = 0;
+
         await mongoConn.db.collection('products').updateOne(
-          { sku: product.sku },
+          { $or: [{ sku: product.sku }, { id: product.id }] },
           { $set: product },
           { upsert: true }
         );
 
         // AUTO-DEDUCTION FOR PENDING/BACKLOG INVOICES ON NEW GRN RESTOCK
-        if ((product.stockStore > 0 || product.stockWarehouse > 0) && product.costPrice > 0) {
+        if (effectiveStoreStock > 0 && product.costPrice > 0) {
           const backlogRes = await resolvePendingBacklogOrders(product, { mongoClient: mongoConn });
           resolvedProduct = backlogRes.product;
           resolvedOrdersCount = backlogRes.resolvedOrders.length;
@@ -85,7 +90,11 @@ export async function PUT(req: NextRequest) {
 
         if (updatedDoc) {
           const { _id, ...cleanProd } = updatedDoc as any;
-          if ((cleanProd.stockStore > 0 || cleanProd.stockWarehouse > 0) && cleanProd.costPrice > 0) {
+          const storeCount = Number(cleanProd.storeStock ?? cleanProd.stockStore ?? cleanProd.stockQuantity ?? 0);
+          if (storeCount > 0 && cleanProd.costPrice > 0) {
+            cleanProd.storeStock = storeCount;
+            cleanProd.stockStore = storeCount;
+            cleanProd.stockWarehouse = 0;
             const backlogRes = await resolvePendingBacklogOrders(cleanProd, { mongoClient: mongoConn });
             resolvedCount = backlogRes.resolvedOrders.length;
           }

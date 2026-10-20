@@ -458,8 +458,7 @@ export async function processOrderReturn(
 // ---------------------------------------------------------------------------
 
 function resolveMockBacklog(product: Product, mock: MockDatabaseState): Order[] {
-  let storeStock = product.stockStore || 0;
-  let warehouseStock = product.stockWarehouse || 0;
+  let storeStock = Number(product.storeStock ?? product.stockStore ?? product.stockQuantity ?? 0);
   const resolved: Order[] = [];
 
   mock.orders.forEach((order) => {
@@ -489,14 +488,8 @@ function resolveMockBacklog(product: Product, mock: MockDatabaseState): Order[] 
 
         if (matchRes.matchedProduct || (item.sku && item.sku.toUpperCase() === product.sku.toUpperCase())) {
           const reqQty = item.quantity || 1;
-          if (storeStock + warehouseStock >= reqQty) {
-            if (storeStock >= reqQty) {
-              storeStock -= reqQty;
-            } else {
-              const rem = reqQty - storeStock;
-              storeStock = 0;
-              warehouseStock = Math.max(0, warehouseStock - rem);
-            }
+          if (storeStock >= reqQty) {
+            storeStock -= reqQty;
             item.sku = product.sku;
             item.barcode = product.barcode || item.barcode;
             item.costPrice = product.costPrice || 0;
@@ -539,8 +532,9 @@ function resolveMockBacklog(product: Product, mock: MockDatabaseState): Order[] 
     }
   });
 
+  product.storeStock = storeStock;
   product.stockStore = storeStock;
-  product.stockWarehouse = warehouseStock;
+  product.stockWarehouse = 0;
   return resolved;
 }
 
@@ -645,8 +639,10 @@ export async function restockProduct(
     return { success: false, message: `Product ${sku} not found` };
   }
 
-  prod.stockStore = (prod.stockStore || 0) + (addedStore || 0);
-  prod.stockWarehouse = (prod.stockWarehouse || 0) + (addedWarehouse || 0);
+  const storeIncrement = Number(addedStore || 0);
+  prod.storeStock = (prod.storeStock ?? prod.stockStore ?? 0) + storeIncrement;
+  prod.stockStore = prod.storeStock;
+  prod.stockWarehouse = 0;
   if (typeof costPrice === 'number' && costPrice > 0) {
     prod.costPrice = costPrice;
   }
@@ -658,17 +654,16 @@ export async function restockProduct(
 
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch('/api/products/restock', {
+      const res = await fetch('/api/grn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sku,
-          restockQty: addedStore,
-          addedStore,
-          addedWarehouse,
+          skuCode: sku,
+          restockQty: storeIncrement,
+          addedStore: storeIncrement,
           costPrice,
           batchRef: grnBatch,
-          grnBatch,
           supplier,
         }),
       });

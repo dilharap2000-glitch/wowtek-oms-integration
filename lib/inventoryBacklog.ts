@@ -122,8 +122,9 @@ export async function resolvePendingBacklogOrders(
     };
   }
 
-  let currentStoreStock = typeof product.stockStore === 'number' ? product.stockStore : 0;
-  let currentWarehouseStock = typeof product.stockWarehouse === 'number' ? product.stockWarehouse : 0;
+  let currentStoreStock = Number(
+    product.storeStock ?? product.stockStore ?? product.stockQuantity ?? 0
+  );
   let totalDeductedUnits = 0;
   const resolvedOrders: Order[] = [];
 
@@ -155,18 +156,10 @@ export async function resolvePendingBacklogOrders(
 
       if (isMatch) {
         const requiredQty = item.quantity || 1;
-        const totalAvailableStock = currentStoreStock + currentWarehouseStock;
 
-        if (totalAvailableStock >= requiredQty) {
-          // Deduct from stockStore first, then stockWarehouse
-          if (currentStoreStock >= requiredQty) {
-            currentStoreStock -= requiredQty;
-          } else {
-            const remainder = requiredQty - currentStoreStock;
-            currentStoreStock = 0;
-            currentWarehouseStock = Math.max(0, currentWarehouseStock - remainder);
-          }
-
+        if (currentStoreStock >= requiredQty) {
+          // Deduct from storeStock directly (Warehouse removed)
+          currentStoreStock -= requiredQty;
           totalDeductedUnits += requiredQty;
 
           // Update line item with verified SKU & Cost Price
@@ -256,21 +249,23 @@ export async function resolvePendingBacklogOrders(
     }
   }
 
-  // Update product stock with deducted amounts
+  // Update product stock with deducted amounts (storeStock exclusively)
   const updatedProduct: Product = {
     ...product,
+    storeStock: currentStoreStock,
     stockStore: currentStoreStock,
-    stockWarehouse: currentWarehouseStock,
+    stockWarehouse: 0,
   };
 
   if (mongoConn && totalDeductedUnits > 0) {
     try {
       await mongoConn.db.collection('products').updateOne(
-        { sku: product.sku },
+        { $or: [{ sku: product.sku }, { id: product.id }] },
         {
           $set: {
+            storeStock: currentStoreStock,
             stockStore: currentStoreStock,
-            stockWarehouse: currentWarehouseStock,
+            stockWarehouse: 0,
           },
         }
       );
