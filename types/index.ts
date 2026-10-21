@@ -103,6 +103,8 @@ export interface Order {
   waybillError?: string;
   notes?: string;
   isPosSale?: boolean;
+  baseSubtotal?: number;
+  feeSurchargeAdded?: boolean;
   returnedAt?: string;
   returnReason?: string;
   smsConfirmationSent?: boolean;

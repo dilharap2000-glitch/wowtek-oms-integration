@@ -98,13 +98,45 @@ export const PosTab: React.FC<PosTabProps> = ({
     active: true,
   };
 
-  // Cart calculations
+  // Cart calculations according to the Customer-Surcharge Pricing Model:
+  // 1. Base Item Price: cart item selling prices (e.g., Rs. 4,490)
+  // 2. Gateway Fee Percentage: Payzy BNPL, Koko, Mintpay = 12% (0.12), Card = 3% (0.03), Cash = 0%
+  // 3. Customer Surcharge: paymentFeeAmount = baseItemPrice * feePercentage (added to customer total)
+  // 4. Net Profit: Merchant keeps Base Selling Price - COGS - Platform Fee (customer pays the gateway surcharge)
   const safeCart = cart || [];
-  const grossTotal = safeCart.reduce((sum, item) => sum + (item?.unitPrice || 0) * (item?.quantity || 0), 0);
+  const baseItemPrice = safeCart.reduce((sum, item) => sum + (item?.unitPrice || 0) * (item?.quantity || 0), 0);
   const totalCostOfGoods = safeCart.reduce((sum, item) => sum + (item?.costPrice || 0) * (item?.quantity || 0), 0);
 
-  const platformFeeAmount = Math.round((grossTotal * activePlatform.feePercent) / 100);
-  const gatewayFeeAmount = Math.round((grossTotal * activeGateway.feePercent) / 100);
+  // 2. Gateway Fee Percentage determination
+  let gatewayFeePercentage = 0;
+  const gwName = activeGateway?.name || '';
+  const gwCode = (activeGateway?.code || selectedGatewayCode || '').toLowerCase();
+
+  if (
+    gwName === 'Payzy BNPL' ||
+    gwName === 'Koko' ||
+    gwName === 'Mintpay' ||
+    gwName.toLowerCase().includes('payzy') ||
+    gwName.toLowerCase().includes('koko') ||
+    gwName.toLowerCase().includes('mintpay') ||
+    ['payzy', 'koko', 'mintpay'].includes(gwCode)
+  ) {
+    gatewayFeePercentage = 0.12; // 12% BNPL
+  } else if (
+    gwName === 'Card' ||
+    gwName.toLowerCase().includes('card') ||
+    ['card', 'card_online'].includes(gwCode)
+  ) {
+    gatewayFeePercentage = 0.03; // 3% Card
+  } else if (typeof activeGateway?.feePercent === 'number') {
+    gatewayFeePercentage = activeGateway.feePercent > 1 ? activeGateway.feePercent / 100 : activeGateway.feePercent;
+  }
+
+  // 3. Customer Fee Surcharge Added to Item Price (Add to Total)
+  const paymentFeeAmount = Math.round(baseItemPrice * gatewayFeePercentage);
+  const finalGrossTotal = baseItemPrice + paymentFeeAmount + (courierFee || 0);
+
+  const platformFeeAmount = Math.round((baseItemPrice * activePlatform.feePercent) / 100);
 
   const hasUnregisteredInCart = safeCart.some((item) => {
     const prod = products.find(
@@ -116,9 +148,11 @@ export const PosTab: React.FC<PosTabProps> = ({
     return !prod || !prod.costPrice || prod.costPrice <= 0 || !item.costPrice || item.costPrice <= 0;
   });
 
+  // 4. Net Profit: Customer pays the gateway surcharge, so Net Profit is:
+  // Base Selling Price - COGS - Platform Fee (merchant is not penalized by gateway fee)
   const netProfit = hasUnregisteredInCart
     ? 0
-    : grossTotal - platformFeeAmount - gatewayFeeAmount - courierFee - totalCostOfGoods;
+    : Math.round(baseItemPrice - totalCostOfGoods - platformFeeAmount);
 
   // Add product to cart by barcode or SKU
   const handleAddProductToCart = (prod: Product) => {
@@ -263,11 +297,12 @@ export const PosTab: React.FC<PosTabProps> = ({
       deliveryAddress: 'Walk-in / In-Store Checkout',
       city: customerCity,
       items: [...cart],
-      grossTotal,
+      baseSubtotal: baseItemPrice,
+      grossTotal: finalGrossTotal,
       platformFeePercent: activePlatform.feePercent,
       platformFeeAmount,
-      gatewayFeePercent: activeGateway.feePercent,
-      gatewayFeeAmount,
+      gatewayFeePercent: Math.round(gatewayFeePercentage * 100),
+      gatewayFeeAmount: paymentFeeAmount,
       courierFee,
       costOfGoods: totalCostOfGoods,
       netProfit: hasUnregistered ? 0 : netProfit,
@@ -275,11 +310,12 @@ export const PosTab: React.FC<PosTabProps> = ({
       hasUnregisteredItems: hasUnregistered,
       unregisteredItemsCount: hasUnregistered ? safeCart.filter((item) => !products.some((p) => p.sku === item.sku && p.costPrice > 0)).length : 0,
       status: 'Completed',
+      feeSurchargeAdded: paymentFeeAmount > 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       waybillGenerated: false,
       isPosSale: true,
-      notes: `POS sale processed via ${activeGateway.name} (${activeGateway.feePercent}% fee).${hasUnregistered ? ' [Contains unregistered items: profit pending inventory valuation]' : ''}`,
+      notes: `POS sale processed via ${activeGateway.name} (${Math.round(gatewayFeePercentage * 100)}% surcharge added: +Rs. ${paymentFeeAmount.toLocaleString()}). Base: Rs. ${baseItemPrice.toLocaleString()} | COGS: Rs. ${totalCostOfGoods.toLocaleString()} | Net Profit: Rs. ${netProfit.toLocaleString()}.${hasUnregistered ? ' [Contains unregistered items: profit pending inventory valuation]' : ''}`,
     };
 
     onCreateOrder(newOrder);
@@ -292,7 +328,7 @@ export const PosTab: React.FC<PosTabProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contact: customerPhone,
-            message: `WOWTEK PRO: Invoice ${invoiceNum} confirmed. Total: Rs. ${grossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase!`,
+            message: `WOWTEK PRO: Invoice ${invoiceNum} confirmed. Total: Rs. ${finalGrossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase!`,
             triggerType: 'order_confirmed',
             referenceId: invoiceNum,
           }),
@@ -605,30 +641,42 @@ export const PosTab: React.FC<PosTabProps> = ({
                   </div>
                 </div>
 
-                {/* Payment Gateway Selector with Dynamic Fees */}
+                {/* Payment Gateway Selector with Dynamic Surcharge */}
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-neutral-300 font-medium">Payment Gateway</span>
                     <span className="text-[11px] font-mono text-purple-400">
-                      Fee: {activeGateway.feePercent}%
+                      Surcharge: {Math.round(gatewayFeePercentage * 100)}% added to total
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {(gateways || []).map((gw) => (
-                      <button
-                        key={gw.code}
-                        type="button"
-                        onClick={() => setSelectedGatewayCode(gw.code)}
-                        className={`p-2 rounded-lg border text-left transition-all ${
-                          selectedGatewayCode === gw.code
-                            ? 'border-purple-500 bg-purple-500/10 text-white'
-                            : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
-                        }`}
-                      >
-                        <div className="font-semibold text-[11px] truncate">{gw.name}</div>
-                        <div className="text-[10px] font-mono opacity-80">{gw.feePercent}% Gateway Fee</div>
-                      </button>
-                    ))}
+                    {(gateways || []).map((gw) => {
+                      const gwLower = gw.code.toLowerCase();
+                      const isBnpl =
+                        ['payzy', 'koko', 'mintpay'].includes(gwLower) ||
+                        gw.name.includes('Payzy') ||
+                        gw.name.includes('Koko') ||
+                        gw.name.includes('Mintpay');
+                      const isCard = gwLower.includes('card') || gw.name.includes('Card');
+                      const feePct = isBnpl ? 12 : isCard ? 3 : gw.feePercent;
+                      return (
+                        <button
+                          key={gw.code}
+                          type="button"
+                          onClick={() => setSelectedGatewayCode(gw.code)}
+                          className={`p-2 rounded-lg border text-left transition-all ${
+                            selectedGatewayCode === gw.code
+                              ? 'border-purple-500 bg-purple-500/10 text-white'
+                              : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
+                          }`}
+                        >
+                          <div className="font-semibold text-[11px] truncate">{gw.name}</div>
+                          <div className="text-[10px] font-mono opacity-80">
+                            {feePct > 0 ? `+${feePct}% Added to Total` : '0% (No Surcharge)'}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -660,29 +708,44 @@ export const PosTab: React.FC<PosTabProps> = ({
             <div className="pt-3 border-t border-neutral-800 space-y-2 text-xs">
               <div className="space-y-1 font-mono">
                 <div className="flex justify-between text-neutral-400">
-                  <span>Gross Total:</span>
-                  <span className="text-white">Rs. {grossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <span>Base Item Price:</span>
+                  <span className="text-white">Rs. {baseItemPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+                {paymentFeeAmount > 0 ? (
+                  <div className="flex justify-between text-purple-400">
+                    <span>Payment Fee (+{Math.round(gatewayFeePercentage * 100)}% Add to Total):</span>
+                    <span>+Rs. {paymentFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-neutral-500 text-[11px]">
+                    <span>Payment Fee (0%):</span>
+                    <span>Rs. 0.00</span>
+                  </div>
+                )}
+                {courierFee > 0 && (
+                  <div className="flex justify-between text-neutral-400">
+                    <span>Courier Shipping Cost:</span>
+                    <span>+Rs. {courierFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-white font-bold text-sm pt-1.5 pb-1 border-t border-neutral-800">
+                  <span>Final Gross Total (Customer Pays):</span>
+                  <span className="text-purple-400">Rs. {finalGrossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {platformFeeAmount > 0 && (
-                  <div className="flex justify-between text-amber-400">
+                  <div className="flex justify-between text-amber-400 text-[11px]">
                     <span>Platform Fee ({activePlatform.feePercent}%):</span>
                     <span>-Rs. {platformFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
-                {gatewayFeeAmount > 0 && (
-                  <div className="flex justify-between text-amber-400">
-                    <span>Payment Fee ({activeGateway.feePercent}%):</span>
-                    <span>-Rs. {gatewayFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-neutral-400">
+                <div className="flex justify-between text-neutral-400 text-[11px]">
                   <span>Cost of Goods (COGS):</span>
                   <span>-Rs. {totalCostOfGoods.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {hasUnregisteredInCart ? (
                   <div className="pt-1.5 pb-1 border-t border-neutral-800">
                     <div className="flex justify-between items-center text-amber-400">
-                      <span className="font-semibold text-[11px]">Net Profit:</span>
+                      <span className="font-semibold text-[11px]">Net Estimated Profit:</span>
                       <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
                         Pending / Inventory Not Found
                       </span>
@@ -693,8 +756,13 @@ export const PosTab: React.FC<PosTabProps> = ({
                   </div>
                 ) : (
                   <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-neutral-800">
-                    <span>Net Estimated Profit:</span>
-                    <span>Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <div>
+                      <span>Net Estimated Profit:</span>
+                      <div className="text-[9px] text-neutral-400 font-sans font-normal">
+                        (Base Selling Price - COGS; Customer paid the {Math.round(gatewayFeePercentage * 100)}% fee)
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold">Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
               </div>
@@ -706,7 +774,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                 className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-xs shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 transition-all"
               >
                 <Printer className="w-4 h-4" />
-                <span>Complete POS Sale & Print Invoice (Rs. {grossTotal.toLocaleString()})</span>
+                <span>Complete POS Sale & Print Invoice (Rs. {finalGrossTotal.toLocaleString()})</span>
               </button>
             </div>
           </div>
@@ -813,6 +881,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                       <div className="text-[11px] text-purple-300 font-mono">
                         {order.paymentGatewayName} ({order.gatewayFeePercent}%)
                       </div>
+                      {order.gatewayFeeAmount > 0 && (
+                        <div className="text-[10px] text-purple-400 font-mono">
+                          +Rs. {order.gatewayFeeAmount.toLocaleString()} surcharge
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3 px-4">
@@ -828,6 +901,11 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                         <td className="py-3 px-4 text-right font-mono tabular-nums text-white font-medium">
                           Rs. {order.grossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {order.baseSubtotal && order.baseSubtotal !== order.grossTotal && (
+                            <div className="text-[10px] text-neutral-400 font-normal">
+                              Base: Rs. {order.baseSubtotal.toLocaleString()}
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold">

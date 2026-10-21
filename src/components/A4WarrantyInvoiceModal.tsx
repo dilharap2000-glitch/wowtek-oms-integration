@@ -591,6 +591,22 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
               </div>
 
               <div className="space-y-1 text-right text-[11px]">
+                <div className="flex justify-between text-neutral-600">
+                  <span>SUBTOTAL:</span>
+                  <span>Rs. {Number(subtotal).toLocaleString()}</span>
+                </div>
+                {order.gatewayFeePercent > 0 && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>GATEWAY SURCHARGE ({order.gatewayFeePercent}%):</span>
+                    <span>Rs. {Number(order.gatewayFeeAmount || 0).toLocaleString()}</span>
+                  </div>
+                )}
+                {order.courierFee > 0 && (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>DELIVERY:</span>
+                    <span>Rs. {Number(order.courierFee).toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-bold text-sm pt-1 border-t border-black">
                   <span>TOTAL PAYABLE:</span>
                   <span>Rs. {Number(order.grossTotal).toLocaleString()}</span>
