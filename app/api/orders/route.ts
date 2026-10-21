@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { getServerStore, saveServerOrder, deleteServerOrder } from '@/lib/serverStore';
 import { Order, Product, ProductAlias } from '@/types';
 import { findBestProductMatch, DEFAULT_PRODUCT_ALIASES } from '@/lib/productMatching';
+import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
 
 export const dynamic = 'force-dynamic';
 
@@ -119,153 +120,266 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    const order: Order = body;
-    if (!order || !order.id) {
-      return NextResponse.json({ success: false, error: 'Invalid order payload' }, { status: 400 });
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (items.length === 0) {
+      return NextResponse.json({ success: false, message: 'Order must contain at least one item' }, { status: 400 });
     }
+
+    const paymentGateway = body.paymentGateway || body.paymentMethod || 'Cash';
+    const shippingCost = Number(body.shippingCost !== undefined ? body.shippingCost : (body.courierFee !== undefined ? body.courierFee : 350));
+    const customerDetails = body.customerDetails || {
+      name: body.customerName || 'Walk-in Customer',
+      phone: body.customerPhone || '',
+      address: body.shippingAddress || body.customerAddress || '',
+    };
+
+    let totalNetProfit = 0;
+    const processedItems: any[] = [];
+    const orderId = String(body.orderId || body.id || body.invoiceNumber || `INV-${Math.floor(1000 + Math.random() * 9000)}`);
 
     let savedToMongo = false;
-    try {
-      const mongoConn = await connectToMongoDB();
-      if (mongoConn) {
-        let hasUnregistered = false;
-        let unregCount = 0;
-        let verifiedCogs = 0;
+    const mongoConn = await connectToMongoDB();
 
-        const [prodDocs, aliasDocs] = await Promise.all([
-          mongoConn.db.collection('products').find({}).toArray().catch(() => []),
-          mongoConn.db.collection('product_aliases').find({}).toArray().catch(() => []),
-        ]);
+    if (mongoConn) {
+      const db = mongoConn.db;
 
-        const catalog: Product[] = prodDocs.map(({ _id, ...rest }: any) => rest as Product);
-        const aliases: ProductAlias[] = [
-          ...DEFAULT_PRODUCT_ALIASES,
-          ...aliasDocs.map(({ _id, ...rest }: any) => rest as ProductAlias),
+      for (const item of items) {
+        const searchId = String(item.sku || item.skuCode || item.barcode || item.code || item.id || '').trim();
+        const qtyToBuy = Number(item.qty || item.quantity || 1);
+
+        // 1. Flexible Product Lookup in Database
+        let isObjectId = false;
+        try {
+          isObjectId = ObjectId.isValid(searchId) && searchId.length === 24;
+        } catch {
+          isObjectId = false;
+        }
+
+        const orQuery: any[] = [
+          { sku: searchId },
+          { skuCode: searchId },
+          { barcode: searchId },
+          { code: searchId },
+          { _id: searchId },
         ];
-
-        if (Array.isArray(order.items)) {
-          for (const item of order.items) {
-            const matchRes = findBestProductMatch(
-              {
-                externalName: item.name,
-                externalSku: item.sku,
-                externalBarcode: item.barcode,
-                channel: order.channel,
-              },
-              catalog,
-              aliases
-            );
-
-            const matchedProduct = matchRes.matchedProduct;
-            const availableStock = matchedProduct
-              ? (matchedProduct.stockStore || 0) + (matchedProduct.stockWarehouse || 0)
-              : 0;
-
-            if (matchedProduct && availableStock >= (item.quantity || 1)) {
-              // Deduct stock from stockStore first, then stockWarehouse
-              const reqQty = item.quantity || 1;
-              let deductStore = 0;
-              let deductWarehouse = 0;
-
-              if ((matchedProduct.stockStore || 0) >= reqQty) {
-                deductStore = reqQty;
-                matchedProduct.stockStore -= reqQty;
-              } else {
-                deductStore = matchedProduct.stockStore || 0;
-                deductWarehouse = reqQty - deductStore;
-                matchedProduct.stockStore = 0;
-                matchedProduct.stockWarehouse = Math.max(0, (matchedProduct.stockWarehouse || 0) - deductWarehouse);
-              }
-
-              await mongoConn.db.collection('products').updateOne(
-                { sku: matchedProduct.sku },
-                {
-                  $inc: {
-                    stockStore: -deductStore,
-                    stockWarehouse: -deductWarehouse,
-                  },
-                }
-              );
-
-              const realCost =
-                typeof matchedProduct.costPrice === 'number' && matchedProduct.costPrice > 0
-                  ? matchedProduct.costPrice
-                  : 0;
-
-              item.sku = matchedProduct.sku;
-              item.barcode = matchedProduct.barcode || item.barcode;
-              item.costPrice = realCost;
-              item.isRegistered = realCost > 0;
-              verifiedCogs += realCost * reqQty;
-
-              if (realCost <= 0) {
-                hasUnregistered = true;
-                unregCount++;
-              }
-            } else {
-              // Item is missing or out of stock! Keep in backlog queue
-              hasUnregistered = true;
-              unregCount++;
-              item.costPrice = 0;
-              item.isRegistered = false;
-              if (matchedProduct) {
-                item.sku = matchedProduct.sku;
-              }
-              console.warn(
-                `[Orders API POST] Backlog queued: ${item.sku || 'UNREGISTERED'} ("${item.name}") is out of stock (available: ${availableStock}). Awaiting GRN restock.`
-              );
-            }
-          }
+        if (isObjectId) {
+          orQuery.unshift({ _id: new ObjectId(searchId) });
+        }
+        if (item.name) {
+          orQuery.push({ name: item.name });
         }
 
-        // Set verified financial state
-        order.costOfGoods = verifiedCogs;
-        if (hasUnregistered) {
-          order.hasUnregisteredItems = true;
-          order.unregisteredItemsCount = unregCount;
-          order.profitStatus = 'Pending / Inventory Not Found';
-          order.netProfit = 0; // Prevent fake profit display
-          if (!order.status || order.status === 'Processing' || order.status === 'Completed') {
-            order.status = 'Pending';
-          }
-          const backlogNote = '[Backlog Queue] Awaiting inward GRN restock for out-of-stock items.';
-          if (!order.notes?.includes('[Backlog Queue]')) {
-            order.notes = [order.notes, backlogNote].filter(Boolean).join(' | ');
-          }
-        } else {
-          order.hasUnregisteredItems = false;
-          order.unregisteredItemsCount = 0;
-          order.profitStatus = 'Calculated';
-          const courierFee = typeof order.courierFee === 'number' && order.courierFee > 0 ? order.courierFee : (order.shippingCost || 350);
-          const totalFees = (order.platformFeeAmount || 0) + (order.gatewayFeeAmount || 0) + courierFee;
-          order.netProfit = Math.max(0, Math.round(order.grossTotal - verifiedCogs - totalFees));
+        const product = await db.collection<any>('products').findOne({
+          $or: orQuery,
+        });
+
+        if (!product) {
+          return NextResponse.json({
+            success: false,
+            message: `Inventory Not Found for SKU: ${searchId || item.name || 'Unknown'}`,
+          }, { status: 400 });
         }
 
-        await mongoConn.db.collection('orders').updateOne(
-          { $or: [{ id: order.id }, { invoiceNumber: order.invoiceNumber }] },
-          { $set: order },
-          { upsert: true }
+        // 2. Pricing and Gateway Fee Calculation
+        const unitPrice = Number(item.sellingPrice || item.unitPrice || item.price || product.sellingPrice || 0);
+        const costPrice = Number(product.costPrice || item.costPrice || 0);
+
+        // Gateway Fee Calculation (e.g.: Payzy BNPL, Koko, Mintpay => 12%, Card => 3%)
+        let feePercentage = 0;
+        const gwLower = String(paymentGateway).toLowerCase();
+        if (
+          ['Payzy BNPL', 'Koko', 'Mintpay'].includes(paymentGateway) ||
+          gwLower.includes('payzy') ||
+          gwLower.includes('koko') ||
+          gwLower.includes('mintpay') ||
+          gwLower.includes('bnpl')
+        ) {
+          feePercentage = 0.12;
+        } else if (
+          paymentGateway === 'Card / Online Bank Gateway' ||
+          paymentGateway === 'Card' ||
+          gwLower.includes('card') ||
+          gwLower.includes('bank')
+        ) {
+          feePercentage = 0.03;
+        }
+
+        const gatewayFee = unitPrice * feePercentage;
+        const shipping = Number(shippingCost || 350);
+
+        // Net Profit Calculation
+        const itemProfit = unitPrice - costPrice - gatewayFee - (shipping / items.length);
+        totalNetProfit += itemProfit * qtyToBuy;
+
+        // 3. Atomic Store Stock Decrement
+        await db.collection('products').updateOne(
+          { _id: product._id },
+          {
+            $inc: {
+              storeStock: -qtyToBuy,
+              stockQuantity: -qtyToBuy,
+            },
+            $unset: { warehouseStock: '', stockWarehouse: '', stockStore: '' },
+          }
         );
 
-        savedToMongo = true;
-      } else {
-        // Fallback store handling if Mongo is offline
-        const hasUnregistered = !order.items || order.items.some((it) => !it.costPrice || it.costPrice <= 0);
-        if (hasUnregistered) {
-          order.hasUnregisteredItems = true;
-          order.profitStatus = 'Pending / Inventory Not Found';
-          order.netProfit = 0;
-        }
+        processedItems.push({
+          ...item,
+          name: item.name || product.name,
+          sku: product.sku || searchId,
+          barcode: product.barcode || item.barcode,
+          costPrice,
+          unitPrice,
+          sellingPrice: unitPrice,
+          profit: itemProfit,
+          quantity: qtyToBuy,
+          qty: qtyToBuy,
+          isRegistered: costPrice > 0,
+        });
       }
-    } catch (err: any) {
-      console.warn('[Orders API POST] MongoDB write error:', err.message);
+
+      // 4. Save Order with 'Completed' Status
+      const newOrder = {
+        ...body,
+        id: orderId,
+        orderId,
+        invoiceNumber: orderId,
+        items: processedItems,
+        paymentGateway,
+        paymentMethod: paymentGateway,
+        shippingCost: Number(shippingCost || 0),
+        courierFee: Number(shippingCost || 0),
+        customerDetails,
+        customerName: customerDetails?.name || body.customerName || 'Walk-in Customer',
+        customerPhone: customerDetails?.phone || body.customerPhone || '',
+        shippingAddress: customerDetails?.address || body.shippingAddress || '',
+        netProfit: Math.round(totalNetProfit),
+        grossTotal: body.grossTotal || processedItems.reduce((acc, it) => acc + (it.unitPrice * (it.quantity || 1)), 0),
+        costOfGoods: processedItems.reduce((acc, it) => acc + (it.costPrice * (it.quantity || 1)), 0),
+        status: 'Completed', // Pending වෙනුවට කෙලින්ම Completed වේ
+        profitStatus: 'Calculated',
+        hasUnregisteredItems: processedItems.some((it) => it.costPrice <= 0),
+        unregisteredItemsCount: processedItems.filter((it) => it.costPrice <= 0).length,
+        channel: body.channel || 'POS',
+        createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await db.collection('orders').updateOne(
+        { $or: [{ orderId: newOrder.orderId }, { id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }] },
+        { $set: newOrder },
+        { upsert: true }
+      );
+
+      saveServerOrder(newOrder as any);
+      savedToMongo = true;
+
+      return NextResponse.json({
+        success: true,
+        message: 'Order completed, stock deducted, and profit calculated successfully!',
+        orderId: newOrder.orderId,
+        order: newOrder,
+        savedToMongo,
+      });
     }
 
-    saveServerOrder(order);
+    // Local / ServerStore Fallback if MongoDB is offline
+    const store = getServerStore();
+    for (const item of items) {
+      const searchId = String(item.sku || item.skuCode || item.barcode || item.code || item.id || '').trim().toLowerCase();
+      const qtyToBuy = Number(item.qty || item.quantity || 1);
 
-    return NextResponse.json({ success: true, order, savedToMongo });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+      const product = SAMPLE_PRODUCTS.find(
+        (p) =>
+          p.sku.toLowerCase() === searchId ||
+          (p.barcode && p.barcode.toLowerCase() === searchId) ||
+          p.id.toLowerCase() === searchId ||
+          (item.name && p.name.toLowerCase() === item.name.toLowerCase())
+      );
+
+      const unitPrice = Number(item.sellingPrice || item.unitPrice || item.price || product?.sellingPrice || 0);
+      const costPrice = Number(product?.costPrice || item.costPrice || 0);
+
+      let feePercentage = 0;
+      const gwLower = String(paymentGateway).toLowerCase();
+      if (
+        ['Payzy BNPL', 'Koko', 'Mintpay'].includes(paymentGateway) ||
+        gwLower.includes('payzy') ||
+        gwLower.includes('koko') ||
+        gwLower.includes('mintpay') ||
+        gwLower.includes('bnpl')
+      ) {
+        feePercentage = 0.12;
+      } else if (
+        paymentGateway === 'Card / Online Bank Gateway' ||
+        paymentGateway === 'Card' ||
+        gwLower.includes('card') ||
+        gwLower.includes('bank')
+      ) {
+        feePercentage = 0.03;
+      }
+
+      const gatewayFee = unitPrice * feePercentage;
+      const shipping = Number(shippingCost || 350);
+      const itemProfit = unitPrice - costPrice - gatewayFee - (shipping / items.length);
+      totalNetProfit += itemProfit * qtyToBuy;
+
+      if (product) {
+        product.storeStock = Math.max(0, (product.storeStock ?? product.stockQuantity ?? 0) - qtyToBuy);
+        product.stockQuantity = product.storeStock;
+      }
+
+      processedItems.push({
+        ...item,
+        name: item.name || product?.name || searchId,
+        sku: product?.sku || searchId,
+        barcode: product?.barcode || item.barcode,
+        costPrice,
+        unitPrice,
+        sellingPrice: unitPrice,
+        profit: itemProfit,
+        quantity: qtyToBuy,
+        qty: qtyToBuy,
+        isRegistered: costPrice > 0,
+      });
+    }
+
+    const fallbackOrder = {
+      ...body,
+      id: orderId,
+      orderId,
+      invoiceNumber: orderId,
+      items: processedItems,
+      paymentGateway,
+      paymentMethod: paymentGateway,
+      shippingCost: Number(shippingCost || 0),
+      courierFee: Number(shippingCost || 0),
+      customerDetails,
+      customerName: customerDetails?.name || body.customerName || 'Walk-in Customer',
+      customerPhone: customerDetails?.phone || body.customerPhone || '',
+      shippingAddress: customerDetails?.address || body.shippingAddress || '',
+      netProfit: Math.round(totalNetProfit),
+      grossTotal: body.grossTotal || processedItems.reduce((acc, it) => acc + (it.unitPrice * (it.quantity || 1)), 0),
+      costOfGoods: processedItems.reduce((acc, it) => acc + (it.costPrice * (it.quantity || 1)), 0),
+      status: 'Completed',
+      profitStatus: 'Calculated',
+      channel: body.channel || 'POS',
+      createdAt: body.createdAt ? new Date(body.createdAt) : new Date(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveServerOrder(fallbackOrder as any);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Order completed, stock deducted, and profit calculated successfully!',
+      orderId: fallbackOrder.orderId,
+      order: fallbackOrder,
+      savedToMongo: false,
+    });
+  } catch (error: any) {
+    console.error('Checkout Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 

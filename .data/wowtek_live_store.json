@@ -1,6 +1,51 @@
 {
   "orders": [
     {
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "qty": 1,
+          "sellingPrice": 22800,
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "barcode": "4792038100142",
+          "costPrice": 16500,
+          "unitPrice": 22800,
+          "profit": 3214,
+          "quantity": 1,
+          "isRegistered": true,
+          "returned": true,
+          "returnedQty": 1
+        }
+      ],
+      "paymentGateway": "Payzy BNPL",
+      "shippingCost": 350,
+      "customerDetails": {
+        "name": "Test Customer",
+        "phone": "0771234567"
+      },
+      "id": "INV-9248",
+      "orderId": "INV-9248",
+      "invoiceNumber": "INV-9248",
+      "paymentMethod": "Payzy BNPL",
+      "courierFee": 350,
+      "customerName": "Test Customer",
+      "customerPhone": "0771234567",
+      "shippingAddress": "",
+      "netProfit": 0,
+      "grossTotal": 22800,
+      "costOfGoods": 16500,
+      "status": "Returned",
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "channel": "POS",
+      "createdAt": "2026-10-21T14:32:44.672Z",
+      "updatedAt": "2026-10-21T14:32:53.329Z",
+      "_id": "6ad8cd0c6763672e516a822b",
+      "returnedAt": "2026-10-21T14:32:53.260Z",
+      "returnReason": "Customer requested return & refund"
+    },
+    {
       "id": "ord-wc-99883-8022",
       "invoiceNumber": "WT-WC-99883",
       "channel": "woocommerce",
@@ -732,5 +777,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-09T14:44:10.497Z"
+  "lastUpdated": "2026-10-21T14:32:53.329Z"
 }
