@@ -422,9 +422,14 @@ export async function processOrderReturn(
       item.returnedQty = item.quantity;
       restoredItems.push(`${item.name} (${item.quantity} qty)`);
 
-      const prod = mock.products.find((p) => p.sku === item.sku);
+      const prod = mock.products.find(
+        (p) => p.sku === item.sku || p.skuCode === item.sku || p.barcode === item.sku
+      );
       if (prod) {
-        prod.stockStore += item.quantity;
+        prod.storeStock = Number(prod.storeStock ?? prod.stockQuantity ?? 0) + item.quantity;
+        prod.stockQuantity = prod.storeStock;
+        delete (prod as any).stockStore;
+        delete (prod as any).warehouseStock;
       }
     }
   });
@@ -442,10 +447,10 @@ export async function processOrderReturn(
 
   if (typeof window !== 'undefined') {
     try {
-      await fetch('/api/orders', {
+      await fetch('/api/orders/return', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'return', orderId, returnedSkus, reason }),
+        body: JSON.stringify({ orderId, returnedSkus, reason }),
       });
     } catch {}
   }

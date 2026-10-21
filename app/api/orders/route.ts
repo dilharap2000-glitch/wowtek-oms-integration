@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 import { getServerStore, saveServerOrder, deleteServerOrder } from '@/lib/serverStore';
 import { Order, Product, ProductAlias } from '@/types';
 import { findBestProductMatch, DEFAULT_PRODUCT_ALIASES } from '@/lib/productMatching';
@@ -35,24 +36,46 @@ export async function POST(req: NextRequest) {
       const { orderId, returnedSkus, reason } = body;
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
-        const orderDoc = await mongoConn.db.collection('orders').findOne({ id: orderId });
+        const queryConditions: any[] = [
+          { id: String(orderId) },
+          { orderId: String(orderId) },
+          { invoiceNumber: String(orderId) },
+          { _id: String(orderId) },
+        ];
+        if (ObjectId.isValid(String(orderId)) && String(orderId).length === 24) {
+          try {
+            queryConditions.unshift({ _id: new ObjectId(String(orderId)) });
+          } catch {}
+        }
+
+        const orderDoc = await mongoConn.db.collection('orders').findOne({
+          $or: queryConditions,
+        });
+
         if (orderDoc) {
           const { _id, ...orderData } = orderDoc;
           const order = orderData as unknown as Order;
           const restoredItems: string[] = [];
 
-          order.items.forEach((item: any) => {
-            if (returnedSkus.includes(item.sku) && !item.returned) {
-              item.returned = true;
-              item.returnedQty = item.quantity;
+          const targetSkus = Array.isArray(returnedSkus) && returnedSkus.length > 0 ? returnedSkus : [];
+
+          order.items = (order.items || []).map((item: any) => {
+            const shouldReturn = targetSkus.length === 0 || targetSkus.includes(item.sku) || targetSkus.includes(item.skuCode);
+            if (shouldReturn && !item.returned) {
               restoredItems.push(`${item.name} (${item.quantity} qty)`);
+              return {
+                ...item,
+                returned: true,
+                returnedQty: item.quantity,
+              };
             }
+            return item;
           });
 
           const allItemsReturned = order.items.every((it: any) => it.returned);
           order.status = allItemsReturned ? 'Returned' : 'Partially Returned';
           order.returnedAt = new Date().toISOString();
-          order.returnReason = reason || 'Customer requested return';
+          order.returnReason = reason || 'Customer requested return & refund';
           order.updatedAt = new Date().toISOString();
 
           if (allItemsReturned) {
@@ -60,24 +83,37 @@ export async function POST(req: NextRequest) {
           }
 
           // Restore inventory stock in MongoDB Atlas
-          for (const sku of returnedSkus) {
-            const matchedItem = order.items.find((i: any) => i.sku === sku);
-            if (matchedItem) {
+          const itemsToRestore = targetSkus.length > 0
+            ? order.items.filter((i: any) => targetSkus.includes(i.sku) || targetSkus.includes(i.skuCode))
+            : order.items;
+
+          for (const rawItem of itemsToRestore) {
+            const item = rawItem as any;
+            const sku = item.sku || item.skuCode || item.barcode || item.code;
+            if (sku) {
               await mongoConn.db.collection('products').updateOne(
-                { sku },
-                { $inc: { stockStore: matchedItem.quantity } }
+                { $or: [{ sku }, { skuCode: sku }, { barcode: sku }, { code: sku }] },
+                {
+                  $inc: { storeStock: Number(item.quantity || 1), stockQuantity: Number(item.quantity || 1) },
+                  $unset: { warehouseStock: '', stockWarehouse: '', stockStore: '' },
+                }
               );
             }
           }
 
           await mongoConn.db.collection('orders').updateOne(
-            { id: orderId },
-            { $set: order }
+            { _id: orderDoc._id },
+            { $set: { ...order, status: 'Returned', netProfit: 0, returnedAt: new Date() } }
           );
 
           saveServerOrder(order);
 
-          return NextResponse.json({ success: true, order, restoredItems });
+          return NextResponse.json({
+            success: true,
+            message: 'Item successfully returned, added back to store stock, and profit reversed!',
+            order,
+            restoredItems,
+          });
         }
       }
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
