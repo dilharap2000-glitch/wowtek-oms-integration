@@ -30,16 +30,17 @@ function renderSvgBarcode(code: string) {
 }
 
 export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalProps) {
-  // Fix Barcode Generator Count: Set default print count directly to product.storeStock (or stockQuantity/stockStore)
+  // Fix Barcode Generator Count: Set default print count directly to product.storeStock (or stockQuantity)
   const calculateDefaultCount = (p: Product | null): number => {
     if (!p) return 1;
-    const stock = Number(
-      p.storeStock ??
-      p.stockQuantity ??
-      p.stockStore ??
-      1
-    );
-    return Math.max(1, isNaN(stock) ? 1 : stock);
+    // Strictly evaluate storeStock or stockQuantity
+    const stockVal = p.storeStock !== undefined && p.storeStock !== null
+      ? Number(p.storeStock)
+      : p.stockQuantity !== undefined && p.stockQuantity !== null
+      ? Number(p.stockQuantity)
+      : Number(p.stockStore ?? 1);
+
+    return isNaN(stockVal) || stockVal <= 0 ? 1 : stockVal;
   };
 
   const [printCount, setPrintCount] = useState<number>(calculateDefaultCount(product));
@@ -56,10 +57,11 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
   }
 
   const effectiveStoreStock = Number(
-    product.storeStock ??
-    product.stockQuantity ??
-    product.stockStore ??
-    0
+    product.storeStock !== undefined && product.storeStock !== null
+      ? product.storeStock
+      : product.stockQuantity !== undefined && product.stockQuantity !== null
+      ? product.stockQuantity
+      : (product.stockStore ?? 0)
   );
 
   return (

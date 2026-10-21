@@ -42,7 +42,8 @@ interface ProductsTabProps {
     addedWarehouse: number,
     costPrice?: number,
     grnBatch?: string,
-    supplier?: string
+    supplier?: string,
+    productId?: string
   ) => Promise<any>;
 }
 
@@ -856,11 +857,24 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
               return (
                 <RestockGRNForm
                   product={{
+                    id: (restockProductTarget as any)._id || restockProductTarget.id,
+                    _id: (restockProductTarget as any)._id || restockProductTarget.id,
                     sku: restockProductTarget.sku,
+                    skuCode: (restockProductTarget as any).skuCode || restockProductTarget.sku,
+                    barcode: restockProductTarget.barcode,
                     title: restockProductTarget.name,
                     name: restockProductTarget.name,
                     costPrice: restockProductTarget.costPrice,
-                    currentStoreStock: restockProductTarget.stockStore,
+                    currentStoreStock:
+                      restockProductTarget.storeStock ??
+                      restockProductTarget.stockStore ??
+                      restockProductTarget.stockQuantity ??
+                      0,
+                    storeStock:
+                      restockProductTarget.storeStock ??
+                      restockProductTarget.stockStore ??
+                      restockProductTarget.stockQuantity ??
+                      0,
                     supplier: restockProductTarget.supplier,
                   }}
                   suppliers={safeSuppliers.map((s) => ({
@@ -880,7 +894,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         0, // Store Stock only (Warehouse removed as requested)
                         data.costPrice,
                         data.batchRef,
-                        data.supplier
+                        data.supplier,
+                        data.id || data.productId || (restockProductTarget as any)._id || restockProductTarget.id
                       );
                       setRestockProductTarget(null);
                       const unitsDeducted = res?.totalUnitsDeducted || 0;

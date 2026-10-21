@@ -425,19 +425,28 @@ export default function WowtekProApp() {
     addedWarehouse: number,
     costPrice?: number,
     grnBatch?: string,
-    supplier?: string
+    supplier?: string,
+    productId?: string
   ) => {
-    const res = await restockProduct(sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier);
+    const res = await restockProduct(sku, addedStore, addedWarehouse, costPrice, grnBatch, supplier, productId);
     if (res?.resolvedOrders && res.resolvedOrders.length > 0) {
       const resolvedMap = new Map(res.resolvedOrders.map((o) => [o.id, o]));
       setOrders((prev) => prev.map((o) => resolvedMap.get(o.id) || o));
     }
     if (res?.product) {
-      setProducts((prev) => prev.map((p) => (p.sku === res.product!.sku ? res.product! : p)));
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.sku === res.product!.sku || p.id === res.product!.id ? { ...p, ...res.product! } : p
+        )
+      );
     }
     const [refreshedProds, refreshedOrders] = await Promise.all([getProducts(), getOrders()]);
-    setProducts(refreshedProds);
-    setOrders(refreshedOrders);
+    if (Array.isArray(refreshedProds) && refreshedProds.length > 0) {
+      setProducts(refreshedProds);
+    }
+    if (Array.isArray(refreshedOrders)) {
+      setOrders(refreshedOrders);
+    }
     return res;
   };
 

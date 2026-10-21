@@ -631,26 +631,42 @@ export async function restockProduct(
   addedWarehouse: number,
   costPrice?: number,
   grnBatch?: string,
-  supplier?: string
+  supplier?: string,
+  productId?: string
 ): Promise<{ success: boolean; product?: Product; resolvedOrders?: Order[]; message?: string }> {
   const mock = initMockDb();
-  const prod = mock.products.find((p) => p.sku === sku);
-  if (!prod) {
-    return { success: false, message: `Product ${sku} not found` };
-  }
+  const clean = String(sku || '').trim().toLowerCase();
+  const cleanId = String(productId || '').trim();
+
+  let prod = mock.products.find(
+    (p) =>
+      (cleanId && p.id === cleanId) ||
+      (p.sku && p.sku.trim().toLowerCase() === clean) ||
+      (p.skuCode && p.skuCode.trim().toLowerCase() === clean) ||
+      (p.barcode && p.barcode.trim().toLowerCase() === clean) ||
+      (p.id && p.id.trim().toLowerCase() === clean) ||
+      String(p.sku) === String(sku) ||
+      String(p.skuCode) === String(sku) ||
+      String(p.barcode) === String(sku)
+  );
 
   const storeIncrement = Number(addedStore || 0);
-  prod.storeStock = (prod.storeStock ?? prod.stockStore ?? 0) + storeIncrement;
-  prod.stockStore = prod.storeStock;
-  prod.stockWarehouse = 0;
-  if (typeof costPrice === 'number' && costPrice > 0) {
-    prod.costPrice = costPrice;
-  }
-  if (grnBatch) prod.grnBatch = grnBatch;
-  if (supplier) prod.supplier = supplier;
+  let resolvedOrders: Order[] = [];
 
-  const resolvedOrders = resolveMockBacklog(prod, mock);
-  persistMockDb();
+  if (prod) {
+    prod.storeStock = (prod.storeStock ?? prod.stockStore ?? prod.stockQuantity ?? 0) + storeIncrement;
+    prod.stockStore = prod.storeStock;
+    prod.stockQuantity = prod.storeStock;
+    prod.stockWarehouse = 0;
+    if (typeof costPrice === 'number' && costPrice > 0) {
+      prod.costPrice = costPrice;
+    }
+    if (grnBatch) prod.grnBatch = grnBatch;
+    if (supplier) prod.supplier = supplier;
+
+    resolvedOrders = resolveMockBacklog(prod, mock);
+    persistMockDb();
+  }
 
   if (typeof window !== 'undefined') {
     try {
@@ -658,8 +674,11 @@ export async function restockProduct(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sku,
-          skuCode: sku,
+          id: prod?.id || cleanId || undefined,
+          productId: prod?.id || cleanId || undefined,
+          sku: prod?.sku || sku,
+          skuCode: prod?.skuCode || prod?.sku || sku,
+          barcode: prod?.barcode,
           restockQty: storeIncrement,
           addedStore: storeIncrement,
           costPrice,
@@ -667,16 +686,38 @@ export async function restockProduct(
           supplier,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.product) {
+          const idx = mock.products.findIndex((p) => p.sku === data.product.sku || p.id === data.product.id);
+          if (idx !== -1) {
+            mock.products[idx] = { ...mock.products[idx], ...data.product };
+          } else {
+            mock.products.unshift(data.product);
+          }
+          persistMockDb();
+        }
         return {
           success: true,
           product: data.product || prod,
-          resolvedOrders: data.resolvedOrders || resolvedOrders,
+          resolvedOrders: data.resolvedOrders,
           message: data.message,
         };
+      } else if (!prod) {
+        return {
+          success: false,
+          message: data.message || `Product ${sku} not found in database`,
+        };
       }
-    } catch {}
+    } catch (e: any) {
+      if (!prod) {
+        return { success: false, message: e.message || `Failed to connect to restock API` };
+      }
+    }
+  }
+
+  if (!prod) {
+    return { success: false, message: `Product ${sku} not found` };
   }
 
   return {
