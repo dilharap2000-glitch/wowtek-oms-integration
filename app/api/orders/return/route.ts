@@ -18,28 +18,54 @@ export async function POST(req: Request) {
 
     const { db } = await connectToDatabase();
 
+    const cleanOrderId = String(orderId).trim();
+    const numId = Number(cleanOrderId);
+
     // 1. අදාළ Order එක හෝ Invoice එක හොයාගැනීම (ObjectId, string _id, orderId, id, හෝ invoiceNumber මගින්)
     const orConditions: any[] = [
-      { orderId: String(orderId) },
-      { id: String(orderId) },
-      { invoiceNumber: String(orderId) },
-      { _id: String(orderId) },
+      { orderId: cleanOrderId },
+      { id: cleanOrderId },
+      { invoiceNumber: cleanOrderId },
+      { _id: cleanOrderId },
     ];
 
-    if (ObjectId.isValid(String(orderId)) && String(orderId).length === 24) {
+    if (!isNaN(numId) && numId > 0) {
+      orConditions.push(
+        { orderId: numId },
+        { id: numId },
+        { wooOrderId: numId },
+        { wcOrderId: numId }
+      );
+    }
+
+    if (ObjectId.isValid(cleanOrderId) && cleanOrderId.length === 24) {
       try {
-        orConditions.unshift({ _id: new ObjectId(String(orderId)) });
+        orConditions.unshift({ _id: new ObjectId(cleanOrderId) });
       } catch {
         // Safe fallback if not valid BSON ObjectId
       }
     }
 
-    const order = await db.collection('orders').findOne({
+    let order = await db.collection('orders').findOne({
       $or: orConditions,
     });
 
     if (!order) {
-      return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
+      // Fallback regex match for cases where SKU/invoice/order suffix was provided
+      const safeEscaped = cleanOrderId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      order = await db.collection('orders').findOne({
+        $or: [
+          { invoiceNumber: { $regex: safeEscaped, $options: 'i' } },
+          { id: { $regex: safeEscaped, $options: 'i' } },
+        ],
+      });
+    }
+
+    if (!order) {
+      return NextResponse.json(
+        { success: false, message: `Order not found with identifier: ${cleanOrderId}` },
+        { status: 404 }
+      );
     }
 
     if (order.status === 'Returned') {

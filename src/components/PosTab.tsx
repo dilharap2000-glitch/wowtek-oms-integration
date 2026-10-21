@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingCart,
   Camera,
@@ -308,10 +308,52 @@ export const PosTab: React.FC<PosTabProps> = ({
     setCustomerPhone('+94 77 ');
   };
 
+  const [isProcessingReturn, setIsProcessingReturn] = useState(false);
+
+  // Return order handler - sends orderId to /api/orders/return
+  const handleReturnOrder = useCallback(
+    async (orderId: string, reason?: string) => {
+      if (!orderId) {
+        alert("Error: Order ID is missing!");
+        return;
+      }
+      setIsProcessingReturn(true);
+      try {
+        const res = await fetch('/api/orders/return', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: orderId, reason: reason || returnReason }), // Order ID එක හරියට pass වෙනවාද බලන්න
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Return successful and stock updated!");
+          window.location.reload();
+        } else {
+          alert("Error: " + (data.message || data.error || 'Failed to process return'));
+        }
+      } catch (err: any) {
+        alert("Error: " + (err.message || 'Network error processing return'));
+      } finally {
+        setIsProcessingReturn(false);
+      }
+    },
+    [returnReason]
+  );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).handleReturnOrder = handleReturnOrder;
+    }
+  }, [handleReturnOrder]);
+
   // Confirm Return & Stock Restoration
-  const handleConfirmReturn = () => {
+  const handleConfirmReturn = async () => {
     if (!returnModalOrder) return;
-    onProcessReturn(returnModalOrder.id, undefined, returnReason);
+    const orderIdToPass =
+      (returnModalOrder as any)._id ||
+      returnModalOrder.id ||
+      returnModalOrder.invoiceNumber;
+    await handleReturnOrder(String(orderIdToPass), returnReason);
     setReturnModalOrder(null);
   };
 
@@ -975,10 +1017,18 @@ export const PosTab: React.FC<PosTabProps> = ({
                 </button>
                 <button
                   type="button"
+                  disabled={isProcessingReturn}
                   onClick={handleConfirmReturn}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg shadow-sm"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg shadow-sm flex items-center gap-1.5"
                 >
-                  Confirm Return & Restore Stock
+                  {isProcessingReturn ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Processing Return...</span>
+                    </>
+                  ) : (
+                    <span>Confirm Return & Restore Stock</span>
+                  )}
                 </button>
               </div>
             </div>

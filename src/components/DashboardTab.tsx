@@ -82,6 +82,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [restockLoading, setRestockLoading] = React.useState(false);
   const [restockSuccessMsg, setRestockSuccessMsg] = React.useState<string | null>(null);
 
+  const handleReturnOrder = async (orderId: string) => {
+    try {
+      const res = await fetch('/api/orders/return', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: orderId }), // Order ID එක හරියට pass වෙනවාද බලන්න
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Return successful and stock updated!");
+        window.location.reload();
+      } else {
+        alert("Error: " + (data.message || data.error || 'Failed to process return'));
+      }
+    } catch (err: any) {
+      alert("Error: " + (err.message || 'Network error'));
+    }
+  };
+
   // Defensive array bindings
   const safeOrders = orders || [];
   const safeWaybills = waybills || [];
@@ -669,6 +688,26 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             <Printer className="w-3 h-3" />
                             <span>4x6 Label</span>
                           </button>
+
+                          {order.status !== 'Returned' && (
+                            <button
+                              onClick={() => {
+                                const idToPass = (order as any)._id || order.id || order.invoiceNumber;
+                                if (
+                                  confirm(
+                                    `Process return for order #${order.invoiceNumber || order.id}? Items will be restored to store stock.`
+                                  )
+                                ) {
+                                  handleReturnOrder(String(idToPass));
+                                }
+                              }}
+                              className="px-2 py-1 text-amber-300 hover:text-white bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 rounded-md transition-all inline-flex items-center gap-1 text-[11px] font-medium"
+                              title="Process Customer Return & Restore Stock"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Return</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
