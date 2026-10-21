@@ -135,18 +135,66 @@ export async function POST(req: Request) {
 
         await db.collection('products').updateOne({ _id: matchedProduct._id }, updateOps);
 
-        // Record inward in grns collection
+        const targetSku = matchedProduct.sku || searchIdentifier;
+        const totalCost = Number(unitCost) * Number(qtyToAdd);
+
+        // 1. Record inward in grns collection
         try {
           await db.collection('grns').insertOne({
             productId: matchedProduct._id,
-            sku: matchedProduct.sku || searchIdentifier,
+            sku: targetSku,
             qtyAdded: qtyToAdd,
             costPrice: unitCost,
+            totalCost: totalCost,
             supplier: assignedSupplier,
             batchRef: effectiveBatch,
             createdAt: new Date(),
           });
-        } catch {}
+        } catch (e: any) {
+          console.warn('[GRN API] Error inserting into grns collection:', e?.message);
+        }
+
+        // 2. Record in expenses collection
+        try {
+          await db.collection('expenses').insertOne({
+            id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            type: 'GRN_PURCHASE',
+            batchRef: effectiveBatch,
+            sku: targetSku,
+            supplier: assignedSupplier,
+            totalCost: totalCost,
+            qty: Number(qtyToAdd),
+            category: 'Stock Purchases',
+            description: `GRN Restock for SKU: ${targetSku} (Batch: ${effectiveBatch})`,
+            amount: totalCost,
+            channel: 'GRN',
+            reference: effectiveBatch,
+            date: new Date().toISOString(),
+            createdAt: new Date(),
+          });
+        } catch (e: any) {
+          console.warn('[GRN API] Error inserting into expenses collection:', e?.message);
+        }
+
+        // 3. Record in financials ledger
+        try {
+          await db.collection('financials').insertOne({
+            category: 'Inventory Purchase',
+            description: `GRN Restock for SKU: ${targetSku} (Batch: ${effectiveBatch})`,
+            amount: totalCost,
+            totalCost: totalCost,
+            costPrice: unitCost,
+            qty: Number(qtyToAdd),
+            sku: targetSku,
+            supplier: assignedSupplier,
+            batchRef: effectiveBatch,
+            type: 'expense',
+            date: new Date(),
+            createdAt: new Date(),
+          });
+        } catch (e: any) {
+          console.warn('[GRN API] Error inserting into financials ledger:', e?.message);
+        }
 
         const updatedDoc = await db.collection('products').findOne({ _id: matchedProduct._id });
         const { _id, ...cleanProduct } = (updatedDoc || matchedProduct) as any;
@@ -154,6 +202,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: true,
           message: 'Store stock updated successfully!',
+          totalCost: totalCost,
           product: {
             ...cleanProduct,
             _id: _id ? String(_id) : undefined,
@@ -182,9 +231,12 @@ export async function POST(req: Request) {
       lastRestockedAt: new Date().toISOString(),
     };
 
+    const totalCost = Number(unitCost) * Number(qtyToAdd);
+
     return NextResponse.json({
       success: true,
       message: 'Store stock updated successfully!',
+      totalCost: totalCost,
       product: fallbackProduct,
       source: 'fallback',
     });
