@@ -200,8 +200,9 @@ export async function POST(req: NextRequest) {
           order.hasUnregisteredItems = false;
           order.unregisteredItemsCount = 0;
           order.profitStatus = 'Calculated';
-          const totalFees = (order.platformFeeAmount || 0) + (order.gatewayFeeAmount || 0) + (order.courierFee || 0);
-          order.netProfit = Math.max(0, order.grossTotal - verifiedCogs - totalFees);
+          const courierFee = typeof order.courierFee === 'number' && order.courierFee > 0 ? order.courierFee : (order.shippingCost || 350);
+          const totalFees = (order.platformFeeAmount || 0) + (order.gatewayFeeAmount || 0) + courierFee;
+          order.netProfit = Math.max(0, Math.round(order.grossTotal - verifiedCogs - totalFees));
         }
 
         await mongoConn.db.collection('orders').updateOne(

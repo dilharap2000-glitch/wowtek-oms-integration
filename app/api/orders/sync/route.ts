@@ -275,13 +275,43 @@ export async function GET(req: NextRequest) {
             transExpressError = `Trans Express Error: ${teErr?.message || 'Connection failed'}`;
           }
 
+          const rawMethod = (wcOrder.payment_method || wcOrder.payment_method_title || '').toLowerCase();
+          let gatewayCode = 'card_online';
+          let gatewayName = wcOrder.payment_method_title || 'Online Payment';
+          let gatewayFeePercent = 3.0;
+
+          if (rawMethod.includes('cod') || rawMethod.includes('cash')) {
+            gatewayCode = 'cash_cod';
+            gatewayName = 'Cash on Delivery (COD)';
+            gatewayFeePercent = 0.0;
+          } else if (rawMethod.includes('payzy')) {
+            gatewayCode = 'payzy';
+            gatewayName = 'Payzy BNPL';
+            gatewayFeePercent = 12.0;
+          } else if (rawMethod.includes('koko')) {
+            gatewayCode = 'koko';
+            gatewayName = 'Koko Pay (3x Installments)';
+            gatewayFeePercent = 12.0;
+          } else if (rawMethod.includes('mintpay')) {
+            gatewayCode = 'mintpay';
+            gatewayName = 'Mintpay (Pay in 3)';
+            gatewayFeePercent = 12.0;
+          }
+
+          const rawShipping = Number(wcOrder.shipping_total || wcOrder.shippingCost);
+          const courierFee = !isNaN(rawShipping) && rawShipping > 0 ? rawShipping : (gatewayCode === 'cash_cod' ? 450 : 350);
+          const gatewayFeeAmount = Math.round((grossTotal * gatewayFeePercent) / 100);
+          const netProfit = hasUnregisteredItems
+            ? 0
+            : Math.max(0, Math.round(grossTotal - costOfGoods - gatewayFeeAmount - courierFee));
+
           const newOrder: Order = {
             id: `ord-wc-${wcOrder.id}-${Date.now().toString().slice(-4)}`,
             invoiceNumber,
             channel: 'woocommerce',
             channelName: 'WooCommerce Store',
-            paymentGateway: isCod ? 'cash_cod' : 'card_online',
-            paymentGatewayName: wcOrder.payment_method_title || 'Online Payment',
+            paymentGateway: gatewayCode,
+            paymentGatewayName: gatewayName,
             customerName,
             customerPhone,
             deliveryAddress,
@@ -298,11 +328,11 @@ export async function GET(req: NextRequest) {
             grossTotal,
             platformFeePercent: 0,
             platformFeeAmount: 0,
-            gatewayFeePercent: isCod ? 0 : 3,
-            gatewayFeeAmount: isCod ? 0 : Math.round(grossTotal * 0.03),
-            courierFee: 400,
+            gatewayFeePercent,
+            gatewayFeeAmount,
+            courierFee,
             costOfGoods,
-            netProfit: hasUnregisteredItems ? 0 : Math.max(0, grossTotal - costOfGoods - 400 - (isCod ? 0 : Math.round(grossTotal * 0.03))),
+            netProfit,
             profitStatus: hasUnregisteredItems ? 'Pending / Inventory Not Found' : 'Calculated',
             hasUnregisteredItems,
             unregisteredItemsCount,

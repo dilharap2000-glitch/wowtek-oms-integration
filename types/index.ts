@@ -87,6 +87,7 @@ export interface Order {
   gatewayFeePercent: number;
   gatewayFeeAmount: number;
   courierFee: number;
+  shippingCost?: number;
   costOfGoods: number;
   netProfit: number;
   profitStatus?: ProfitCalculationStatus;

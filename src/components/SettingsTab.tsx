@@ -48,9 +48,10 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const [savedNotification, setSavedNotification] = useState<string | null>(null);
 
-  // Live Formula Simulator
-  const [simSellingPrice, setSimSellingPrice] = useState<number>(25000);
-  const [simCostPrice, setSimCostPrice] = useState<number>(18000);
+  // Live Formula Simulator with exact 4-step user formula
+  const [simSellingPrice, setSimSellingPrice] = useState<number>(4490);
+  const [simCostPrice, setSimCostPrice] = useState<number>(4250);
+  const [simCourierCost, setSimCourierCost] = useState<number>(350);
   const [simPlatformId, setSimPlatformId] = useState<string>(localPlatforms[0]?.id || '');
   const [simGatewayId, setSimGatewayId] = useState<string>(localGateways[0]?.id || '');
 
@@ -139,16 +140,20 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     notifySaved('Payment gateway removed.');
   };
 
-  // Calculate simulated profit based on exact formula:
-  // Net Profit = Total Selling Price - Cost Price - (Total Selling Price * (Platform Fee % + Gateway Fee %))
+  // Calculate simulated profit based on exact 4-step formula:
+  // 1. Base values (Selling price, Cost price)
+  // 2. Gateway commission (Payzy: 12%, Koko: 12%, Mintpay: 12%, Card: 3%, Cash: 0%)
+  // 3. Courier Shipping Cost (Default: Rs. 350)
+  // 4. Net Profit = Selling Price - Cost Price - Gateway Fee - Platform Fee - Courier Shipping Cost
   const selectedSimPlatform = localPlatforms.find((p) => p.id === simPlatformId) || localPlatforms[0];
   const selectedSimGateway = localGateways.find((g) => g.id === simGatewayId) || localGateways[0];
 
   const simPlatformPct = selectedSimPlatform ? selectedSimPlatform.feePercent : 0;
   const simGatewayPct = selectedSimGateway ? selectedSimGateway.feePercent : 0;
-  const combinedFeePct = simPlatformPct + simGatewayPct;
-  const totalFeeDeduction = (simSellingPrice * combinedFeePct) / 100;
-  const calculatedNetProfit = simSellingPrice - simCostPrice - totalFeeDeduction;
+  const simPlatformFeeAmount = (simSellingPrice * simPlatformPct) / 100;
+  const simGatewayFeeAmount = (simSellingPrice * simGatewayPct) / 100;
+  const totalFeeDeduction = simPlatformFeeAmount + simGatewayFeeAmount;
+  const calculatedNetProfit = simSellingPrice - simCostPrice - totalFeeDeduction - simCourierCost;
   const calculatedProfitMargin =
     simSellingPrice > 0 ? ((calculatedNetProfit / simSellingPrice) * 100).toFixed(1) : '0';
 
@@ -416,9 +421,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
           <div>
-            <label className="block text-neutral-400 mb-1">Total Selling Price (LKR)</label>
+            <label className="block text-neutral-400 mb-1">Selling Price (LKR)</label>
             <input
               type="number"
               value={simSellingPrice}
@@ -433,6 +438,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               type="number"
               value={simCostPrice}
               onChange={(e) => setSimCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-neutral-400 mb-1">Courier Shipping Cost (LKR)</label>
+            <input
+              type="number"
+              value={simCourierCost}
+              onChange={(e) => setSimCourierCost(Math.max(0, parseInt(e.target.value) || 0))}
               className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
             />
           </div>
@@ -469,17 +484,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
         {/* Calculation Result */}
-        <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
-          <div>
-            <div className="text-[10px] text-neutral-400 uppercase">Total Fee Deduction</div>
-            <div className="text-base font-bold text-amber-400 mt-0.5">
-              -Rs. {totalFeeDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <div className="text-[10px] text-neutral-500 mt-0.5">
-              Combined: {combinedFeePct}% ({simPlatformPct}% + {simGatewayPct}%)
-            </div>
-          </div>
-
+        <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono">
           <div>
             <div className="text-[10px] text-neutral-400 uppercase">Gross Product Margin</div>
             <div className="text-base font-bold text-neutral-200 mt-0.5">
@@ -489,11 +494,29 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           <div>
+            <div className="text-[10px] text-neutral-400 uppercase">Gateway & Platform Fee</div>
+            <div className="text-base font-bold text-amber-400 mt-0.5">
+              -Rs. {totalFeeDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-neutral-500 mt-0.5">
+              Gateway ({simGatewayPct}%): Rs. {simGatewayFeeAmount.toFixed(2)}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[10px] text-neutral-400 uppercase">Courier Shipping Cost</div>
+            <div className="text-base font-bold text-amber-400 mt-0.5">
+              -Rs. {simCourierCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-neutral-500 mt-0.5">Courier delivery charge</div>
+          </div>
+
+          <div>
             <div className="text-[10px] text-neutral-400 uppercase">Calculated Net Profit</div>
-            <div className="text-base font-bold text-emerald-400 mt-0.5">
+            <div className={`text-base font-bold mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               Rs. {calculatedNetProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-emerald-300 mt-0.5">
+            <div className={`text-[10px] mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
               Net Margin: {calculatedProfitMargin}%
             </div>
           </div>

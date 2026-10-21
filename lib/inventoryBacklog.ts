@@ -183,7 +183,7 @@ export async function resolvePendingBacklogOrders(
       const verifiedGross = order.grossTotal || order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
       const platformFee = order.platformFeeAmount || 0;
       const gatewayFee = order.gatewayFeeAmount || 0;
-      const courierFee = order.courierFee || 0;
+      const courierFee = typeof order.courierFee === 'number' && order.courierFee > 0 ? order.courierFee : 350;
 
       order.costOfGoods = verifiedCogs;
 
@@ -191,7 +191,7 @@ export async function resolvePendingBacklogOrders(
         order.hasUnregisteredItems = false;
         order.unregisteredItemsCount = 0;
         order.profitStatus = 'Calculated';
-        order.netProfit = Math.max(0, verifiedGross - verifiedCogs - platformFee - gatewayFee - courierFee);
+        order.netProfit = Math.max(0, Math.round(verifiedGross - verifiedCogs - platformFee - gatewayFee - courierFee));
 
         // Move to fully processed/active status
         if (order.status === 'Pending') {
