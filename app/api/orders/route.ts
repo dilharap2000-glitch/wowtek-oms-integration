@@ -229,6 +229,54 @@ export async function POST(req: NextRequest) {
           }
         );
 
+        // 6. Order එකක් save වෙද්දී වොරන්ටි දත්තයන් ඇතුළත් කිරීම:
+        const warrantyMonths = Number(product.warrantyMonths || product.warrantyPeriodMonths || 18);
+        const purchasedDate = new Date();
+        const warrantyEndDate = new Date(purchasedDate);
+        warrantyEndDate.setMonth(purchasedDate.getMonth() + warrantyMonths);
+
+        const orderedItemWithWarranty = {
+          sku: item.sku || product.sku || searchId,
+          name: item.name || product.name,
+          invoiceRef: orderId,
+          customerPhone: customerDetails?.phone || body.customerPhone || '',
+          purchasedDate: purchasedDate,
+          warrantyEndDate: warrantyEndDate,
+          status: 'Active',
+        };
+
+        // Warranties Collection එකට වොරන්ටි Record එකක් Record කිරීම
+        try {
+          const warrantyRecord = {
+            id: `WAR-${orderId}-${item.sku || product.sku || searchId}`,
+            serialNumber: item.serialNumber || `SN-${(item.sku || product.sku || searchId)}-${Math.floor(100000 + Math.random() * 900000)}`,
+            productSku: item.sku || product.sku || searchId,
+            productName: item.name || product.name,
+            customerName: customerDetails?.name || body.customerName || 'Customer',
+            customerPhone: customerDetails?.phone || body.customerPhone || '',
+            customerWarrantyStart: purchasedDate.toISOString(),
+            customerWarrantyMonths: warrantyMonths,
+            customerWarrantyEnd: warrantyEndDate.toISOString(),
+            supplierName: product.supplier || 'Local Supplier',
+            supplierWarrantyEnd: warrantyEndDate.toISOString(),
+            smsStatus: 'Scheduled',
+            smsGateway: 'SMSlenz',
+            status: 'Active',
+            invoiceRef: orderId,
+            purchasedDate: purchasedDate,
+            warrantyEndDate: warrantyEndDate,
+            createdAt: new Date().toISOString(),
+          };
+
+          await db.collection('warranties').updateOne(
+            { id: warrantyRecord.id },
+            { $set: warrantyRecord },
+            { upsert: true }
+          );
+        } catch (warrErr: any) {
+          console.warn('[Orders API] Warranty registration notice:', warrErr.message);
+        }
+
         processedItems.push({
           ...item,
           name: item.name || product.name,
@@ -242,6 +290,8 @@ export async function POST(req: NextRequest) {
           quantity: qtyToBuy,
           qty: qtyToBuy,
           isRegistered: costPrice > 0,
+          warrantyMonths,
+          ...orderedItemWithWarranty,
         });
       }
 
@@ -375,6 +425,22 @@ export async function POST(req: NextRequest) {
         product.stockQuantity = product.storeStock;
       }
 
+      // Order එකක් save වෙද්දී වොරන්ටි දත්තයන් ඇතුළත් කිරීම:
+      const warrantyMonths = Number(product?.warrantyMonths || product?.warrantyPeriodMonths || 18);
+      const purchasedDate = new Date();
+      const warrantyEndDate = new Date(purchasedDate);
+      warrantyEndDate.setMonth(purchasedDate.getMonth() + warrantyMonths);
+
+      const orderedItemWithWarranty = {
+        sku: item.sku || product?.sku || searchId,
+        name: item.name || product?.name || searchId,
+        invoiceRef: orderId,
+        customerPhone: customerDetails?.phone || body.customerPhone || '',
+        purchasedDate: purchasedDate,
+        warrantyEndDate: warrantyEndDate,
+        status: 'Active',
+      };
+
       processedItems.push({
         ...item,
         name: item.name || product?.name || searchId,
@@ -388,6 +454,8 @@ export async function POST(req: NextRequest) {
         quantity: qtyToBuy,
         qty: qtyToBuy,
         isRegistered: costPrice > 0,
+        warrantyMonths,
+        ...orderedItemWithWarranty,
       });
     }
 
