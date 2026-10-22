@@ -67,6 +67,7 @@ export function RestockGRNModal({
     product?.supplier || supplierList[0]?.name || 'WOWTEK Direct Import'
   );
   const [batchRef, setBatchRef] = useState<string>(`GRN-${Date.now()}`);
+  const [serialNumbersInput, setSerialNumbersInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export function RestockGRNModal({
       setCostPrice(Number(product.costPrice) || 0);
       setSelectedSupplier(product.supplier || supplierList[0]?.name || 'WOWTEK Direct Import');
       setBatchRef(`GRN-${Date.now()}`);
+      setSerialNumbersInput('');
       setErrorMessage(null);
       setSuccessMessage(null);
     }
@@ -119,8 +121,10 @@ export function RestockGRNModal({
         barcode: product.barcode,
         restockQty: qtyToAdd,
         costPrice: Number(costPrice) || 0,
+        sellingPrice: Number(product.sellingPrice) || 0,
         supplier: selectedSupplier,
         batchRef: batchRef || `GRN-${Date.now()}`,
+        serialNumbersInput: serialNumbersInput.trim(),
       };
 
       console.log('[RestockGRNModal] Submitting GRN payload to /api/grn:', payload);
@@ -321,6 +325,23 @@ export function RestockGRNModal({
                 placeholder="GRN-YYYYMMDD-001"
               />
             </div>
+          </div>
+
+          {/* Serial Numbers (Optional) */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-neutral-300">
+                Serial Numbers (Optional, Comma-Separated)
+              </label>
+              <span className="text-[10px] text-neutral-500">Auto barcodes if blank</span>
+            </div>
+            <input
+              type="text"
+              value={serialNumbersInput}
+              onChange={(e) => setSerialNumbersInput(e.target.value)}
+              className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-2 text-xs text-white font-mono placeholder-neutral-600 focus:border-green-500 focus:outline-none"
+              placeholder="SN1001, SN1002, SN1003..."
+            />
           </div>
 
           {/* Action Buttons */}

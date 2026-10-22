@@ -3,6 +3,145 @@
     {
       "items": [
         {
+          "sku": "WT-SSD-1TB-NVME",
+          "quantity": 999,
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "qty": 999,
+          "sellingPrice": 22800,
+          "unitPrice": 22800,
+          "costPrice": 16500,
+          "status": "Pending Stock",
+          "allocatedSerials": []
+        }
+      ],
+      "paymentGateway": "Payzy BNPL",
+      "orderSource": "PickMe",
+      "customerDetails": {
+        "name": "Nadeeka Jayawardena",
+        "phone": "0773344556"
+      },
+      "id": "INV-9837",
+      "orderId": "INV-9837",
+      "invoiceNumber": "INV-9837",
+      "channel": "PickMe",
+      "customerName": "Nadeeka Jayawardena",
+      "customerPhone": "0773344556",
+      "shippingAddress": "",
+      "paymentMethod": "Payzy BNPL",
+      "shippingCost": 0,
+      "courierFee": 0,
+      "grossTotal": 22777200,
+      "costOfGoods": 16483500,
+      "netProfit": 0,
+      "status": "Pending Stock",
+      "profitStatus": "Pending",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "createdAt": "2026-10-22T11:57:40.635Z",
+      "updatedAt": "2026-10-22T11:57:40.635Z",
+      "_id": "6ad9fa34c4b464419c3581da"
+    },
+    {
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "quantity": 1,
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "barcode": "4792038100142",
+          "allocatedSerials": [
+            "SN-SSD-002"
+          ],
+          "status": "Allocated & Sold",
+          "costPrice": 16500,
+          "unitPrice": 22800,
+          "sellingPrice": 22800,
+          "profit": 6300,
+          "qty": 1,
+          "warrantyMonths": 36,
+          "purchasedDate": "2026-10-22T11:57:33.619Z",
+          "warrantyEndDate": "2029-10-22T11:57:33.619Z",
+          "warrantyStatus": "Active"
+        }
+      ],
+      "paymentGateway": "Cash",
+      "orderSource": "Website",
+      "customerDetails": {
+        "name": "Dilshan Silva",
+        "phone": "0771122334"
+      },
+      "id": "INV-1871",
+      "orderId": "INV-1871",
+      "invoiceNumber": "INV-1871",
+      "channel": "Website",
+      "customerName": "Dilshan Silva",
+      "customerPhone": "0771122334",
+      "shippingAddress": "",
+      "paymentMethod": "Cash",
+      "shippingCost": 0,
+      "courierFee": 0,
+      "grossTotal": 22800,
+      "costOfGoods": 16500,
+      "netProfit": 6300,
+      "status": "Completed",
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "createdAt": "2026-10-22T11:57:33.687Z",
+      "updatedAt": "2026-10-22T11:57:33.687Z",
+      "_id": "6ad9fa2dc4b464419c3581d9"
+    },
+    {
+      "items": [
+        {
+          "sku": "WT-SSD-1TB-NVME",
+          "quantity": 1,
+          "sellingPrice": 22800,
+          "name": "Kingston NV2 1TB PCIe 4.0 NVMe SSD",
+          "barcode": "4792038100142",
+          "costPrice": 16500,
+          "unitPrice": 22800,
+          "paymentFee": 0,
+          "profit": 6300,
+          "qty": 1,
+          "isRegistered": true,
+          "warrantyMonths": 36,
+          "invoiceRef": "INV-2982",
+          "customerPhone": "0775551234",
+          "purchasedDate": "2026-10-22T11:51:15.416Z",
+          "warrantyEndDate": "2029-10-22T11:51:15.416Z",
+          "status": "Active"
+        }
+      ],
+      "status": "Completed",
+      "customerDetails": {
+        "name": "Kamal Silva",
+        "phone": "0775551234"
+      },
+      "id": "INV-2982",
+      "orderId": "INV-2982",
+      "invoiceNumber": "INV-2982",
+      "paymentGateway": "Cash",
+      "paymentMethod": "Cash",
+      "shippingCost": 350,
+      "courierFee": 350,
+      "customerName": "Kamal Silva",
+      "customerPhone": "0775551234",
+      "shippingAddress": "",
+      "baseItemPrice": 22800,
+      "paymentFee": 0,
+      "grossTotal": 23150,
+      "costOfGoods": 16500,
+      "netProfit": 6300,
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "channel": "POS",
+      "createdAt": "2026-10-22T11:51:15.485Z",
+      "updatedAt": "2026-10-22T11:51:15.485Z"
+    },
+    {
+      "items": [
+        {
           "sku": "WT-MOUSE-MX3S",
           "quantity": 1,
           "name": "Logitech MX Master 3S Wireless Mouse - Graphite",
@@ -963,5 +1102,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-22T11:24:45.622Z"
+  "lastUpdated": "2026-10-22T11:57:40.764Z"
 }
