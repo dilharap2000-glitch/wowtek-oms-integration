@@ -10,6 +10,95 @@
           "costPrice": 28000,
           "unitPrice": 38500,
           "sellingPrice": 38500,
+          "paymentFee": 0,
+          "profit": 10500,
+          "qty": 1,
+          "isRegistered": true
+        }
+      ],
+      "paymentGateway": "Cash",
+      "shippingCost": 0,
+      "source": "PickMe",
+      "customerDetails": {
+        "name": "Sunil Gamage Updated",
+        "phone": "0779988776"
+      },
+      "id": "INV-7530",
+      "orderId": "INV-7530",
+      "invoiceNumber": "INV-7530",
+      "paymentMethod": "Cash",
+      "courierFee": 0,
+      "customerName": "Sunil Gamage Updated",
+      "customerPhone": "0779988776",
+      "shippingAddress": "",
+      "baseItemPrice": 38500,
+      "paymentFee": 0,
+      "grossTotal": 38500,
+      "costOfGoods": 28000,
+      "netProfit": 10500,
+      "status": "Completed",
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "channel": "POS",
+      "createdAt": "2026-10-22T09:15:31.612Z",
+      "updatedAt": "2026-10-22T09:15:31.612Z"
+    },
+    {
+      "items": [
+        {
+          "sku": "WT-MOUSE-MX3S",
+          "quantity": 1,
+          "name": "Logitech MX Master 3S Wireless Mouse - Graphite",
+          "barcode": "4792038100289",
+          "costPrice": 28000,
+          "unitPrice": 38500,
+          "sellingPrice": 38500,
+          "paymentFee": 4620,
+          "profit": 10500,
+          "qty": 1,
+          "isRegistered": true
+        }
+      ],
+      "paymentGateway": "Payzy BNPL",
+      "shippingCost": 350,
+      "source": "Website",
+      "customerDetails": {
+        "name": "Sunil Gamage",
+        "phone": "0779988776",
+        "address": "Galle Road, Colombo 03"
+      },
+      "id": "INV-2649",
+      "orderId": "INV-2649",
+      "invoiceNumber": "INV-2649",
+      "paymentMethod": "Payzy BNPL",
+      "courierFee": 350,
+      "customerName": "Sunil Gamage",
+      "customerPhone": "0779988776",
+      "shippingAddress": "Galle Road, Colombo 03",
+      "baseItemPrice": 38500,
+      "paymentFee": 4620,
+      "grossTotal": 43470,
+      "costOfGoods": 28000,
+      "netProfit": 10500,
+      "status": "Completed",
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "channel": "POS",
+      "createdAt": "2026-10-22T09:15:19.041Z",
+      "updatedAt": "2026-10-22T09:15:19.041Z"
+    },
+    {
+      "items": [
+        {
+          "sku": "WT-MOUSE-MX3S",
+          "quantity": 1,
+          "name": "Logitech MX Master 3S Wireless Mouse - Graphite",
+          "barcode": "4792038100289",
+          "costPrice": 28000,
+          "unitPrice": 38500,
+          "sellingPrice": 38500,
           "paymentFee": 4620,
           "profit": 10500,
           "qty": 1,
@@ -825,5 +914,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-22T08:43:44.490Z"
+  "lastUpdated": "2026-10-22T09:15:31.746Z"
 }

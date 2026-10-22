@@ -282,6 +282,32 @@ export async function POST(req: NextRequest) {
         { upsert: true }
       );
 
+      // Customer De-duplication & Upsert by Phone Number
+      const rawPhone = customerDetails?.phone || body.customerPhone || '';
+      const customerPhone = String(rawPhone).trim();
+      const orderSource = body.source || body.channel || (body.isPosSale ? 'Walk-in POS' : 'Website');
+
+      if (customerPhone && customerPhone.length >= 7) {
+        try {
+          await db.collection('customers').updateOne(
+            { phone: customerPhone }, // Phone number used as unique identifier
+            {
+              $set: {
+                name: customerDetails?.name || body.customerName || 'Valued Customer',
+                lastOrderDate: new Date(),
+                source: orderSource, // 'Website', 'PickMe', 'Uber', 'Walk-in POS'
+                address: customerDetails?.address || body.shippingAddress || '',
+              },
+              $inc: { totalOrders: 1 },
+              $setOnInsert: { createdAt: new Date() },
+            },
+            { upsert: true } // Inserts if new, updates existing record
+          );
+        } catch (custErr: any) {
+          console.warn('[Orders API] Customer upsert notice:', custErr.message);
+        }
+      }
+
       saveServerOrder(newOrder as any);
       savedToMongo = true;
 
