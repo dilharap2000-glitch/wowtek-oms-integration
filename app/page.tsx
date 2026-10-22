@@ -720,17 +720,17 @@ export default function WowtekProApp() {
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-700 to-indigo-500 flex items-center justify-center font-bold text-white shadow-md shadow-purple-900/40">
+          {/* Brand / Logo Section */}
+          <div className="flex items-center space-x-3">
+            <div className="bg-purple-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-xl shadow-lg">
               W
-            </span>
-            <span className="text-base font-bold tracking-tight text-white">WOWTEK Pro</span>
+            </div>
+            <div>
+              {/* මෙන්න මෙතන Pro කියන එක අයින් කරලා WOWTEK කියලා දාලා තියෙන්නේ */}
+              <h1 className="text-lg font-bold tracking-wide text-white leading-tight">WOWTEK</h1>
+              <p className="text-xs text-gray-400">Order Management System</p>
+            </div>
           </div>
-
-          <span className="hidden sm:inline-block text-neutral-700">|</span>
-          <span className="hidden sm:inline-block text-xs text-neutral-400 font-mono">
-            Order Management & POS Automation
-          </span>
         </div>
 
         {/* Zone 2: Navigation Breadcrumb */}
@@ -768,14 +768,27 @@ export default function WowtekProApp() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Nav */}
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-neutral-950 border-r border-neutral-800 p-4 transition-transform duration-200 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64 bg-neutral-950 border-r border-neutral-800 transition-transform duration-200 lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } flex flex-col justify-between`}
         >
-          <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
-              Management Modules
+          <div>
+            {/* Brand / Logo Section */}
+            <div className="flex items-center space-x-3 px-6 py-5 border-b border-gray-800">
+              <div className="bg-purple-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-xl shadow-lg">
+                W
+              </div>
+              <div>
+                {/* මෙන්න මෙතන Pro කියන එක අයින් කරලා WOWTEK කියලා දාලා තියෙන්නේ */}
+                <h1 className="text-lg font-bold tracking-wide text-white">WOWTEK</h1>
+                <p className="text-xs text-gray-400">Order Management System</p>
+              </div>
             </div>
+
+            <div className="p-4 space-y-1">
+              <div className="px-3 py-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+                Management Modules
+              </div>
 
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -809,19 +822,22 @@ export default function WowtekProApp() {
                 </button>
               );
             })}
+            </div>
           </div>
 
           {/* Quick Rates Banner */}
-          <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs space-y-1">
-            <div className="flex items-center justify-between text-neutral-400 text-[10px]">
-              <span className="font-semibold text-neutral-300">ACTIVE FEE RATES</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            </div>
-            <div className="text-[11px] text-neutral-300 font-mono">
-              PickMe: {platforms.find((p) => p.code === 'pickme')?.feePercent ?? 20}% · Uber: {platforms.find((p) => p.code === 'ubereats')?.feePercent ?? 15.4}%
-            </div>
-            <div className="text-[10px] text-neutral-400 font-mono">
-              Payzy/Koko/Mintpay: 12% · Cash: 0%
+          <div className="p-4 pt-0">
+            <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs space-y-1">
+              <div className="flex items-center justify-between text-neutral-400 text-[10px]">
+                <span className="font-semibold text-neutral-300">ACTIVE FEE RATES</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              </div>
+              <div className="text-[11px] text-neutral-300 font-mono">
+                PickMe: {platforms.find((p) => p.code === 'pickme')?.feePercent ?? 20}% · Uber: {platforms.find((p) => p.code === 'ubereats')?.feePercent ?? 15.4}%
+              </div>
+              <div className="text-[10px] text-neutral-400 font-mono">
+                Payzy/Koko/Mintpay: 12% · Cash: 0%
+              </div>
             </div>
           </div>
         </aside>
