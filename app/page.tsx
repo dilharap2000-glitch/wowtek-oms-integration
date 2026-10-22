@@ -16,6 +16,7 @@ import {
   Camera,
   KeyRound,
   Building2,
+  MessageSquare,
 } from 'lucide-react';
 
 import {
@@ -94,6 +95,7 @@ import { ExpensesTab } from '@/src/components/ExpensesTab';
 import { SettingsTab } from '@/src/components/SettingsTab';
 import { IntegrationsTab } from '@/src/components/IntegrationsTab';
 import { SuppliersTab } from '@/src/components/SuppliersTab';
+import { SMSMarketingTab } from '@/src/components/SMSMarketingTab';
 
 export default function WowtekProApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -699,6 +701,7 @@ export default function WowtekProApp() {
       badge: rmaClaims.filter((r) => r.status === 'Pending with Supplier').length || undefined,
     },
     { id: 'expenses', label: 'Financials Ledger', icon: DollarSign },
+    { id: 'sms', label: 'SMS Marketing & CRM', icon: MessageSquare },
     { id: 'integrations', label: 'API & Courier Integrations', icon: KeyRound },
     { id: 'settings', label: 'Dynamic Fee Engine', icon: Settings },
   ];
@@ -916,6 +919,10 @@ export default function WowtekProApp() {
 
             {activeTab === 'expenses' && (
               <ExpensesTab expenses={expenses} orders={orders} onAddExpense={handleAddExpense} />
+            )}
+
+            {activeTab === 'sms' && (
+              <SMSMarketingTab />
             )}
 
             {activeTab === 'integrations' && apiConfig && (
