@@ -134,6 +134,8 @@ export async function POST(req: NextRequest) {
     };
 
     let totalNetProfit = 0;
+    let totalBasePrice = 0;
+    let totalPaymentFee = 0;
     const processedItems: any[] = [];
     const orderId = String(body.orderId || body.id || body.invoiceNumber || `INV-${Math.floor(1000 + Math.random() * 9000)}`);
 
@@ -180,11 +182,11 @@ export async function POST(req: NextRequest) {
           }, { status: 400 });
         }
 
-        // 2. Pricing and Gateway Fee Calculation
+        // 2. Base Item Price & Gateway Fee Percentage
         const unitPrice = Number(item.sellingPrice || item.unitPrice || item.price || product.sellingPrice || 0);
         const costPrice = Number(product.costPrice || item.costPrice || 0);
 
-        // Gateway Fee Calculation (e.g.: Payzy BNPL, Koko, Mintpay => 12%, Card => 3%)
+        // Platform / Gateway Fee Percentage (Payzy, Koko, Mintpay => 12%, Card => 3%, Cash => 0%)
         let feePercentage = 0;
         const gwLower = String(paymentGateway).toLowerCase();
         if (
@@ -204,14 +206,18 @@ export async function POST(req: NextRequest) {
           feePercentage = 0.03;
         }
 
-        const gatewayFee = unitPrice * feePercentage;
-        const shipping = Number(shippingCost || 350);
+        // 3. Customer Surcharge: Payment Fee is added to item total
+        const baseItemTotal = unitPrice * qtyToBuy;
+        const paymentFeeAmount = Math.round(baseItemTotal * feePercentage);
+        totalPaymentFee += paymentFeeAmount;
+        totalBasePrice += baseItemTotal;
 
-        // Net Profit Calculation
-        const itemProfit = unitPrice - costPrice - gatewayFee - (shipping / items.length);
+        // 4. Net Profit: Customer pays the gateway fee surcharge, so Net Profit is:
+        // Base Selling Price - Cost Price (COGS)
+        const itemProfit = unitPrice - costPrice;
         totalNetProfit += itemProfit * qtyToBuy;
 
-        // 3. Atomic Store Stock Decrement
+        // 5. Atomic Store Stock Decrement
         await db.collection('products').updateOne(
           { _id: product._id },
           {
@@ -231,6 +237,7 @@ export async function POST(req: NextRequest) {
           costPrice,
           unitPrice,
           sellingPrice: unitPrice,
+          paymentFee: paymentFeeAmount,
           profit: itemProfit,
           quantity: qtyToBuy,
           qty: qtyToBuy,
@@ -238,7 +245,9 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // 4. Save Order with 'Completed' Status
+      // 6. Save Order with 'Completed' Status
+      const finalGrossTotal = body.grossTotal || (totalBasePrice + totalPaymentFee + Number(shippingCost || 0));
+
       const newOrder = {
         ...body,
         id: orderId,
@@ -253,10 +262,12 @@ export async function POST(req: NextRequest) {
         customerName: customerDetails?.name || body.customerName || 'Walk-in Customer',
         customerPhone: customerDetails?.phone || body.customerPhone || '',
         shippingAddress: customerDetails?.address || body.shippingAddress || '',
-        netProfit: Math.round(totalNetProfit),
-        grossTotal: body.grossTotal || processedItems.reduce((acc, it) => acc + (it.unitPrice * (it.quantity || 1)), 0),
+        baseItemPrice: totalBasePrice,
+        paymentFee: totalPaymentFee,
+        grossTotal: finalGrossTotal,
         costOfGoods: processedItems.reduce((acc, it) => acc + (it.costPrice * (it.quantity || 1)), 0),
-        status: 'Completed', // Pending වෙනුවට කෙලින්ම Completed වේ
+        netProfit: Math.round(totalNetProfit),
+        status: 'Completed', // Direct Completed status
         profitStatus: 'Calculated',
         hasUnregisteredItems: processedItems.some((it) => it.costPrice <= 0),
         unregisteredItemsCount: processedItems.filter((it) => it.costPrice <= 0).length,
@@ -284,7 +295,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Local / ServerStore Fallback if MongoDB is offline
-    const store = getServerStore();
+    totalNetProfit = 0;
+    totalBasePrice = 0;
+    totalPaymentFee = 0;
+    processedItems.length = 0;
+
     for (const item of items) {
       const searchId = String(item.sku || item.skuCode || item.barcode || item.code || item.id || '').trim().toLowerCase();
       const qtyToBuy = Number(item.qty || item.quantity || 1);
@@ -319,9 +334,14 @@ export async function POST(req: NextRequest) {
         feePercentage = 0.03;
       }
 
-      const gatewayFee = unitPrice * feePercentage;
-      const shipping = Number(shippingCost || 350);
-      const itemProfit = unitPrice - costPrice - gatewayFee - (shipping / items.length);
+      // Customer Surcharge: Payment Fee is added to item total
+      const baseItemTotal = unitPrice * qtyToBuy;
+      const paymentFeeAmount = Math.round(baseItemTotal * feePercentage);
+      totalPaymentFee += paymentFeeAmount;
+      totalBasePrice += baseItemTotal;
+
+      // Net profit = Base Selling Price - Cost Price (COGS)
+      const itemProfit = unitPrice - costPrice;
       totalNetProfit += itemProfit * qtyToBuy;
 
       if (product) {
@@ -337,12 +357,15 @@ export async function POST(req: NextRequest) {
         costPrice,
         unitPrice,
         sellingPrice: unitPrice,
+        paymentFee: paymentFeeAmount,
         profit: itemProfit,
         quantity: qtyToBuy,
         qty: qtyToBuy,
         isRegistered: costPrice > 0,
       });
     }
+
+    const finalGrossTotal = body.grossTotal || (totalBasePrice + totalPaymentFee + Number(shippingCost || 0));
 
     const fallbackOrder = {
       ...body,
@@ -358,9 +381,11 @@ export async function POST(req: NextRequest) {
       customerName: customerDetails?.name || body.customerName || 'Walk-in Customer',
       customerPhone: customerDetails?.phone || body.customerPhone || '',
       shippingAddress: customerDetails?.address || body.shippingAddress || '',
-      netProfit: Math.round(totalNetProfit),
-      grossTotal: body.grossTotal || processedItems.reduce((acc, it) => acc + (it.unitPrice * (it.quantity || 1)), 0),
+      baseItemPrice: totalBasePrice,
+      paymentFee: totalPaymentFee,
+      grossTotal: finalGrossTotal,
       costOfGoods: processedItems.reduce((acc, it) => acc + (it.costPrice * (it.quantity || 1)), 0),
+      netProfit: Math.round(totalNetProfit),
       status: 'Completed',
       profitStatus: 'Calculated',
       channel: body.channel || 'POS',
