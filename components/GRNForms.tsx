@@ -42,6 +42,7 @@ export function AddProductGRNForm({
     stockQuantity: 0, // Warehouse අයින් කර Store Stock පමණි
     warrantyMonths: 0,
     supplier: defaultSuppliers[0]?.name || 'WOWTEK Direct Import',
+    serialNumbersInput: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -178,6 +179,19 @@ export function AddProductGRNForm({
           />
           <p className="text-[11px] text-gray-500 mt-1">Official WOWTEK warranty period</p>
         </div>
+      </div>
+
+      {/* 🌟 මෙන්න අලුතින් එකතු කළ Serial Numbers Input එක */}
+      <div>
+        <label className="block text-xs text-gray-300 mb-1">Serial Numbers (Optional - Comma separated)</label>
+        <textarea
+          rows={2}
+          placeholder="Leave blank to auto-generate barcodes, or enter serials separated by comma (e.g. SN1001, SN1002)"
+          value={formData.serialNumbersInput || ''}
+          onChange={(e) => setFormData({ ...formData, serialNumbersInput: e.target.value })}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-pink-500 font-mono resize-none"
+        />
+        <p className="text-[10px] text-purple-400 mt-0.5">ප්රමාණයට අදාළව Serials දෙන්න. නැත්නම් සිස්ටම් එකෙන් Auto Barcodes හැදේ.</p>
       </div>
 
       <div>
