@@ -251,15 +251,30 @@ export async function POST(req: NextRequest) {
       rawOrderObj.number ||
       Math.floor(10000 + Math.random() * 90000);
 
-    // 1. Read the incoming payload status field: payload.status
-    const rawStatus = (rawOrderObj.status || '').toLowerCase().trim();
+    // WooCommerce Payload දත්ත ලබා ගැනීම
+    const orderStatus = (rawOrderObj.status || '').toLowerCase().trim(); // e.g., 'processing', 'pending'
+    const paymentMethod = (rawOrderObj.payment_method || rawOrderObj.payment_method_title || '').toLowerCase().trim(); // e.g., 'cod'
 
-    // -------------------------------------------------------------------------
-    // STRICT FILTER FOR WOOCOMMERCE ORDERS: FILTER ONLY 'PROCESSING' STATUS.
-    // DO NOT import or create Waybills/Orders for 'pending' or 'on-hold' status.
-    // Only accept and process orders when payment is confirmed and status transitions to 'processing'.
-    // -------------------------------------------------------------------------
-    if (rawStatus !== 'processing') {
+    // 1. Strict Policy: COD orders (pending/processing) සහ අනෙකුත් processing orders Allow කිරීම
+    const isProcessable = orderStatus === 'processing' || (paymentMethod === 'cod' && (orderStatus === 'pending' || orderStatus === 'processing'));
+
+    if (!isProcessable) {
+      // Skipped events ලොග් කිරීම (Dashboard එකේ පෙන්වීමට)
+      try {
+        const mongoConn = await connectToMongoDB();
+        if (mongoConn) {
+          await mongoConn.db.collection('webhook_logs').insertOne({
+            event: 'order.skipped',
+            orderId: rawOrderObj.id || wcOrderId,
+            status: orderStatus,
+            reason: `Skipped under policy (Status: ${orderStatus}, Payment: ${paymentMethod})`,
+            createdAt: new Date(),
+          });
+        }
+      } catch (logErr: any) {
+        console.warn('[Webhook] webhook_logs insert notice:', logErr?.message);
+      }
+
       const billing = rawOrderObj.billing || {};
       const shipping = rawOrderObj.shipping || {};
       const firstName = billing.first_name || shipping.first_name || 'Online';
@@ -268,7 +283,7 @@ export async function POST(req: NextRequest) {
       const customerPhone = billing.phone || shipping.phone || rawOrderObj.customer_phone || '';
       const grossTotal = parseFloat(rawOrderObj.total) || 0;
       const invoiceNumber = `WT-WC-${wcOrderId}`;
-      const skipMessage = `Skipped: Payment Pending (Status: '${rawStatus || 'unspecified'}')`;
+      const skipReason = `Order status '${orderStatus}' is skipped under strict policy.`;
 
       const skippedEvent: WebhookEvent = {
         id: `evt-skip-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
@@ -280,11 +295,11 @@ export async function POST(req: NextRequest) {
         customerPhone,
         amount: grossTotal,
         status: 'skipped',
-        skipReason: skipMessage,
-        orderStatus: rawStatus || 'pending',
+        skipReason,
+        orderStatus: orderStatus || 'pending',
         rawPayload: rawOrderObj,
         receivedAt,
-        errorMessage: `Order #${wcOrderId} skipped: Payment Pending (status: '${rawStatus || 'none'}'). Only 'processing' status orders are imported and manifested.`,
+        errorMessage: skipReason,
       };
 
       // Persist skipped audit log record to MongoDB Atlas & serverStore
@@ -313,24 +328,23 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(
         {
-          success: true,
-          action: 'skipped',
-          status: 'skipped',
-          orderStatus: rawStatus || 'pending',
-          message: `Order #${wcOrderId} skipped: Payment Pending. Orders are only imported when status is 'processing'.`,
-          reason: 'Skipped: Payment Pending',
-          orderId: invoiceNumber,
-          webhookEventId: skippedEvent.id,
-          timestamp: receivedAt,
+          status: 'Skipped',
+          reason: `Order status '${orderStatus}' is skipped under strict policy.`,
         },
         { headers: corsHeaders }
       );
     }
 
-    // Status is strictly 'processing' - proceed with order import, TE waybill, and SMS
-    const orderStatus: OrderStatus = 'Processing';
+    // Status is processable ('processing', or COD 'pending'/'processing')
+    const initialOrderStatus: OrderStatus = orderStatus === 'processing' ? 'Processing' : 'Pending';
 
-    // 2. Extract Customer Info
+    // 2. Order items සහ Customer details ලබා ගැනීම
+    const orderId = `WT-WC-${rawOrderObj.id || wcOrderId}`;
+    const customerDetails = {
+      name: `${rawOrderObj.billing?.first_name || ''} ${rawOrderObj.billing?.last_name || ''}`.trim() || 'Valued Customer',
+      phone: rawOrderObj.billing?.phone || rawOrderObj.shipping?.phone || rawOrderObj.customer_phone || '',
+      email: rawOrderObj.billing?.email || '',
+    };
     const billing = rawOrderObj.billing || {};
     const shipping = rawOrderObj.shipping || {};
     const firstName = billing.first_name || shipping.first_name || 'Online';
@@ -480,7 +494,7 @@ export async function POST(req: NextRequest) {
     const netProfit = hasUnregisteredItems
       ? 0
       : Math.round(grossTotal - costOfGoods - gatewayFeeAmount - platformFeeAmount - courierFee);
-    const finalOrderStatus: OrderStatus = hasUnregisteredItems ? 'Pending' : orderStatus;
+    const finalOrderStatus: OrderStatus = hasUnregisteredItems ? 'Pending' : (initialOrderStatus || 'Processing');
 
     const invoiceNumber = `WT-WC-${wcOrderId}`;
     const newOrderId = `ord-wc-${wcOrderId}-${Date.now().toString().slice(-4)}`;
@@ -562,12 +576,14 @@ export async function POST(req: NextRequest) {
       if (teRes.ok) {
         const resData = transExpressApiResponse?.data || transExpressApiResponse;
         const returnedTracking =
+          resData?.order?.waybill_id ||
           resData?.tracking_number ||
           resData?.tracking_no ||
           resData?.waybill_number ||
           resData?.waybill_no ||
           resData?.waybill_id ||
           resData?.barcode ||
+          transExpressApiResponse?.order?.waybill_id ||
           transExpressApiResponse?.tracking_number ||
           transExpressApiResponse?.tracking_no ||
           transExpressApiResponse?.waybill_number ||
@@ -577,9 +593,11 @@ export async function POST(req: NextRequest) {
         if (returnedTracking) {
           realTrackingNumber = String(returnedTracking);
           realWaybillId = String(
+            resData?.order?.waybill_id ||
             resData?.waybill_id ||
             resData?.data?.waybill_id ||
             resData?.id ||
+            transExpressApiResponse?.order?.waybill_id ||
             transExpressApiResponse?.waybill_id ||
             `wb-${realTrackingNumber}`
           );
@@ -816,6 +834,13 @@ export async function POST(req: NextRequest) {
             { $set: webhookEvent },
             { upsert: true }
           );
+
+          await mongoConn.db.collection('webhook_logs').insertOne({
+            event: 'order.processed',
+            orderId: orderId,
+            customer: customerDetails.name,
+            createdAt: new Date(),
+          });
         }
       } catch {}
     }
@@ -845,9 +870,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: realWaybill
-          ? 'Live WooCommerce Webhook processed successfully. Order persisted, Trans Express waybill generated, and SMS dispatched.'
-          : `Live WooCommerce Webhook received & order persisted. Note: Courier rejected or failed to generate waybill: ${transExpressError}`,
+        message: `Webhook received and processed for Order ID: ${orderId}`,
         order: {
           id: newOrder.id,
           invoiceNumber: newOrder.invoiceNumber,
