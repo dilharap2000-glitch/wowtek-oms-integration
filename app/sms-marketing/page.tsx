@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 
+import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
+
 export default function SmsMarketingPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
@@ -9,6 +11,7 @@ export default function SmsMarketingPage() {
   // Manual Customer Form States
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch Customers
@@ -43,31 +46,59 @@ export default function SmsMarketingPage() {
     }
   };
 
+  // Live Phone Input Change Handler (Auto +94 on typing "0" or spaces/hyphens cleanup)
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = handleLivePhoneInput(e.target.value);
+    setManualPhone(formatted);
+    if (phoneError) setPhoneError(null);
+  };
+
+  const handlePhoneBlur = () => {
+    if (manualPhone.trim()) {
+      const formatted = formatSriLankanPhone(manualPhone);
+      setManualPhone(formatted);
+      if (!isValidSriLankanPhone(formatted)) {
+        setPhoneError('වලංගු ශ්‍රී ලාංකික දුරකථන අංකයක් ඇතුළත් කරන්න (e.g. 0715330724 හෝ +94715330724)');
+      } else {
+        setPhoneError(null);
+      }
+    }
+  };
+
   // Manual Customer Add Handler
   const handleAddManualCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualPhone) {
-      alert('ෆෝන් අංකයක් ඇතුළත් කරන්න!');
+    if (!manualPhone.trim()) {
+      setPhoneError('දුරකථන අංකයක් ඇතුළත් කරන්න!');
       return;
     }
+
+    const formattedPhone = formatSriLankanPhone(manualPhone);
+    if (!isValidSriLankanPhone(formattedPhone)) {
+      setPhoneError('කරුණාකර වලංගු ශ්‍රී ලාංකික අංකයක් (e.g. 0715330724 හෝ +94715330724) ඇතුළත් කරන්න.');
+      return;
+    }
+
+    setPhoneError(null);
     setLoading(true);
     try {
       const res = await fetch('/api/customers/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: manualName, phone: manualPhone, source: 'Manual Add' }),
+        body: JSON.stringify({ name: manualName.trim(), phone: formattedPhone, source: 'Manual Add' }),
       });
       const data = await res.json();
       if (data.success) {
-        alert('Customer successfully added!');
+        alert('Customer successfully added with phone: ' + (data.phone || formattedPhone));
         setManualName('');
         setManualPhone('');
         fetchCustomers();
       } else {
-        alert('Error: ' + data.error);
+        setPhoneError(data.error || 'Failed to add customer');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setPhoneError(err?.message || 'Error occurred');
     } finally {
       setLoading(false);
     }
@@ -120,15 +151,27 @@ export default function SmsMarketingPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Phone Number</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs text-gray-400">Phone Number *</label>
+                <span className="text-[10px] text-pink-400 font-mono">Format: +947XXXXXXXX</span>
+              </div>
               <input
                 type="text"
                 value={manualPhone}
-                onChange={(e) => setManualPhone(e.target.value)}
-                placeholder="e.g. +94771234567"
+                onChange={handlePhoneChange}
+                onBlur={handlePhoneBlur}
+                placeholder="0715330724 (auto-converts to +94715330724)"
                 required
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-pink-500"
+                className={`w-full bg-gray-800 border ${
+                  phoneError ? 'border-red-500' : 'border-gray-700'
+                } rounded p-2 text-sm text-white font-mono focus:outline-none focus:border-pink-500`}
               />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Numbers starting with <span className="text-pink-300 font-mono">0</span> automatically convert to <span className="text-green-400 font-mono">+94</span>.
+              </p>
+              {phoneError && (
+                <p className="text-xs text-red-400 mt-1 font-medium">{phoneError}</p>
+              )}
             </div>
             <button
               type="submit"

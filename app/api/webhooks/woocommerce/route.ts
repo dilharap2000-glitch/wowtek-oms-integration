@@ -24,6 +24,7 @@ import {
   OrderStatus,
 } from '@/types';
 import { findBestProductMatch } from '@/lib/productMatching';
+import { formatSriLankanPhone } from '@/lib/phoneUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -783,6 +784,29 @@ export async function POST(req: NextRequest) {
               { upsert: true }
             )
           );
+        }
+
+        // Persist customer into customers collection with uniform +94 phone number
+        if (customerPhone && String(customerPhone).trim()) {
+          const normCustomerPhone = formatSriLankanPhone(String(customerPhone));
+          if (normCustomerPhone) {
+            mongoOps.push(
+              mongoConn.db.collection('customers').updateOne(
+                { phone: normCustomerPhone },
+                {
+                  $set: {
+                    name: customerName || 'Valued Customer',
+                    lastOrderDate: new Date(),
+                    source: 'WooCommerce',
+                    address: `${deliveryAddress}, ${city}`.trim(),
+                  },
+                  $inc: { totalOrders: 1 },
+                  $setOnInsert: { createdAt: new Date() },
+                },
+                { upsert: true }
+              )
+            );
+          }
         }
 
         await Promise.all(mongoOps);

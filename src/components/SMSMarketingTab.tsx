@@ -16,6 +16,7 @@ import {
   CheckSquare,
   Square,
 } from 'lucide-react';
+import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
 
 export function SMSMarketingTab() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -69,13 +70,42 @@ export function SMSMarketingTab() {
     }
   };
 
+  // Live Phone Input Handler (Auto +94 when typing "0", cleans up spaces & hyphens)
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = handleLivePhoneInput(e.target.value);
+    setManualPhone(formatted);
+  };
+
+  const handlePhoneBlur = () => {
+    if (manualPhone.trim()) {
+      const formatted = formatSriLankanPhone(manualPhone);
+      setManualPhone(formatted);
+      if (!isValidSriLankanPhone(formatted)) {
+        setNotification({
+          type: 'error',
+          message: 'වලංගු ශ්‍රී ලාංකික දුරකථන අංකයක් ඇතුළත් කරන්න (e.g. 0715330724 හෝ +94715330724)',
+        });
+      }
+    }
+  };
+
   // Manual Customer Add Handler
   const handleAddManualCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualPhone.trim()) {
-      setNotification({ type: 'error', message: 'ෆෝන් අංකයක් ඇතුළත් කරන්න!' });
+      setNotification({ type: 'error', message: 'දුරකථන අංකයක් ඇතුළත් කරන්න!' });
       return;
     }
+
+    const formattedPhone = formatSriLankanPhone(manualPhone);
+    if (!isValidSriLankanPhone(formattedPhone)) {
+      setNotification({
+        type: 'error',
+        message: 'කරුණාකර වලංගු ශ්‍රී ලාංකික අංකයක් ඇතුළත් කරන්න (e.g. 0715330724 හෝ +94715330724)',
+      });
+      return;
+    }
+
     setManualLoading(true);
     setNotification(null);
 
@@ -83,11 +113,11 @@ export function SMSMarketingTab() {
       const res = await fetch('/api/customers/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: manualName.trim(), phone: manualPhone.trim(), source: 'Manual Add' }),
+        body: JSON.stringify({ name: manualName.trim(), phone: formattedPhone, source: 'Manual Add' }),
       });
       const data = await res.json();
       if (data.success) {
-        setNotification({ type: 'success', message: 'Customer successfully added!' });
+        setNotification({ type: 'success', message: `Customer added successfully with phone ${data.phone || formattedPhone}!` });
         setManualName('');
         setManualPhone('');
         fetchCustomers();
@@ -278,15 +308,22 @@ export function SMSMarketingTab() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Phone Number *</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs text-gray-400">Phone Number *</label>
+                  <span className="text-[10px] text-pink-400 font-mono">Format: +947XXXXXXXX</span>
+                </div>
                 <input
                   type="text"
                   value={manualPhone}
-                  onChange={(e) => setManualPhone(e.target.value)}
-                  placeholder="e.g. 0771234567 or +94771234567"
+                  onChange={handlePhoneChange}
+                  onBlur={handlePhoneBlur}
+                  placeholder="0715330724 (auto-converts to +94715330724)"
                   required
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-sm text-white font-mono focus:outline-none focus:border-pink-500"
                 />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Numbers starting with <span className="text-pink-300 font-mono">0</span> automatically convert to <span className="text-green-400 font-mono">+94</span>. Spaces and hyphens are cleaned.
+                </p>
               </div>
               <button
                 type="submit"

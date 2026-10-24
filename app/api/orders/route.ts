@@ -5,6 +5,7 @@ import { getServerStore, saveServerOrder, deleteServerOrder } from '@/lib/server
 import { Order, Product, ProductAlias } from '@/types';
 import { findBestProductMatch, DEFAULT_PRODUCT_ALIASES } from '@/lib/productMatching';
 import { SAMPLE_PRODUCTS } from '@/lib/sampleProducts';
+import { formatSriLankanPhone } from '@/lib/phoneUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -341,11 +342,12 @@ export async function POST(req: NextRequest) {
 
       await db.collection('orders').insertOne(newOrder);
 
-      // පාරිභෝගිකයාගේ ඩේටා ඩබල් නොවී save වීම (Upsert by phone)
+      // පාරිභෝගිකයාගේ ඩේටා ඩබල් නොවී save වීම (Upsert by phone with uniform +94 formatting)
       if (customerDetails?.phone && String(customerDetails.phone).trim()) {
         try {
+          const normalizedCustomerPhone = formatSriLankanPhone(String(customerDetails.phone));
           await db.collection('customers').updateOne(
-            { phone: customerDetails.phone.trim() },
+            { phone: normalizedCustomerPhone },
             {
               $set: {
                 name: customerDetails.name,
