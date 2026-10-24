@@ -503,9 +503,14 @@ export async function POST(req: NextRequest) {
     // AUTO-EXECUTION PIPELINE STEP 1: Trans Express Single Auto Waybill API
     // Endpoint: POST https://portal.transexpress.lk/api/orders/upload/single-auto
     // -------------------------------------------------------------------------
+    const transExpressApiUrl = (
+      process.env.TRANS_EXPRESS_API_URL ||
+      'https://v2.transexpress.lk'
+    ).replace(/\/$/, '');
+
     const transExpressClientToken = (
-      process.env.TRANS_EXPRESS_CLIENT_TOKEN ||
       process.env.TRANS_EXPRESS_API_KEY ||
+      process.env.TRANS_EXPRESS_CLIENT_TOKEN ||
       apiConfig.transExpressApiKey ||
       ''
     ).trim();
@@ -544,28 +549,50 @@ export async function POST(req: NextRequest) {
     let transExpressError: string | null = null;
 
     try {
-      console.log('[Trans Express Auto API] Initiating live POST request to: https://portal.transexpress.lk/api/orders/upload/single-auto');
+      console.log(`[Trans Express Auto API] Initiating live POST request to: ${transExpressApiUrl}/api/v1/waybill`);
       console.log('[Trans Express Auto API] Auth Token configured:', Boolean(transExpressClientToken));
-      console.log('[Trans Express Auto API] Payload:', JSON.stringify(transExpressPayload, null, 2));
 
       const teController = new AbortController();
       const teTimeoutId = setTimeout(() => teController.abort(), 10000);
 
-      const teRes = await fetch('https://portal.transexpress.lk/api/orders/upload/single-auto', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${transExpressClientToken}`,
-        },
-        body: JSON.stringify(transExpressPayload),
-        signal: teController.signal,
-      });
+      // 1. Try configured endpoint: ${TRANS_EXPRESS_API_URL}/api/v1/waybill
+      let teRes: Response | null = null;
+      let teResponseText = '';
+
+      try {
+        teRes = await fetch(`${transExpressApiUrl}/api/v1/waybill`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${transExpressClientToken}`,
+          },
+          body: JSON.stringify(transExpressPayload),
+          signal: teController.signal,
+        });
+        if (teRes.ok) {
+          teResponseText = await teRes.text();
+        }
+      } catch (err) {
+        console.warn('[Trans Express v1/waybill error, falling back to portal]:', err);
+      }
+
+      // 2. If v1/waybill was not 200 OK, seamlessly fallback to confirmed portal endpoint
+      if (!teRes || !teRes.ok) {
+        teRes = await fetch('https://portal.transexpress.lk/api/orders/upload/single-auto', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${transExpressClientToken}`,
+          },
+          body: JSON.stringify(transExpressPayload),
+        });
+        teResponseText = await teRes.text();
+      }
 
       clearTimeout(teTimeoutId);
-
-      const teResponseText = await teRes.text();
-      console.log(`[Trans Express Auto API] Response HTTP ${teRes.status} (${teRes.statusText}):`, teResponseText);
+      console.log(`[Trans Express Auto API] Response HTTP ${teRes.status}:`, teResponseText);
 
       try {
         transExpressApiResponse = JSON.parse(teResponseText);
