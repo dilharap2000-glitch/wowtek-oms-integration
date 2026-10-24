@@ -116,10 +116,41 @@ export interface Order {
   isCreditSale?: boolean;
   creditDueDate?: string;
   creditSettled?: boolean;
+  creditSettledAt?: string;
+  advancePaid?: number; // Advance paid at checkout or cumulative paid
+  balanceDue?: number; // Outstanding balance to be collected
+  advancePaymentMethod?: string; // e.g. 'Cash' | 'Card' | 'Bank Transfer'
+  creditNotes?: string;
+  creditPaymentHistory?: CreditPaymentRecord[];
   billDiscountAmount?: number;
   billDiscountPercent?: number;
   billDiscountType?: 'fixed' | 'percent';
   totalDiscount?: number;
+}
+
+export interface CreditPaymentRecord {
+  id: string;
+  orderId: string;
+  invoiceNumber: string;
+  amount: number;
+  paymentMethod: string; // 'Cash' | 'Card' | 'Bank Transfer' | 'Cheque'
+  date: string;
+  notes?: string;
+  receiptNumber?: string;
+  recordedBy?: string;
+}
+
+export interface CreditCustomerSummary {
+  customerName: string;
+  customerPhone: string;
+  totalOrders: number;
+  totalCreditAmount: number;
+  totalPaidAmount: number;
+  totalBalanceDue: number;
+  earliestDueDate?: string;
+  latestDueDate?: string;
+  isOverdue: boolean;
+  orders: Order[];
 }
 
 export interface Supplier {

@@ -41,6 +41,7 @@ import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } fro
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
+import { CreditCustomersTab } from './CreditCustomersTab';
 
 interface PosTabProps {
   products: Product[];
@@ -95,8 +96,10 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [billDiscountType, setBillDiscountType] = useState<'percent' | 'fixed'>('percent');
   const [billDiscountValue, setBillDiscountValue] = useState<number>(0);
 
-  // 4. Credit Customer State & Settlement
+  // 4. Credit Customer State, Partial Payment & Settlement
   const [isCreditSale, setIsCreditSale] = useState<boolean>(false);
+  const [advancePaidAmount, setAdvancePaidAmount] = useState<number>(0);
+  const [advancePaymentMethod, setAdvancePaymentMethod] = useState<string>('Cash');
   const [creditDueDate, setCreditDueDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
@@ -114,7 +117,21 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [returnReason, setReturnReason] = useState('Customer Return & Restock');
   const [editModalOrder, setEditModalOrder] = useState<Order | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'terminal' | 'invoices'>('terminal');
+  const [activeSubTab, setActiveSubTab] = useState<'terminal' | 'invoices' | 'credit'>('terminal');
+
+  // Count active credit orders with remaining balances
+  const creditUnsettledCount = React.useMemo(() => {
+    return (orders || []).filter((o) => {
+      const isCredit =
+        o.isCreditSale ||
+        o.paymentGateway === 'credit' ||
+        (o.balanceDue !== undefined && o.balanceDue > 0);
+      const gross = Number(o.grossTotal || 0);
+      const paid = Number(o.advancePaid || 0);
+      const bal = o.balanceDue !== undefined ? Number(o.balanceDue) : Math.max(0, gross - paid);
+      return isCredit && bal > 0;
+    }).length;
+  }, [orders]);
 
   // Load Customers for search & autocomplete
   const fetchCustomerDirectory = useCallback(async () => {
@@ -215,7 +232,10 @@ export const PosTab: React.FC<PosTabProps> = ({
   const totalDiscount = totalItemDiscounts + billDiscountAmount;
 
   // 3. Gateway Fee Percentage determination (Credit Sales have 0% Surcharge)
-  const isCreditActive = selectedGatewayCode === 'credit' || isCreditSale;
+  const isCreditActive =
+    selectedGatewayCode === 'credit' ||
+    isCreditSale ||
+    (advancePaidAmount > 0 && advancePaidAmount < (baseItemPrice + (courierFee || 0)));
   let gatewayFeePercentage = 0;
   const gwName = activeGateway?.name || '';
   const gwCode = (activeGateway?.code || selectedGatewayCode || '').toLowerCase();
@@ -245,6 +265,9 @@ export const PosTab: React.FC<PosTabProps> = ({
   // 4. Customer Fee Surcharge Added to Item Price (Add to Total)
   const paymentFeeAmount = isCreditActive ? 0 : Math.round(baseItemPrice * gatewayFeePercentage);
   const finalGrossTotal = baseItemPrice + paymentFeeAmount + (courierFee || 0);
+  const creditBalanceDue = isCreditActive
+    ? Math.max(0, finalGrossTotal - advancePaidAmount)
+    : 0;
   const platformFeeAmount = Math.round((baseItemPrice * activePlatform.feePercent) / 100);
 
   const hasUnregisteredInCart = safeCart.some((item) => {
@@ -483,11 +506,16 @@ export const PosTab: React.FC<PosTabProps> = ({
       return;
     }
 
-    const isCredit = selectedGatewayCode === 'credit' || isCreditSale;
+    const isCredit =
+      selectedGatewayCode === 'credit' ||
+      isCreditSale ||
+      (advancePaidAmount > 0 && advancePaidAmount < finalGrossTotal);
+    const balanceDue = isCredit ? Math.max(0, finalGrossTotal - advancePaidAmount) : 0;
+    const isFullySettled = !isCredit || balanceDue === 0;
 
-    // Validation: For Credit Customers, customer phone is mandatory for SMS reminder & receivable tracking!
-    if (isCredit && (!customerPhone || customerPhone.trim().length < 9)) {
-      alert('Customer mobile phone number is required for Credit Customer sales so that invoice details and the due date SMS reminder can be dispatched!');
+    // Validation: For Credit Customers with outstanding balance, customer phone is mandatory for SMS reminder & receivable tracking!
+    if (isCredit && balanceDue > 0 && (!customerPhone || customerPhone.trim().length < 9)) {
+      alert('Customer mobile phone number is required for Credit / Partial Payment sales so that invoice details and the due date SMS reminder can be dispatched!');
       return;
     }
 
@@ -508,13 +536,33 @@ export const PosTab: React.FC<PosTabProps> = ({
       return !prod || !prod.costPrice || prod.costPrice <= 0 || !item.costPrice || item.costPrice <= 0;
     });
 
+    const orderId = `ord-${Date.now().toString().slice(-4)}`;
+
+    const initialPaymentHistory = advancePaidAmount > 0 ? [
+      {
+        id: `pay-${Date.now()}`,
+        orderId,
+        invoiceNumber: invoiceNum,
+        amount: advancePaidAmount,
+        paymentMethod: advancePaymentMethod || 'Cash',
+        date: new Date().toISOString(),
+        notes: 'Initial advance paid at checkout',
+        receiptNumber: `RCP-${Date.now().toString().slice(-6)}`,
+        recordedBy: 'POS Cashier',
+      }
+    ] : [];
+
     const newOrder: Order = {
-      id: `ord-${Date.now().toString().slice(-4)}`,
+      id: orderId,
       invoiceNumber: invoiceNum,
       channel: activePlatform.code,
       channelName: activePlatform.name,
       paymentGateway: isCredit ? 'credit' : activeGateway.code,
-      paymentGatewayName: isCredit ? 'Credit Customer (Pay Later)' : activeGateway.name,
+      paymentGatewayName: isCredit
+        ? advancePaidAmount > 0
+          ? `Split / Credit (Rs. ${advancePaidAmount.toLocaleString()} Advance)`
+          : 'Credit Customer (Pay Later)'
+        : activeGateway.name,
       customerName: finalCustomerName,
       customerPhone: cleanPhone,
       deliveryAddress: customerAddress || 'Walk-in / In-Store Checkout',
@@ -540,12 +588,18 @@ export const PosTab: React.FC<PosTabProps> = ({
       isPosSale: true,
       isCreditSale: isCredit,
       creditDueDate: isCredit ? creditDueDate : undefined,
-      creditSettled: false,
+      creditSettled: isFullySettled,
+      creditSettledAt: isFullySettled && isCredit ? new Date().toISOString() : undefined,
+      advancePaid: isCredit ? advancePaidAmount : finalGrossTotal,
+      balanceDue: balanceDue,
+      advancePaymentMethod: isCredit && advancePaidAmount > 0 ? advancePaymentMethod : activeGateway.name,
+      creditNotes: creditNotes || undefined,
+      creditPaymentHistory: initialPaymentHistory,
       billDiscountAmount: billDiscountAmount > 0 ? billDiscountAmount : undefined,
       billDiscountPercent: billDiscountType === 'percent' && billDiscountValue > 0 ? billDiscountValue : undefined,
       billDiscountType: billDiscountType,
       totalDiscount: totalDiscount > 0 ? totalDiscount : undefined,
-      notes: `${isCredit ? `[CREDIT SALE - Settlement Due: ${creditDueDate}] ` : ''}POS sale processed via ${isCredit ? 'Credit Customer' : activeGateway.name}${totalDiscount > 0 ? ` (Discount: -Rs. ${totalDiscount.toLocaleString()})` : ''}.${creditNotes ? ` Note: ${creditNotes}` : ''}`.trim(),
+      notes: `${isCredit ? `[CREDIT SALE - Advance: Rs. ${advancePaidAmount.toLocaleString()}, Due: Rs. ${balanceDue.toLocaleString()} by ${creditDueDate}] ` : ''}POS sale processed via ${isCredit ? 'Credit Customer' : activeGateway.name}${totalDiscount > 0 ? ` (Discount: -Rs. ${totalDiscount.toLocaleString()})` : ''}.${creditNotes ? ` Note: ${creditNotes}` : ''}`.trim(),
     };
 
     onCreateOrder(newOrder);
@@ -554,15 +608,19 @@ export const PosTab: React.FC<PosTabProps> = ({
     if (cleanPhone && cleanPhone.length >= 9) {
       try {
         let smsText = '';
-        if (isCredit) {
+        if (isCredit && balanceDue > 0) {
           const formattedDueDate = new Date(creditDueDate).toLocaleDateString('en-GB', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
           });
-          smsText = `WOWTEK PRO: Dear ${finalCustomerName}, your Credit Invoice ${invoiceNum} for Rs. ${finalGrossTotal.toLocaleString()} has been approved. Payment Due Date: ${formattedDueDate}. Please settle payment on or before this date. Helpline: 0779673004.`;
+          if (advancePaidAmount > 0) {
+            smsText = `WOWTEK: Dear ${finalCustomerName}, Invoice ${invoiceNum} approved. Total: Rs. ${finalGrossTotal.toLocaleString()}. Advance Paid: Rs. ${advancePaidAmount.toLocaleString()} (${advancePaymentMethod}). Credit Balance Due: Rs. ${balanceDue.toLocaleString()}. Payment Due Date: ${formattedDueDate}. Helpline: 0779673004.`;
+          } else {
+            smsText = `WOWTEK: Dear ${finalCustomerName}, your Credit Invoice ${invoiceNum} for Rs. ${finalGrossTotal.toLocaleString()} has been approved. Payment Due Date: ${formattedDueDate}. Please settle payment on or before this date. Helpline: 0779673004.`;
+          }
         } else {
-          smsText = `WOWTEK PRO: Invoice ${invoiceNum} confirmed. Total: Rs. ${finalGrossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase! Helpline: 0779673004.`;
+          smsText = `WOWTEK: Invoice ${invoiceNum} confirmed. Total: Rs. ${finalGrossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase! Helpline: 0779673004.`;
         }
 
         fetch('/api/sms/send', {
@@ -595,13 +653,15 @@ export const PosTab: React.FC<PosTabProps> = ({
       }
     }
 
-    if (isCredit) {
+    if (isCredit && balanceDue > 0) {
       const formattedDueDate = new Date(creditDueDate).toLocaleDateString('en-GB', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
       });
-      setCreditToast(`Credit Sale Invoice ${invoiceNum} completed! Automated SMS reminder dispatched to ${cleanPhone} (Payment Due: ${formattedDueDate})`);
+      setCreditToast(
+        `Credit Sale ${invoiceNum} completed! Advance: Rs. ${advancePaidAmount.toLocaleString()} | Balance Due: Rs. ${balanceDue.toLocaleString()} (Due: ${formattedDueDate}). SMS dispatched.`
+      );
       setTimeout(() => setCreditToast(null), 7000);
     }
 
@@ -611,6 +671,8 @@ export const PosTab: React.FC<PosTabProps> = ({
     setCustomerPhone('');
     setBillDiscountValue(0);
     setIsCreditSale(false);
+    setAdvancePaidAmount(0);
+    setAdvancePaymentMethod('Cash');
     setCreditNotes('');
   };
 
@@ -707,6 +769,22 @@ export const PosTab: React.FC<PosTabProps> = ({
             <span className="px-1.5 py-0.5 rounded-full bg-neutral-800 text-[10px] text-neutral-300 font-mono">
               {orders.length}
             </span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('credit')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'credit'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-amber-400" />
+            <span>Credit Customers &amp; AR</span>
+            {creditUnsettledCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold">
+                {creditUnsettledCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1290,23 +1368,126 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Credit Customer Specific Settlement Details */}
+                  {/* Credit Customer Specific Settlement Details & Partial Payment Split */}
                   {isCreditActive && (
-                    <div className="p-3 bg-amber-950/20 border border-amber-500/40 rounded-xl space-y-2.5 text-xs animate-fadeIn">
-                      <div className="flex items-center justify-between">
+                    <div className="p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl space-y-3 text-xs animate-fadeIn">
+                      <div className="flex items-center justify-between pb-1 border-b border-amber-500/20">
                         <span className="font-bold text-amber-300 flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-amber-400" />
-                          Credit Customer Settlement Terms
+                          <span>Partial Payment &amp; Credit Split Terms</span>
                         </span>
-                        <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                        <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 font-semibold">
                           Account Receivable
                         </span>
                       </div>
 
+                      {/* Advance Payment Input & Presets */}
+                      <div className="space-y-1.5 bg-neutral-950/70 p-2.5 rounded-xl border border-neutral-800">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[11px] font-semibold text-neutral-300 flex items-center gap-1">
+                            <span>Advance Paid Amount (මුලික ගෙවීම)</span>
+                            <span className="text-[10px] text-neutral-500 font-normal">
+                              (Leave 0 for full credit)
+                            </span>
+                          </label>
+                          {advancePaidAmount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setAdvancePaidAmount(0)}
+                              className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                            >
+                              Reset to 0
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1.5 text-neutral-400 font-mono text-xs">Rs.</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max={finalGrossTotal}
+                              value={advancePaidAmount || ''}
+                              onChange={(e) =>
+                                setAdvancePaidAmount(
+                                  Math.min(finalGrossTotal, Math.max(0, Number(e.target.value) || 0))
+                                )
+                              }
+                              placeholder="0 (Full Credit)"
+                              className="w-full pl-8 pr-2.5 py-1.5 bg-neutral-900 border border-amber-500/40 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          {/* Quick Advance Presets */}
+                          <div className="flex items-center gap-1">
+                            {[
+                              { label: '0%', val: 0 },
+                              { label: '25%', val: Math.round(finalGrossTotal * 0.25) },
+                              { label: '50%', val: Math.round(finalGrossTotal * 0.5) },
+                              { label: '75%', val: Math.round(finalGrossTotal * 0.75) },
+                            ].map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => setAdvancePaidAmount(preset.val)}
+                                className={`px-2 py-1 rounded text-[10px] font-mono border transition ${
+                                  advancePaidAmount === preset.val
+                                    ? 'bg-amber-600 border-amber-500 text-white font-bold'
+                                    : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:text-white'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Advance Payment Method (if advance paid > 0) */}
+                        {advancePaidAmount > 0 && (
+                          <div className="pt-2 border-t border-neutral-800 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-neutral-400">Advance Paid Via:</span>
+                            <div className="flex gap-1 text-[10px]">
+                              {['Cash', 'Card', 'Bank Transfer', 'Cheque'].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setAdvancePaymentMethod(m)}
+                                  className={`px-2 py-0.5 rounded border transition ${
+                                    advancePaymentMethod === m
+                                      ? 'bg-purple-600 border-purple-500 text-white font-bold'
+                                      : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:text-white'
+                                  }`}
+                                >
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Calculation Breakdown Box */}
+                      <div className="grid grid-cols-2 gap-2 p-2 bg-neutral-950 rounded-xl border border-neutral-800 text-[11px] font-mono">
+                        <div>
+                          <div className="text-[10px] text-neutral-400">Advance Collected:</div>
+                          <div className="text-emerald-400 font-bold">
+                            Rs. {advancePaidAmount.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-neutral-400">Credit Balance Due:</div>
+                          <div className="text-amber-400 font-bold text-xs">
+                            Rs. {creditBalanceDue.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Due Date Presets & Date Picker */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <label className="block text-[10px] text-neutral-400 mb-1">
-                            Payment Due Date *
+                            Settlement Due Date *
                           </label>
                           <input
                             type="date"
@@ -1339,7 +1520,7 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                       <div>
                         <label className="block text-[10px] text-neutral-400 mb-1">
-                          Payment Agreement / Notes
+                          Payment Agreement / Terms Note
                         </label>
                         <input
                           type="text"
@@ -1353,11 +1534,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                       <div className="text-[10px] text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 flex items-start gap-1.5">
                         <Send className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
                         <span>
-                          Automated SMS with invoice details &amp; payment due date (
-                          <strong>
-                            {creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'Due Date'}
-                          </strong>
-                          ) will be dispatched to customer&apos;s phone upon completing sale.
+                          Automated SMS with Advance Paid (Rs. {advancePaidAmount.toLocaleString()}), Balance Due (Rs.{' '}
+                          {creditBalanceDue.toLocaleString()}), and Due Date ({creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'Due Date'}) will be dispatched upon sale.
                         </span>
                       </div>
                     </div>
@@ -1527,6 +1705,29 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </span>
                   </div>
 
+                  {isCreditActive && (
+                    <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-1 text-xs font-mono">
+                      <div className="flex justify-between text-neutral-300">
+                        <span>Advance Paid Today:</span>
+                        <span className="font-bold text-emerald-400">
+                          Rs. {advancePaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-amber-300 font-bold">
+                        <span>Balance Due (Credit):</span>
+                        <span className="font-bold text-amber-400 text-sm">
+                          Rs. {creditBalanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[10px] text-neutral-400 pt-0.5 border-t border-neutral-800">
+                        <span>Settlement Due Date:</span>
+                        <span className="font-mono text-white">
+                          {creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'As agreed'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {platformFeeAmount > 0 && (
                     <div className="flex justify-between text-amber-400 text-[11px]">
                       <span>Platform Fee ({activePlatform.feePercent}%):</span>
@@ -1580,7 +1781,9 @@ export const PosTab: React.FC<PosTabProps> = ({
                     <>
                       <Clock className="w-4 h-4" />
                       <span>
-                        Complete Credit Sale &amp; Send Due SMS (Rs. {finalGrossTotal.toLocaleString()})
+                        {advancePaidAmount > 0
+                          ? `Complete Sale (Rs. ${advancePaidAmount.toLocaleString()} Advance, Rs. ${creditBalanceDue.toLocaleString()} Credit)`
+                          : `Complete Credit Sale & Send SMS (Rs. ${finalGrossTotal.toLocaleString()})`}
                       </span>
                     </>
                   ) : (
@@ -1816,6 +2019,15 @@ export const PosTab: React.FC<PosTabProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* CREDIT CUSTOMERS & RECEIVABLES DASHBOARD VIEW */}
+      {activeSubTab === 'credit' && (
+        <CreditCustomersTab
+          orders={orders}
+          onUpdateOrder={onUpdateOrder}
+          onNavigateTab={() => setActiveSubTab('terminal')}
+        />
       )}
 
       {/* Camera Barcode Scanner Modal */}

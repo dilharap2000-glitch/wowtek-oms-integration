@@ -1288,3 +1288,40 @@ export async function clearWebhookEvents(): Promise<boolean> {
   persistMockDb();
   return true;
 }
+
+export async function recordCreditPayment(
+  orderId: string,
+  amount: number,
+  paymentMethod: string = 'Cash',
+  notes: string = '',
+  receiptNumber: string = '',
+  recordedBy: string = 'POS Cashier'
+): Promise<{ success: boolean; order?: Order; error?: string }> {
+  try {
+    const res = await fetch('/api/orders/credit-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId,
+        amount,
+        paymentMethod,
+        notes,
+        receiptNumber,
+        recordedBy,
+      }),
+    });
+    const data = await res.json();
+    if (data.success && data.order) {
+      const mock = initMockDb();
+      const index = mock.orders.findIndex((o: Order) => o.id === orderId || o.invoiceNumber === orderId);
+      if (index !== -1) {
+        mock.orders[index] = data.order;
+        persistMockDb();
+      }
+      return { success: true, order: data.order };
+    }
+    return { success: false, error: data.error || 'Failed to record payment' };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

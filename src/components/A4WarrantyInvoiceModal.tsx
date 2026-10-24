@@ -464,11 +464,47 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                   </div>
 
                   {order.isCreditSale && (
-                    <div className="mt-2 pt-2 border-t border-dashed border-amber-300 bg-amber-50 rounded p-2 text-amber-900 font-semibold text-xs flex justify-between items-center">
-                      <span>CREDIT SALE DUE:</span>
-                      <span className="font-mono font-bold">
-                        {order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pay Later'}
-                      </span>
+                    <div className="mt-2 pt-2 border-t border-dashed border-amber-300 bg-amber-50/80 rounded p-2.5 text-amber-950 text-xs space-y-1">
+                      <div className="flex justify-between items-center font-bold text-amber-900 uppercase">
+                        <span>Payment Terms:</span>
+                        <span>CREDIT / SPLIT PAYMENT</span>
+                      </div>
+                      {order.advancePaid !== undefined && (
+                        <div className="flex justify-between text-neutral-700">
+                          <span>Advance Paid ({order.advancePaymentMethod || 'Initial'}):</span>
+                          <span className="font-mono font-semibold text-emerald-800">
+                            Rs. {Number(order.advancePaid).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold text-amber-950 pt-1 border-t border-amber-200">
+                        <span>Balance Due:</span>
+                        <span className="font-mono text-amber-800">
+                          Rs.{' '}
+                          {(
+                            order.balanceDue !== undefined
+                              ? Number(order.balanceDue)
+                              : Math.max(0, Number(order.grossTotal) - Number(order.advancePaid || 0))
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[11px] text-amber-900 pt-0.5">
+                        <span>Settlement Due Date:</span>
+                        <span className="font-mono font-semibold">
+                          {order.creditDueDate
+                            ? new Date(order.creditDueDate).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : 'As Agreed'}
+                        </span>
+                      </div>
+                      {order.creditSettled && (
+                        <div className="text-center font-bold text-emerald-700 text-[10px] bg-emerald-100 rounded py-0.5">
+                          ✓ FULLY SETTLED / PAID IN FULL
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -646,8 +682,33 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                   <span>Rs. {Number(order.grossTotal).toLocaleString()}</span>
                 </div>
                 {order.isCreditSale && (
-                  <div className="text-center font-bold text-[11px] pt-1 text-red-700 border-t border-dashed border-black">
-                    *** CREDIT SALE - DUE: {order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB') : 'Pay Later'} ***
+                  <div className="text-left font-mono text-[10px] pt-1 text-black border-t border-dashed border-black space-y-0.5">
+                    <div className="font-bold text-center text-[10px] text-red-700">*** CREDIT / SPLIT PAYMENT ***</div>
+                    {order.advancePaid !== undefined && (
+                      <div className="flex justify-between">
+                        <span>ADVANCE PAID ({order.advancePaymentMethod || 'PAID'}):</span>
+                        <span>Rs. {Number(order.advancePaid).toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold">
+                      <span>BALANCE DUE:</span>
+                      <span>
+                        Rs.{' '}
+                        {(
+                          order.balanceDue !== undefined
+                            ? Number(order.balanceDue)
+                            : Math.max(0, Number(order.grossTotal) - Number(order.advancePaid || 0))
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>SETTLEMENT DUE:</span>
+                      <span>
+                        {order.creditDueDate
+                          ? new Date(order.creditDueDate).toLocaleDateString('en-GB')
+                          : 'As Agreed'}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>

@@ -17,6 +17,7 @@ import {
   KeyRound,
   Building2,
   MessageSquare,
+  Users,
 } from 'lucide-react';
 
 import {
@@ -96,6 +97,7 @@ import { SettingsTab } from '@/src/components/SettingsTab';
 import { IntegrationsTab } from '@/src/components/IntegrationsTab';
 import { SuppliersTab } from '@/src/components/SuppliersTab';
 import { SMSMarketingTab } from '@/src/components/SMSMarketingTab';
+import { CreditCustomersTab } from '@/src/components/CreditCustomersTab';
 
 export default function WowtekProApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -672,6 +674,18 @@ export default function WowtekProApp() {
     }
   };
 
+  // Count active credit customers with balance due
+  const creditUnsettledCount = orders.filter((o) => {
+    const isCredit =
+      o.isCreditSale ||
+      o.paymentGateway === 'credit' ||
+      (o.balanceDue !== undefined && o.balanceDue > 0);
+    const gross = Number(o.grossTotal || 0);
+    const paid = Number(o.advancePaid || 0);
+    const bal = o.balanceDue !== undefined ? Number(o.balanceDue) : Math.max(0, gross - paid);
+    return isCredit && bal > 0;
+  }).length;
+
   // Nav menu
   const navItems = [
     { id: 'dashboard', label: 'Sales & Analytics', icon: LayoutDashboard },
@@ -680,6 +694,12 @@ export default function WowtekProApp() {
       label: 'POS & Invoices',
       icon: ShoppingCart,
       badge: orders.length,
+    },
+    {
+      id: 'credit',
+      label: 'Credit Customers (AR)',
+      icon: Users,
+      badge: creditUnsettledCount || undefined,
     },
     { id: 'products', label: 'Inventory & Valuation', icon: Barcode },
     {
@@ -875,6 +895,14 @@ export default function WowtekProApp() {
                 onProcessReturn={handleProcessReturn}
                 onAddProduct={handleAddProduct}
                 onLoadSampleProducts={handleLoadSampleProducts}
+              />
+            )}
+
+            {activeTab === 'credit' && (
+              <CreditCustomersTab
+                orders={orders}
+                onUpdateOrder={handleUpdateOrder}
+                onNavigateTab={(tab) => setActiveTab(tab)}
               />
             )}
 
