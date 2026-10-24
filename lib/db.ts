@@ -29,6 +29,7 @@ export const DEFAULT_PLATFORMS: PlatformConfig[] = [
 
 export const DEFAULT_GATEWAYS: PaymentGatewayConfig[] = [
   { id: 'gw-cash', name: 'Cash on Delivery (COD) / Cash', code: 'cash_cod', feePercent: 0, isCustom: false, active: true },
+  { id: 'gw-credit', name: 'Credit Customer (Pay Later)', code: 'credit', feePercent: 0, isCustom: false, active: true },
   { id: 'gw-payzy', name: 'Payzy BNPL / Pay', code: 'payzy', feePercent: 12, isCustom: false, active: true },
   { id: 'gw-koko', name: 'Koko Pay (3x Installments)', code: 'koko', feePercent: 12, isCustom: false, active: true },
   { id: 'gw-mintpay', name: 'Mintpay (Pay in 3)', code: 'mintpay', feePercent: 12, isCustom: false, active: true },

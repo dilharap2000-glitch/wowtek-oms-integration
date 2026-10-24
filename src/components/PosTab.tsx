@@ -5,6 +5,7 @@ import {
   ShoppingCart,
   Camera,
   Barcode,
+  Scan,
   Plus,
   Minus,
   Trash2,
@@ -22,6 +23,12 @@ import {
   Package,
   Truck,
   AlertTriangle,
+  Percent,
+  Clock,
+  Users,
+  Calendar,
+  Send,
+  UserCheck,
 } from 'lucide-react';
 import {
   Order,
@@ -30,6 +37,7 @@ import {
   PlatformConfig,
   PaymentGatewayConfig,
 } from '@/types';
+import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
@@ -63,12 +71,41 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [selectedPlatformCode, setSelectedPlatformCode] = useState<string>('pos');
   const [selectedGatewayCode, setSelectedGatewayCode] = useState<string>('cash_cod');
-  const [customerName, setCustomerName] = useState('Walk-in Customer');
-  const [customerPhone, setCustomerPhone] = useState('+94 77 ');
+  
+  // 1. Customer Details: default to "Cash Customer" and empty phone (clean input, no forced +94 77)
+  const [customerName, setCustomerName] = useState('Cash Customer');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerCity, setCustomerCity] = useState('Colombo 04');
+  const [customerAddress, setCustomerAddress] = useState('Walk-in / In-Store Checkout');
   const [courierFee, setCourierFee] = useState<number>(0);
+  const [customerList, setCustomerList] = useState<any[]>([]);
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
 
-  // Modals & Scanner state
+  // 2. Barcode & Serial Scanner State
+  const [activeScanInput, setActiveScanInput] = useState('');
+  const [scanStatus, setScanStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const scannerInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // 3. Price & Discount Customization State
+  const [editingPriceSku, setEditingPriceSku] = useState<string | null>(null);
+  const [tempPriceInput, setTempPriceInput] = useState<string>('');
+  const [discountingSku, setDiscountingSku] = useState<string | null>(null);
+  const [tempDiscountType, setTempDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [tempDiscountVal, setTempDiscountVal] = useState<string>('');
+  const [billDiscountType, setBillDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [billDiscountValue, setBillDiscountValue] = useState<number>(0);
+
+  // 4. Credit Customer State & Settlement
+  const [isCreditSale, setIsCreditSale] = useState<boolean>(false);
+  const [creditDueDate, setCreditDueDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split('T')[0];
+  });
+  const [creditNotes, setCreditNotes] = useState<string>('');
+  const [creditToast, setCreditToast] = useState<string | null>(null);
+
+  // Modals & General state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Order | null>(null);
@@ -78,6 +115,39 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [editModalOrder, setEditModalOrder] = useState<Order | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'terminal' | 'invoices'>('terminal');
+
+  // Load Customers for search & autocomplete
+  const fetchCustomerDirectory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/customers');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.customers)) {
+        setCustomerList(data.customers);
+      }
+    } catch (err) {
+      console.warn('Customer list fetch notice:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCustomerDirectory();
+  }, [fetchCustomerDirectory]);
+
+  // Ensure Credit Customer is always present in gateway list
+  const allGateways = React.useMemo(() => {
+    const list = [...(gateways || [])];
+    if (!list.some((g) => g.code === 'credit')) {
+      list.push({
+        id: 'gw-credit',
+        name: 'Credit Customer (Pay Later)',
+        code: 'credit',
+        feePercent: 0,
+        isCustom: false,
+        active: true,
+      });
+    }
+    return list;
+  }, [gateways]);
 
   // Active configurations
   const activePlatform = platforms.find((p) => p.code === selectedPlatformCode) || platforms[0] || {
@@ -89,7 +159,7 @@ export const PosTab: React.FC<PosTabProps> = ({
     active: true,
   };
 
-  const activeGateway = gateways.find((g) => g.code === selectedGatewayCode) || gateways[0] || {
+  const activeGateway = allGateways.find((g) => g.code === selectedGatewayCode) || allGateways[0] || {
     id: 'g1',
     name: 'Cash / COD',
     code: 'cash_cod',
@@ -98,44 +168,83 @@ export const PosTab: React.FC<PosTabProps> = ({
     active: true,
   };
 
-  // Cart calculations according to the Customer-Surcharge Pricing Model:
-  // 1. Base Item Price: cart item selling prices (e.g., Rs. 4,490)
-  // 2. Gateway Fee Percentage: Payzy BNPL, Koko, Mintpay = 12% (0.12), Card = 3% (0.03), Cash = 0%
-  // 3. Customer Surcharge: paymentFeeAmount = baseItemPrice * feePercentage (added to customer total)
-  // 4. Net Profit: Merchant keeps Base Selling Price - COGS - Platform Fee (customer pays the gateway surcharge)
+  // -------------------------------------------------------------
+  // CART CALCULATIONS (Item Discounts, Bill Discounts, Surcharges)
+  // -------------------------------------------------------------
   const safeCart = cart || [];
-  const baseItemPrice = safeCart.reduce((sum, item) => sum + (item?.unitPrice || 0) * (item?.quantity || 0), 0);
-  const totalCostOfGoods = safeCart.reduce((sum, item) => sum + (item?.costPrice || 0) * (item?.quantity || 0), 0);
 
-  // 2. Gateway Fee Percentage determination
+  // 1. Calculate per-item lines with custom price & item-level discounts
+  const itemCalculations = safeCart.map((item) => {
+    const unitPrice = item.unitPrice || 0;
+    const qty = item.quantity || 1;
+    let itemDiscountAmount = 0;
+
+    if (item.discountType === 'percent' && item.discountPercent && item.discountPercent > 0) {
+      itemDiscountAmount = Math.round((unitPrice * item.discountPercent) / 100);
+    } else if (item.discountAmount && item.discountAmount > 0) {
+      itemDiscountAmount = item.discountAmount;
+    }
+
+    const effectiveUnitPrice = Math.max(0, unitPrice - itemDiscountAmount);
+    return {
+      ...item,
+      itemDiscountAmount,
+      effectiveUnitPrice,
+      lineTotal: effectiveUnitPrice * qty,
+      cogsTotal: (item.costPrice || 0) * qty,
+      totalItemDiscount: itemDiscountAmount * qty,
+    };
+  });
+
+  const grossItemSubtotal = itemCalculations.reduce((sum, it) => sum + it.lineTotal, 0);
+  const totalItemDiscounts = itemCalculations.reduce((sum, it) => sum + it.totalItemDiscount, 0);
+  const totalCostOfGoods = itemCalculations.reduce((sum, it) => sum + it.cogsTotal, 0);
+
+  // 2. Bill-level discount calculation
+  let billDiscountAmount = 0;
+  if (billDiscountValue > 0) {
+    if (billDiscountType === 'percent') {
+      billDiscountAmount = Math.round((grossItemSubtotal * billDiscountValue) / 100);
+    } else {
+      billDiscountAmount = Math.min(grossItemSubtotal, billDiscountValue);
+    }
+  }
+
+  // Base Item Price after all item & bill discounts
+  const baseItemPrice = Math.max(0, grossItemSubtotal - billDiscountAmount);
+  const totalDiscount = totalItemDiscounts + billDiscountAmount;
+
+  // 3. Gateway Fee Percentage determination (Credit Sales have 0% Surcharge)
+  const isCreditActive = selectedGatewayCode === 'credit' || isCreditSale;
   let gatewayFeePercentage = 0;
   const gwName = activeGateway?.name || '';
   const gwCode = (activeGateway?.code || selectedGatewayCode || '').toLowerCase();
 
-  if (
-    gwName === 'Payzy BNPL' ||
-    gwName === 'Koko' ||
-    gwName === 'Mintpay' ||
-    gwName.toLowerCase().includes('payzy') ||
-    gwName.toLowerCase().includes('koko') ||
-    gwName.toLowerCase().includes('mintpay') ||
-    ['payzy', 'koko', 'mintpay'].includes(gwCode)
-  ) {
-    gatewayFeePercentage = 0.12; // 12% BNPL
-  } else if (
-    gwName === 'Card' ||
-    gwName.toLowerCase().includes('card') ||
-    ['card', 'card_online'].includes(gwCode)
-  ) {
-    gatewayFeePercentage = 0.03; // 3% Card
-  } else if (typeof activeGateway?.feePercent === 'number') {
-    gatewayFeePercentage = activeGateway.feePercent > 1 ? activeGateway.feePercent / 100 : activeGateway.feePercent;
+  if (!isCreditActive) {
+    if (
+      gwName === 'Payzy BNPL' ||
+      gwName === 'Koko' ||
+      gwName === 'Mintpay' ||
+      gwName.toLowerCase().includes('payzy') ||
+      gwName.toLowerCase().includes('koko') ||
+      gwName.toLowerCase().includes('mintpay') ||
+      ['payzy', 'koko', 'mintpay'].includes(gwCode)
+    ) {
+      gatewayFeePercentage = 0.12; // 12% BNPL
+    } else if (
+      gwName === 'Card' ||
+      gwName.toLowerCase().includes('card') ||
+      ['card', 'card_online'].includes(gwCode)
+    ) {
+      gatewayFeePercentage = 0.03; // 3% Card
+    } else if (typeof activeGateway?.feePercent === 'number') {
+      gatewayFeePercentage = activeGateway.feePercent > 1 ? activeGateway.feePercent / 100 : activeGateway.feePercent;
+    }
   }
 
-  // 3. Customer Fee Surcharge Added to Item Price (Add to Total)
-  const paymentFeeAmount = Math.round(baseItemPrice * gatewayFeePercentage);
+  // 4. Customer Fee Surcharge Added to Item Price (Add to Total)
+  const paymentFeeAmount = isCreditActive ? 0 : Math.round(baseItemPrice * gatewayFeePercentage);
   const finalGrossTotal = baseItemPrice + paymentFeeAmount + (courierFee || 0);
-
   const platformFeeAmount = Math.round((baseItemPrice * activePlatform.feePercent) / 100);
 
   const hasUnregisteredInCart = safeCart.some((item) => {
@@ -148,19 +257,24 @@ export const PosTab: React.FC<PosTabProps> = ({
     return !prod || !prod.costPrice || prod.costPrice <= 0 || !item.costPrice || item.costPrice <= 0;
   });
 
-  // 4. Net Profit: Customer pays the gateway surcharge, so Net Profit is:
-  // Base Selling Price - COGS - Platform Fee (merchant is not penalized by gateway fee)
+  // 5. Net Profit: Merchant keeps Discounted Base Price - COGS - Platform Fee
   const netProfit = hasUnregisteredInCart
     ? 0
     : Math.round(baseItemPrice - totalCostOfGoods - platformFeeAmount);
 
   // Add product to cart by barcode or SKU
-  const handleAddProductToCart = (prod: Product) => {
+  const handleAddProductToCart = (prod: Product, serialNumber?: string) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.sku === prod.sku);
       if (existing) {
         return prev.map((item) =>
-          item.sku === prod.sku ? { ...item, quantity: item.quantity + 1 } : item
+          item.sku === prod.sku
+            ? {
+                ...item,
+                quantity: item.quantity + 1,
+                serialNumber: serialNumber || item.serialNumber,
+              }
+            : item
         );
       }
       return [
@@ -172,24 +286,123 @@ export const PosTab: React.FC<PosTabProps> = ({
           quantity: 1,
           unitPrice: prod.sellingPrice,
           costPrice: prod.costPrice,
+          originalPrice: prod.sellingPrice,
+          serialNumber: serialNumber,
         },
       ];
     });
   };
 
-  // Scanned Barcode Handler (Continuous Cart Addition)
+  // Active Barcode & Serial Scanner Handler (Instant Add & Focus Retention)
+  const handleScanSubmit = (codeToScan: string) => {
+    const clean = codeToScan.trim();
+    if (!clean) return;
+
+    let matchedProduct: Product | undefined = undefined;
+    let matchedSerial: string | undefined = undefined;
+
+    for (const p of products) {
+      // 1. Direct Barcode check
+      if (p.barcode && p.barcode.trim().toLowerCase() === clean.toLowerCase()) {
+        matchedProduct = p;
+        break;
+      }
+      // 2. SKU / SKU Code check
+      if (
+        (p.sku && p.sku.trim().toLowerCase() === clean.toLowerCase()) ||
+        (p.skuCode && p.skuCode.trim().toLowerCase() === clean.toLowerCase())
+      ) {
+        matchedProduct = p;
+        break;
+      }
+      // 3. Serial number in activeSerials
+      const serials = (p as any).activeSerials;
+      if (Array.isArray(serials)) {
+        const found = serials.find(
+          (s: any) => s.serialNumber && s.serialNumber.trim().toLowerCase() === clean.toLowerCase()
+        );
+        if (found) {
+          matchedProduct = p;
+          matchedSerial = found.serialNumber;
+          break;
+        }
+      }
+    }
+
+    if (matchedProduct) {
+      handleAddProductToCart(matchedProduct, matchedSerial);
+      setScanStatus({
+        type: 'success',
+        message: `Scanned & Added: ${matchedProduct.name} (Rs. ${matchedProduct.sellingPrice.toLocaleString()})${
+          matchedSerial ? ` [Allocated Serial: ${matchedSerial}]` : ''
+        }`,
+      });
+      setActiveScanInput('');
+    } else {
+      setScanStatus({
+        type: 'error',
+        message: `No inventory product or serial found for "${clean}". You can search or add as custom item.`,
+      });
+    }
+
+    setTimeout(() => {
+      scannerInputRef.current?.focus();
+    }, 50);
+  };
+
+  // Scanned Barcode Handler from Camera Modal
   const handleBarcodeScanned = (barcode: string) => {
     const clean = barcode.trim();
-    const foundProduct = products.find(
-      (p) =>
-        (p.barcode && p.barcode.trim().toLowerCase() === clean.toLowerCase()) ||
-        (p.sku && p.sku.trim().toLowerCase() === clean.toLowerCase())
+    handleScanSubmit(clean);
+    return true;
+  };
+
+  // Item Price Edit Handler
+  const handleUpdateItemPrice = (sku: string, newPrice: number) => {
+    const cleanPrice = Math.max(0, Number(newPrice) || 0);
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.sku === sku) {
+          return {
+            ...item,
+            originalPrice: item.originalPrice || item.unitPrice,
+            unitPrice: cleanPrice,
+          };
+        }
+        return item;
+      })
     );
-    if (foundProduct) {
-      handleAddProductToCart(foundProduct);
-      return true;
-    }
-    return false;
+    setEditingPriceSku(null);
+  };
+
+  // Item Discount Handler (% or fixed Rs.)
+  const handleUpdateItemDiscount = (sku: string, type: 'percent' | 'fixed', val: number) => {
+    const cleanVal = Math.max(0, Number(val) || 0);
+    setCart((prev) =>
+      prev.map((item) => {
+        if (item.sku === sku) {
+          if (type === 'percent') {
+            const cappedPercent = Math.min(100, cleanVal);
+            return {
+              ...item,
+              discountType: 'percent',
+              discountPercent: cappedPercent,
+              discountAmount: Math.round(((item.unitPrice || 0) * cappedPercent) / 100),
+            };
+          } else {
+            const cappedAmount = Math.min(item.unitPrice || 0, cleanVal);
+            return {
+              ...item,
+              discountType: 'fixed',
+              discountAmount: cappedAmount,
+              discountPercent: item.unitPrice > 0 ? Math.round((cappedAmount / item.unitPrice) * 100) : 0,
+            };
+          }
+        }
+        return item;
+      })
+    );
+    setDiscountingSku(null);
   };
 
   // Add custom uncataloged item directly to cart on the fly
@@ -201,7 +414,6 @@ export const PosTab: React.FC<PosTabProps> = ({
     costPrice?: number;
     saveToInventory?: boolean;
   }) => {
-    // 1. Add to POS cart
     setCart((prev) => {
       const existing = prev.find(
         (i) => i.sku === item.sku || (item.barcode && i.barcode === item.barcode)
@@ -219,12 +431,12 @@ export const PosTab: React.FC<PosTabProps> = ({
           name: item.name,
           quantity: 1,
           unitPrice: item.sellingPrice,
+          originalPrice: item.sellingPrice,
           costPrice: typeof item.costPrice === 'number' && item.costPrice > 0 ? item.costPrice : 0,
         },
       ];
     });
 
-    // 2. If user requested to save to Inventory, persist as a new Product
     if (item.saveToInventory && onAddProduct) {
       const newProd: Product = {
         id: `prod-${Date.now().toString().slice(-4)}`,
@@ -263,7 +475,7 @@ export const PosTab: React.FC<PosTabProps> = ({
     setCart((prev) => prev.filter((item) => item.sku !== sku));
   };
 
-  // Complete POS Checkout
+  // Complete POS Checkout with Credit Support & Automated SMS
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
@@ -271,9 +483,20 @@ export const PosTab: React.FC<PosTabProps> = ({
       return;
     }
 
+    const isCredit = selectedGatewayCode === 'credit' || isCreditSale;
+
+    // Validation: For Credit Customers, customer phone is mandatory for SMS reminder & receivable tracking!
+    if (isCredit && (!customerPhone || customerPhone.trim().length < 9)) {
+      alert('Customer mobile phone number is required for Credit Customer sales so that invoice details and the due date SMS reminder can be dispatched!');
+      return;
+    }
+
     const invoiceNum = `INV-${activePlatform.code.toUpperCase().slice(0, 3)}-${Math.floor(
       1000 + Math.random() * 9000
     )}`;
+
+    const cleanPhone = customerPhone ? formatSriLankanPhone(customerPhone) : '';
+    const finalCustomerName = customerName.trim() || 'Cash Customer';
 
     const hasUnregistered = safeCart.some((item) => {
       const prod = products.find(
@@ -290,19 +513,19 @@ export const PosTab: React.FC<PosTabProps> = ({
       invoiceNumber: invoiceNum,
       channel: activePlatform.code,
       channelName: activePlatform.name,
-      paymentGateway: activeGateway.code,
-      paymentGatewayName: activeGateway.name,
-      customerName,
-      customerPhone,
-      deliveryAddress: 'Walk-in / In-Store Checkout',
-      city: customerCity,
+      paymentGateway: isCredit ? 'credit' : activeGateway.code,
+      paymentGatewayName: isCredit ? 'Credit Customer (Pay Later)' : activeGateway.name,
+      customerName: finalCustomerName,
+      customerPhone: cleanPhone,
+      deliveryAddress: customerAddress || 'Walk-in / In-Store Checkout',
+      city: customerCity || 'Colombo 04',
       items: [...cart],
       baseSubtotal: baseItemPrice,
       grossTotal: finalGrossTotal,
       platformFeePercent: activePlatform.feePercent,
       platformFeeAmount,
-      gatewayFeePercent: Math.round(gatewayFeePercentage * 100),
-      gatewayFeeAmount: paymentFeeAmount,
+      gatewayFeePercent: isCredit ? 0 : Math.round(gatewayFeePercentage * 100),
+      gatewayFeeAmount: isCredit ? 0 : paymentFeeAmount,
       courierFee,
       costOfGoods: totalCostOfGoods,
       netProfit: hasUnregistered ? 0 : netProfit,
@@ -310,27 +533,61 @@ export const PosTab: React.FC<PosTabProps> = ({
       hasUnregisteredItems: hasUnregistered,
       unregisteredItemsCount: hasUnregistered ? safeCart.filter((item) => !products.some((p) => p.sku === item.sku && p.costPrice > 0)).length : 0,
       status: 'Completed',
-      feeSurchargeAdded: paymentFeeAmount > 0,
+      feeSurchargeAdded: !isCredit && paymentFeeAmount > 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       waybillGenerated: false,
       isPosSale: true,
-      notes: `POS sale processed via ${activeGateway.name} (${Math.round(gatewayFeePercentage * 100)}% surcharge added: +Rs. ${paymentFeeAmount.toLocaleString()}). Base: Rs. ${baseItemPrice.toLocaleString()} | COGS: Rs. ${totalCostOfGoods.toLocaleString()} | Net Profit: Rs. ${netProfit.toLocaleString()}.${hasUnregistered ? ' [Contains unregistered items: profit pending inventory valuation]' : ''}`,
+      isCreditSale: isCredit,
+      creditDueDate: isCredit ? creditDueDate : undefined,
+      creditSettled: false,
+      billDiscountAmount: billDiscountAmount > 0 ? billDiscountAmount : undefined,
+      billDiscountPercent: billDiscountType === 'percent' && billDiscountValue > 0 ? billDiscountValue : undefined,
+      billDiscountType: billDiscountType,
+      totalDiscount: totalDiscount > 0 ? totalDiscount : undefined,
+      notes: `${isCredit ? `[CREDIT SALE - Settlement Due: ${creditDueDate}] ` : ''}POS sale processed via ${isCredit ? 'Credit Customer' : activeGateway.name}${totalDiscount > 0 ? ` (Discount: -Rs. ${totalDiscount.toLocaleString()})` : ''}.${creditNotes ? ` Note: ${creditNotes}` : ''}`.trim(),
     };
 
     onCreateOrder(newOrder);
 
-    // Auto-dispatch Order Confirmation SMS via SMSlenz
-    if (customerPhone && customerPhone.trim().length >= 9) {
+    // Auto-dispatch SMS notification via SMSlenz
+    if (cleanPhone && cleanPhone.length >= 9) {
       try {
+        let smsText = '';
+        if (isCredit) {
+          const formattedDueDate = new Date(creditDueDate).toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+          });
+          smsText = `WOWTEK PRO: Dear ${finalCustomerName}, your Credit Invoice ${invoiceNum} for Rs. ${finalGrossTotal.toLocaleString()} has been approved. Payment Due Date: ${formattedDueDate}. Please settle payment on or before this date. Helpline: 0779673004.`;
+        } else {
+          smsText = `WOWTEK PRO: Invoice ${invoiceNum} confirmed. Total: Rs. ${finalGrossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase! Helpline: 0779673004.`;
+        }
+
         fetch('/api/sms/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contact: customerPhone,
-            message: `WOWTEK PRO: Invoice ${invoiceNum} confirmed. Total: Rs. ${finalGrossTotal.toLocaleString()}. Payment: ${activeGateway.name}. Thank you for your purchase!`,
-            triggerType: 'order_confirmed',
+            contact: cleanPhone,
+            message: smsText,
+            triggerType: isCredit ? 'credit_invoice' : 'order_confirmed',
             referenceId: invoiceNum,
+          }),
+        }).catch((err) => console.warn('POS SMS notice:', err));
+      } catch {
+        // Safe fallback
+      }
+
+      // Auto-upsert into customer database with uniform formatting
+      try {
+        fetch('/api/customers/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: finalCustomerName,
+            phone: cleanPhone,
+            source: isCredit ? 'Credit Customer' : 'POS Cash Customer',
           }),
         }).catch(() => {});
       } catch {
@@ -338,10 +595,23 @@ export const PosTab: React.FC<PosTabProps> = ({
       }
     }
 
+    if (isCredit) {
+      const formattedDueDate = new Date(creditDueDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      setCreditToast(`Credit Sale Invoice ${invoiceNum} completed! Automated SMS reminder dispatched to ${cleanPhone} (Payment Due: ${formattedDueDate})`);
+      setTimeout(() => setCreditToast(null), 7000);
+    }
+
     setSelectedInvoiceForPrint(newOrder);
     setCart([]);
-    setCustomerName('Walk-in Customer');
-    setCustomerPhone('+94 77 ');
+    setCustomerName('Cash Customer');
+    setCustomerPhone('');
+    setBillDiscountValue(0);
+    setIsCreditSale(false);
+    setCreditNotes('');
   };
 
   const [isProcessingReturn, setIsProcessingReturn] = useState(false);
@@ -453,333 +723,879 @@ export const PosTab: React.FC<PosTabProps> = ({
 
       {/* POS TERMINAL VIEW */}
       {activeSubTab === 'terminal' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: Product Catalog & Fast Quick-Add (7 cols) */}
-          <div className="lg:col-span-7 space-y-4">
-            {/* Search and Category Filter */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="text"
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search products by SKU, name, or scan barcode..."
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
-                />
-              </div>
-              <button
-                onClick={() => setIsScannerOpen(true)}
-                className="px-3 py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-200 rounded-xl text-xs font-medium flex items-center gap-1.5"
-                title="Scan Barcode with Camera"
-              >
-                <Barcode className="w-4 h-4 text-purple-400" />
-                <span>Camera Scan</span>
-              </button>
-            </div>
-
-            {/* Product Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[640px] overflow-y-auto pr-1">
-              {filteredProducts.length === 0 ? (
-                <div className="col-span-full py-16 px-4 text-center bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center justify-center gap-2">
-                  <Package className="w-10 h-10 text-neutral-600 mb-1" />
-                  <h4 className="text-sm font-semibold text-white">No Products in Inventory</h4>
-                  <p className="text-xs text-neutral-400 max-w-sm">
-                    Your store inventory is empty. Add products in the Products & Barcode GRN tab or scan barcodes to begin invoicing.
-                  </p>
+        <div className="space-y-4">
+          {/* Active Barcode & Serial Scanner Bar */}
+          <div className="bg-neutral-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl backdrop-blur-sm">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  <Barcode className="w-5 h-5" />
                 </div>
-              ) : (
-                (filteredProducts || []).map((prod) => {
-                const profitMargin =
-                  prod.sellingPrice > 0
-                    ? Math.round(((prod.sellingPrice - prod.costPrice) / prod.sellingPrice) * 100)
-                    : 0;
-
-                return (
-                  <div
-                    key={prod.id}
-                    onClick={() => handleAddProductToCart(prod)}
-                    className="p-3 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 hover:border-purple-500/60 rounded-xl cursor-pointer transition-all flex flex-col justify-between group"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-mono font-semibold text-purple-400">
-                          {prod.sku}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-950 font-mono text-neutral-300">
-                          {prod.stockStore} in store
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-semibold text-white mt-1 line-clamp-2 group-hover:text-purple-300 transition-colors">
-                        {prod.name}
-                      </h4>
-                    </div>
-
-                    <div className="mt-3 pt-2 border-t border-neutral-800/80">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-mono font-bold text-white">
-                          Rs. {prod.sellingPrice.toLocaleString()}
-                        </span>
-                        <span className="text-[10px] font-mono text-emerald-400 font-semibold">
-                          +{profitMargin}%
-                        </span>
-                      </div>
-                      <div className="text-[10px] font-mono text-neutral-500 mt-0.5 truncate">
-                        Barcode: {prod.barcode}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }))}
-            </div>
-          </div>
-
-          {/* Right: Active POS Cart & Dynamic Checkout (5 cols) */}
-          <div className="lg:col-span-5 bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
-            <div>
-              {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-purple-400" />
-                  <h3 className="text-sm font-semibold text-white">POS Checkout Cart</h3>
-                </div>
-                {cart.length > 0 && (
-                  <button
-                    onClick={() => setCart([])}
-                    className="text-xs text-neutral-400 hover:text-red-400 transition-colors"
-                  >
-                    Clear Cart
-                  </button>
-                )}
-              </div>
-
-              {/* Cart Items List */}
-              <div className="my-3 space-y-2 max-h-56 overflow-y-auto pr-1">
-                {cart.length === 0 ? (
-                  <div className="py-12 text-center text-neutral-500 text-xs">
-                    Cart is currently empty.
-                    <br />
-                    Click products from catalog or scan a barcode to add.
-                  </div>
-                ) : (
-                  (cart || []).map((item) => (
-                    <div
-                      key={item.sku}
-                      className="p-2.5 rounded-lg bg-neutral-950 border border-neutral-800/90 flex items-center justify-between text-xs"
-                    >
-                      <div className="max-w-[170px]">
-                        <div className="font-medium text-white line-clamp-1">{item.name}</div>
-                        <div className="text-[10px] font-mono text-neutral-400">
-                          Rs. {item.unitPrice.toLocaleString()} each
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-0.5">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item.sku, -1)}
-                            className="p-1 text-neutral-400 hover:text-white rounded"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="w-6 text-center font-mono font-semibold text-white text-xs">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateQuantity(item.sku, 1)}
-                            className="p-1 text-neutral-400 hover:text-white rounded"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-
-                        <span className="font-mono font-bold text-white text-xs w-20 text-right">
-                          Rs. {(item.unitPrice * item.quantity).toLocaleString()}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFromCart(item.sku)}
-                          className="p-1 text-neutral-500 hover:text-red-400 rounded"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Dynamic Channel & Payment Gateway Selectors */}
-              <div className="space-y-3 pt-3 border-t border-neutral-800 text-xs">
-                {/* Platform Selector */}
                 <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-neutral-300 font-medium">Sales Channel / Platform</span>
-                    <span className="text-[11px] font-mono text-purple-400">
-                      Fee: {activePlatform.feePercent}%
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Fast Barcode & Serial Scanner</span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                      ● Scanner Ready
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(platforms || []).map((plt) => (
+                  <p className="text-[11px] text-neutral-400">
+                    Scan with handheld USB/Bluetooth barcode scanner or type & press Enter. Auto-detects barcodes, SKUs & item serial numbers.
+                  </p>
+                </div>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleScanSubmit(activeScanInput);
+                }}
+                className="flex items-center gap-2 flex-1 max-w-xl"
+              >
+                <div className="relative flex-1">
+                  <input
+                    ref={scannerInputRef}
+                    type="text"
+                    value={activeScanInput}
+                    onChange={(e) => setActiveScanInput(e.target.value)}
+                    placeholder="Scan barcode, SKU, or serial number here (Auto-adds to cart)..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-950 border border-purple-500/40 rounded-xl text-white placeholder-neutral-500 text-xs font-mono focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400"
+                  />
+                  <Scan className="w-4 h-4 text-purple-400 absolute left-3 top-3" />
+                </div>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-purple-900/30 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="px-3 py-2.5 bg-neutral-800 hover:bg-neutral-750 text-neutral-300 border border-neutral-700 text-xs rounded-xl transition flex items-center gap-1.5 shrink-0"
+                  title="Open Phone Camera Scanner"
+                >
+                  <Camera className="w-3.5 h-3.5 text-purple-400" />
+                  Camera
+                </button>
+              </form>
+            </div>
+
+            {scanStatus && (
+              <div
+                className={`mt-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between border ${
+                  scanStatus.type === 'success'
+                    ? 'bg-emerald-950/70 border-emerald-800 text-emerald-200'
+                    : 'bg-rose-950/70 border-rose-800 text-rose-200'
+                }`}
+              >
+                <span className="font-mono">{scanStatus.message}</span>
+                <button
+                  type="button"
+                  onClick={() => setScanStatus(null)}
+                  className="text-[11px] underline ml-2 opacity-80 hover:opacity-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
+            {creditToast && (
+              <div className="mt-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between border bg-amber-950/80 border-amber-500 text-amber-200 animate-fadeIn">
+                <span className="font-semibold">{creditToast}</span>
+                <button
+                  type="button"
+                  onClick={() => setCreditToast(null)}
+                  className="text-[11px] underline ml-2 opacity-80 hover:opacity-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Product Catalog & Fast Quick-Add (7 cols) */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* Search and Category Filter */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                  <input
+                    type="text"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Search products by SKU, name, or barcode..."
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-neutral-900 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Product Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[640px] overflow-y-auto pr-1">
+                {filteredProducts.length === 0 ? (
+                  <div className="col-span-full py-16 px-4 text-center bg-neutral-900 border border-neutral-800 rounded-2xl flex flex-col items-center justify-center gap-2">
+                    <Package className="w-10 h-10 text-neutral-600 mb-1" />
+                    <h4 className="text-sm font-semibold text-white">No Products in Inventory</h4>
+                    <p className="text-xs text-neutral-400 max-w-sm">
+                      Your store inventory is empty. Add products in the Products &amp; Barcode GRN tab or scan barcodes to begin invoicing.
+                    </p>
+                  </div>
+                ) : (
+                  (filteredProducts || []).map((prod) => {
+                    const profitMargin =
+                      prod.sellingPrice > 0
+                        ? Math.round(((prod.sellingPrice - prod.costPrice) / prod.sellingPrice) * 100)
+                        : 0;
+
+                    return (
+                      <div
+                        key={prod.id}
+                        onClick={() => handleAddProductToCart(prod)}
+                        className="p-3 bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 hover:border-purple-500/60 rounded-xl cursor-pointer transition-all flex flex-col justify-between group"
+                      >
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <span className="text-[10px] font-mono font-semibold text-purple-400">
+                              {prod.sku}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-950 font-mono text-neutral-300">
+                              {prod.stockStore} in store
+                            </span>
+                          </div>
+                          <h4 className="text-xs font-semibold text-white mt-1 line-clamp-2 group-hover:text-purple-300 transition-colors">
+                            {prod.name}
+                          </h4>
+                        </div>
+
+                        <div className="mt-3 pt-2 border-t border-neutral-800/80">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-mono font-bold text-white">
+                              Rs. {prod.sellingPrice.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-mono text-emerald-400 font-semibold">
+                              +{profitMargin}%
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-neutral-500 mt-0.5 truncate">
+                            Barcode: {prod.barcode}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right: Active POS Cart & Dynamic Checkout (5 cols) */}
+            <div className="lg:col-span-5 bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+              <div>
+                {/* Cart Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-purple-400" />
+                    <h3 className="text-sm font-semibold text-white">POS Checkout Cart</h3>
+                    <span className="text-[11px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                      {cart.length} item{cart.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {cart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCart([])}
+                      className="text-xs text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+                    >
+                      Clear Cart
+                    </button>
+                  )}
+                </div>
+
+                {/* Cart Items List with Price & Discount Editing */}
+                <div className="my-3 space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                  {cart.length === 0 ? (
+                    <div className="py-12 text-center text-neutral-500 text-xs">
+                      Cart is currently empty.
+                      <br />
+                      Scan barcodes or click items from the catalog.
+                    </div>
+                  ) : (
+                    itemCalculations.map((item) => (
+                      <div
+                        key={item.sku}
+                        className="p-3 rounded-xl bg-neutral-950 border border-neutral-800/90 space-y-2 text-xs"
+                      >
+                        {/* Line Item Top: Name, Serial, Quantity, Total, Delete */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-white truncate">{item.name}</div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-neutral-400">
+                              <span>SKU: {item.sku}</span>
+                              {item.serialNumber && (
+                                <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-300 rounded border border-purple-500/30">
+                                  SN: {item.serialNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 rounded-lg p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item.sku, -1)}
+                              className="p-1 text-neutral-400 hover:text-white rounded"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-6 text-center font-mono font-semibold text-white text-xs">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateQuantity(item.sku, 1)}
+                              className="p-1 text-neutral-400 hover:text-white rounded"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* Line Total */}
+                          <div className="text-right font-mono min-w-[75px]">
+                            <div className="font-bold text-white text-xs">
+                              Rs. {item.lineTotal.toLocaleString()}
+                            </div>
+                            {item.itemDiscountAmount > 0 && (
+                              <div className="text-[10px] text-emerald-400">
+                                -Rs. {(item.itemDiscountAmount * item.quantity).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromCart(item.sku)}
+                            className="p-1 text-neutral-500 hover:text-red-400 rounded transition cursor-pointer"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Line Item Bottom: Price Customization & Item-level Discount */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-neutral-900 text-[11px]">
+                          {/* Unit Price Customization */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-neutral-400">Price:</span>
+                            {editingPriceSku === item.sku ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-neutral-400 font-mono">Rs.</span>
+                                <input
+                                  type="number"
+                                  autoFocus
+                                  value={tempPriceInput}
+                                  onChange={(e) => setTempPriceInput(e.target.value)}
+                                  className="w-20 px-1.5 py-0.5 bg-neutral-900 border border-purple-500 rounded text-white font-mono text-xs focus:outline-none"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateItemPrice(item.sku, Number(tempPriceInput));
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemPrice(item.sku, Number(tempPriceInput))}
+                                  className="px-1.5 py-0.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-[10px] font-bold"
+                                >
+                                  OK
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingPriceSku(null)}
+                                  className="px-1 text-neutral-400 hover:text-white text-[10px]"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingPriceSku(item.sku);
+                                  setTempPriceInput(String(item.unitPrice));
+                                }}
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 text-white font-mono hover:border-purple-500/50 transition cursor-pointer"
+                                title="Click to edit unit price"
+                              >
+                                <span>Rs. {item.unitPrice.toLocaleString()}</span>
+                                <Edit className="w-2.5 h-2.5 text-neutral-400" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Item Discount Controls */}
+                          <div className="flex items-center gap-1.5">
+                            {discountingSku === item.sku ? (
+                              <div className="flex items-center gap-1 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
+                                <select
+                                  value={tempDiscountType}
+                                  onChange={(e) => setTempDiscountType(e.target.value as any)}
+                                  className="bg-neutral-950 text-white text-[10px] rounded px-1 py-0.5 border border-neutral-800 focus:outline-none"
+                                >
+                                  <option value="percent">%</option>
+                                  <option value="fixed">Rs.</option>
+                                </select>
+                                <input
+                                  type="number"
+                                  autoFocus
+                                  value={tempDiscountVal}
+                                  onChange={(e) => setTempDiscountVal(e.target.value)}
+                                  placeholder={tempDiscountType === 'percent' ? '10' : '200'}
+                                  className="w-14 px-1 py-0.5 bg-neutral-950 border border-purple-500 rounded text-white font-mono text-[10px] focus:outline-none"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateItemDiscount(item.sku, tempDiscountType, Number(tempDiscountVal));
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateItemDiscount(item.sku, tempDiscountType, Number(tempDiscountVal))
+                                  }
+                                  className="px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold"
+                                >
+                                  Apply
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateItemDiscount(item.sku, 'fixed', 0);
+                                    setDiscountingSku(null);
+                                  }}
+                                  className="px-1 text-red-400 hover:text-red-300 text-[10px]"
+                                  title="Remove discount"
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDiscountingSku(item.sku);
+                                  setTempDiscountType(item.discountType || 'percent');
+                                  setTempDiscountVal(
+                                    String(
+                                      item.discountType === 'percent'
+                                        ? item.discountPercent || ''
+                                        : item.discountAmount || ''
+                                    )
+                                  );
+                                }}
+                                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border transition cursor-pointer ${
+                                  item.itemDiscountAmount > 0
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-semibold'
+                                    : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:text-white'
+                                }`}
+                              >
+                                <Tag className="w-2.5 h-2.5" />
+                                {item.itemDiscountAmount > 0
+                                  ? `${item.discountType === 'percent' ? `${item.discountPercent}% OFF` : `Rs. ${item.discountAmount} OFF`}`
+                                  : '+ Item Discount'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Bill / Cart Total Discount Section */}
+                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-2.5 space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-neutral-300 flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-purple-400" />
+                      Total Bill Discount
+                    </span>
+                    {billDiscountAmount > 0 && (
+                      <span className="font-mono text-emerald-400 font-bold">
+                        -Rs. {billDiscountAmount.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-lg bg-neutral-900 border border-neutral-800 p-0.5 text-[11px]">
                       <button
-                        key={plt.code}
                         type="button"
-                        onClick={() => setSelectedPlatformCode(plt.code)}
-                        className={`p-2 rounded-lg border text-left transition-all ${
-                          selectedPlatformCode === plt.code
-                            ? 'border-purple-500 bg-purple-500/10 text-white'
-                            : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
+                        onClick={() => setBillDiscountType('percent')}
+                        className={`px-2 py-0.5 rounded transition ${
+                          billDiscountType === 'percent' ? 'bg-purple-600 text-white font-bold' : 'text-neutral-400'
                         }`}
                       >
-                        <div className="font-semibold text-[11px] truncate">{plt.name}</div>
-                        <div className="text-[10px] font-mono opacity-80">{plt.feePercent}% Platform Fee</div>
+                        %
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBillDiscountType('fixed')}
+                        className={`px-2 py-0.5 rounded transition ${
+                          billDiscountType === 'fixed' ? 'bg-purple-600 text-white font-bold' : 'text-neutral-400'
+                        }`}
+                      >
+                        Rs.
+                      </button>
+                    </div>
+
+                    <input
+                      type="number"
+                      value={billDiscountValue || ''}
+                      onChange={(e) => setBillDiscountValue(Math.max(0, Number(e.target.value) || 0))}
+                      placeholder={billDiscountType === 'percent' ? 'e.g. 5%' : 'e.g. 500'}
+                      className="flex-1 px-2.5 py-1 bg-neutral-900 border border-neutral-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-purple-500"
+                    />
+
+                    {billDiscountValue > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setBillDiscountValue(0)}
+                        className="px-2 py-1 text-neutral-400 hover:text-red-400 text-xs cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Presets */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-neutral-500">Presets:</span>
+                    {[5, 10, 15].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setBillDiscountType('percent');
+                          setBillDiscountValue(pct);
+                        }}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                          billDiscountType === 'percent' && billDiscountValue === pct
+                            ? 'bg-purple-600 border-purple-500 text-white font-bold'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                    {[500, 1000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => {
+                          setBillDiscountType('fixed');
+                          setBillDiscountValue(amt);
+                        }}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                          billDiscountType === 'fixed' && billDiscountValue === amt
+                            ? 'bg-purple-600 border-purple-500 text-white font-bold'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        Rs. {amt}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Payment Gateway Selector with Dynamic Surcharge */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-neutral-300 font-medium">Payment Gateway</span>
-                    <span className="text-[11px] font-mono text-purple-400">
-                      Surcharge: {Math.round(gatewayFeePercentage * 100)}% added to total
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(gateways || []).map((gw) => {
-                      const gwLower = gw.code.toLowerCase();
-                      const isBnpl =
-                        ['payzy', 'koko', 'mintpay'].includes(gwLower) ||
-                        gw.name.includes('Payzy') ||
-                        gw.name.includes('Koko') ||
-                        gw.name.includes('Mintpay');
-                      const isCard = gwLower.includes('card') || gw.name.includes('Card');
-                      const feePct = isBnpl ? 12 : isCard ? 3 : gw.feePercent;
-                      return (
+                {/* Channel & Payment Gateways */}
+                <div className="space-y-3 pt-3 border-t border-neutral-800 text-xs">
+                  {/* Platform Selector */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-neutral-300 font-medium">Sales Channel / Platform</span>
+                      <span className="text-[11px] font-mono text-purple-400">
+                        Fee: {activePlatform.feePercent}%
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(platforms || []).map((plt) => (
                         <button
-                          key={gw.code}
+                          key={plt.code}
                           type="button"
-                          onClick={() => setSelectedGatewayCode(gw.code)}
+                          onClick={() => setSelectedPlatformCode(plt.code)}
                           className={`p-2 rounded-lg border text-left transition-all ${
-                            selectedGatewayCode === gw.code
+                            selectedPlatformCode === plt.code
                               ? 'border-purple-500 bg-purple-500/10 text-white'
                               : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
                           }`}
                         >
-                          <div className="font-semibold text-[11px] truncate">{gw.name}</div>
-                          <div className="text-[10px] font-mono opacity-80">
-                            {feePct > 0 ? `+${feePct}% Added to Total` : '0% (No Surcharge)'}
-                          </div>
+                          <div className="font-semibold text-[11px] truncate">{plt.name}</div>
+                          <div className="text-[10px] font-mono opacity-80">{plt.feePercent}% Platform Fee</div>
                         </button>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Customer Info */}
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {/* Payment Gateway Selector */}
                   <div>
-                    <label className="block text-[10px] text-neutral-400 mb-0.5">Customer Name</label>
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-2.5 py-1 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-sans text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-neutral-400 mb-0.5">Mobile Phone (Sri Lanka)</label>
-                    <input
-                      type="text"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full px-2.5 py-1 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Financial Summary & Checkout Button */}
-            <div className="pt-3 border-t border-neutral-800 space-y-2 text-xs">
-              <div className="space-y-1 font-mono">
-                <div className="flex justify-between text-neutral-400">
-                  <span>Base Item Price:</span>
-                  <span className="text-white">Rs. {baseItemPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-                {paymentFeeAmount > 0 ? (
-                  <div className="flex justify-between text-purple-400">
-                    <span>Payment Fee (+{Math.round(gatewayFeePercentage * 100)}% Add to Total):</span>
-                    <span>+Rs. {paymentFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between text-neutral-500 text-[11px]">
-                    <span>Payment Fee (0%):</span>
-                    <span>Rs. 0.00</span>
-                  </div>
-                )}
-                {courierFee > 0 && (
-                  <div className="flex justify-between text-neutral-400">
-                    <span>Courier Shipping Cost:</span>
-                    <span>+Rs. {courierFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-white font-bold text-sm pt-1.5 pb-1 border-t border-neutral-800">
-                  <span>Final Gross Total (Customer Pays):</span>
-                  <span className="text-purple-400">Rs. {finalGrossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-                {platformFeeAmount > 0 && (
-                  <div className="flex justify-between text-amber-400 text-[11px]">
-                    <span>Platform Fee ({activePlatform.feePercent}%):</span>
-                    <span>-Rs. {platformFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-neutral-400 text-[11px]">
-                  <span>Cost of Goods (COGS):</span>
-                  <span>-Rs. {totalCostOfGoods.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-                {hasUnregisteredInCart ? (
-                  <div className="pt-1.5 pb-1 border-t border-neutral-800">
-                    <div className="flex justify-between items-center text-amber-400">
-                      <span className="font-semibold text-[11px]">Net Estimated Profit:</span>
-                      <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
-                        Pending / Inventory Not Found
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-neutral-300 font-medium">Payment Gateway</span>
+                      <span className="text-[11px] font-mono text-purple-400">
+                        {isCreditActive ? 'Credit Sale (0% Surcharge)' : `Surcharge: ${Math.round(gatewayFeePercentage * 100)}% added`}
                       </span>
                     </div>
-                    <p className="text-[10px] text-amber-300/80 mt-1">
-                      Cart contains unregistered items with missing cost price. Arbitrary profit suppressed.
-                    </p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {allGateways.map((gw) => {
+                        const gwLower = gw.code.toLowerCase();
+                        const isCredit = gwLower === 'credit';
+                        const isBnpl =
+                          ['payzy', 'koko', 'mintpay'].includes(gwLower) ||
+                          gw.name.includes('Payzy') ||
+                          gw.name.includes('Koko') ||
+                          gw.name.includes('Mintpay');
+                        const isCard = gwLower.includes('card') || gw.name.includes('Card');
+                        const feePct = isCredit ? 0 : isBnpl ? 12 : isCard ? 3 : gw.feePercent;
+                        const isSelected = selectedGatewayCode === gw.code;
+
+                        return (
+                          <button
+                            key={gw.code}
+                            type="button"
+                            onClick={() => {
+                              setSelectedGatewayCode(gw.code);
+                              setIsCreditSale(isCredit);
+                            }}
+                            className={`p-2 rounded-lg border text-left transition-all ${
+                              isSelected
+                                ? isCredit
+                                  ? 'border-amber-500 bg-amber-500/15 text-white'
+                                  : 'border-purple-500 bg-purple-500/10 text-white'
+                                : 'border-neutral-800 bg-neutral-950 text-neutral-400 hover:border-neutral-700'
+                            }`}
+                          >
+                            <div className="font-semibold text-[11px] truncate flex items-center gap-1">
+                              {isCredit && <Clock className="w-3 h-3 text-amber-400" />}
+                              <span>{gw.name}</span>
+                            </div>
+                            <div className="text-[10px] font-mono opacity-80">
+                              {isCredit
+                                ? 'Store Credit (Pay Later)'
+                                : feePct > 0
+                                ? `+${feePct}% Added to Total`
+                                : '0% (No Surcharge)'}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-neutral-800">
-                    <div>
-                      <span>Net Estimated Profit:</span>
-                      <div className="text-[9px] text-neutral-400 font-sans font-normal">
-                        (Base Selling Price - COGS; Customer paid the {Math.round(gatewayFeePercentage * 100)}% fee)
+
+                  {/* Credit Customer Specific Settlement Details */}
+                  {isCreditActive && (
+                    <div className="p-3 bg-amber-950/20 border border-amber-500/40 rounded-xl space-y-2.5 text-xs animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-400" />
+                          Credit Customer Settlement Terms
+                        </span>
+                        <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+                          Account Receivable
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-neutral-400 mb-1">
+                            Payment Due Date *
+                          </label>
+                          <input
+                            type="date"
+                            value={creditDueDate}
+                            onChange={(e) => setCreditDueDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="w-full px-2.5 py-1.5 bg-neutral-900 border border-amber-500/50 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-neutral-400 mb-1">Due Date Presets</label>
+                          <div className="flex items-center gap-1">
+                            {[7, 14, 30].map((days) => (
+                              <button
+                                key={days}
+                                type="button"
+                                onClick={() => {
+                                  const d = new Date();
+                                  d.setDate(d.getDate() + days);
+                                  setCreditDueDate(d.toISOString().split('T')[0]);
+                                }}
+                                className="flex-1 py-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded text-[10px] font-mono text-amber-300"
+                              >
+                                +{days}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-neutral-400 mb-1">
+                          Payment Agreement / Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={creditNotes}
+                          onChange={(e) => setCreditNotes(e.target.value)}
+                          placeholder="e.g. 50% advance received, balance payable upon monthly settlement"
+                          className="w-full px-2.5 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white text-xs focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div className="text-[10px] text-amber-200/90 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20 flex items-start gap-1.5">
+                        <Send className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                        <span>
+                          Automated SMS with invoice details &amp; payment due date (
+                          <strong>
+                            {creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'Due Date'}
+                          </strong>
+                          ) will be dispatched to customer&apos;s phone upon completing sale.
+                        </span>
                       </div>
                     </div>
-                    <span className="text-sm font-bold">Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  )}
+
+                  {/* Customer Info (Searchable & Dynamic) */}
+                  <div className="space-y-2 pt-2 border-t border-neutral-800 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-300 font-medium flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-purple-400" />
+                        Customer Details
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerName('Cash Customer');
+                          setCustomerPhone('');
+                          setCustomerCity('Colombo 04');
+                          setIsCustomerDropdownOpen(false);
+                        }}
+                        className="text-[10px] text-purple-400 hover:text-purple-300 underline cursor-pointer"
+                      >
+                        Reset to Cash Customer
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 relative">
+                      {/* Customer Name input with autocomplete */}
+                      <div className="relative">
+                        <label className="block text-[10px] text-neutral-400 mb-0.5">Customer Name</label>
+                        <input
+                          type="text"
+                          value={customerName}
+                          onChange={(e) => {
+                            setCustomerName(e.target.value);
+                            setIsCustomerDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsCustomerDropdownOpen(true)}
+                          placeholder="Cash Customer (or search/type)"
+                          className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-sans text-xs focus:outline-none focus:border-purple-500"
+                        />
+
+                        {/* Customer Autocomplete Dropdown */}
+                        {isCustomerDropdownOpen && customerList.length > 0 && (
+                          <div className="absolute top-full left-0 z-50 w-72 mt-1 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl max-h-52 overflow-y-auto p-1 text-xs">
+                            <div className="px-2 py-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex justify-between items-center border-b border-neutral-800">
+                              <span>Directory Customers</span>
+                              <button
+                                type="button"
+                                onClick={() => setIsCustomerDropdownOpen(false)}
+                                className="text-neutral-500 hover:text-white"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            {customerList
+                              .filter(
+                                (c) =>
+                                  !customerName ||
+                                  customerName === 'Cash Customer' ||
+                                  c.name?.toLowerCase().includes(customerName.toLowerCase()) ||
+                                  c.phone?.includes(customerName)
+                              )
+                              .slice(0, 8)
+                              .map((c, i) => (
+                                <div
+                                  key={i}
+                                  onClick={() => {
+                                    setCustomerName(c.name || 'Valued Customer');
+                                    setCustomerPhone(c.phone || '');
+                                    if (c.city) setCustomerCity(c.city);
+                                    if (c.address) setCustomerAddress(c.address);
+                                    setIsCustomerDropdownOpen(false);
+                                  }}
+                                  className="p-2 hover:bg-neutral-800 rounded-lg cursor-pointer transition flex items-center justify-between"
+                                >
+                                  <div>
+                                    <div className="font-semibold text-white">{c.name || 'Customer'}</div>
+                                    <div className="text-[10px] font-mono text-purple-400">{c.phone}</div>
+                                  </div>
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-950 text-neutral-400 font-mono">
+                                    {c.source || 'POS'}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Customer Phone */}
+                      <div>
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="block text-[10px] text-neutral-400">
+                            Mobile Phone {isCreditActive && <span className="text-amber-400 font-bold">* Required</span>}
+                          </label>
+                          <span className="text-[9px] text-neutral-500 font-mono">Auto +94</span>
+                        </div>
+                        <input
+                          type="text"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(handleLivePhoneInput(e.target.value))}
+                          onBlur={() => {
+                            if (customerPhone.trim()) {
+                              setCustomerPhone(formatSriLankanPhone(customerPhone));
+                            }
+                          }}
+                          placeholder="0715330724 (or leave blank)"
+                          className={`w-full px-2.5 py-1.5 bg-neutral-950 border ${
+                            isCreditActive && (!customerPhone || customerPhone.length < 9)
+                              ? 'border-amber-500/80 ring-1 ring-amber-500/40'
+                              : 'border-neutral-800'
+                          } rounded-lg text-white font-mono text-xs focus:outline-none focus:border-purple-500`}
+                        />
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCheckout}
-                disabled={cart.length === 0}
-                className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-xs shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2 transition-all"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Complete POS Sale & Print Invoice (Rs. {finalGrossTotal.toLocaleString()})</span>
-              </button>
+              {/* Financial Summary & Checkout Button */}
+              <div className="pt-3 border-t border-neutral-800 space-y-2 text-xs">
+                <div className="space-y-1 font-mono">
+                  <div className="flex justify-between text-neutral-400">
+                    <span>Gross Item Subtotal:</span>
+                    <span className="text-white">
+                      Rs. {grossItemSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {totalDiscount > 0 && (
+                    <div className="flex justify-between text-emerald-400 font-semibold">
+                      <span>Total Discounts Applied:</span>
+                      <span>-Rs. {totalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
+                  {billDiscountAmount > 0 && (
+                    <div className="flex justify-between text-neutral-500 text-[11px]">
+                      <span>└ Bill Discount ({billDiscountType === 'percent' ? `${billDiscountValue}%` : `Rs. ${billDiscountValue}`}):</span>
+                      <span>-Rs. {billDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
+                  {paymentFeeAmount > 0 ? (
+                    <div className="flex justify-between text-purple-400">
+                      <span>Payment Fee (+{Math.round(gatewayFeePercentage * 100)}% Add to Total):</span>
+                      <span>+Rs. {paymentFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-neutral-500 text-[11px]">
+                      <span>Payment Fee (0%):</span>
+                      <span>Rs. 0.00</span>
+                    </div>
+                  )}
+
+                  {courierFee > 0 && (
+                    <div className="flex justify-between text-neutral-400">
+                      <span>Courier Shipping Cost:</span>
+                      <span>+Rs. {courierFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-white font-bold text-sm pt-1.5 pb-1 border-t border-neutral-800">
+                    <span>Final Gross Total (Customer Pays):</span>
+                    <span className="text-purple-400">
+                      Rs. {finalGrossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+
+                  {platformFeeAmount > 0 && (
+                    <div className="flex justify-between text-amber-400 text-[11px]">
+                      <span>Platform Fee ({activePlatform.feePercent}%):</span>
+                      <span>-Rs. {platformFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-neutral-400 text-[11px]">
+                    <span>Cost of Goods (COGS):</span>
+                    <span>-Rs. {totalCostOfGoods.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+
+                  {hasUnregisteredInCart ? (
+                    <div className="pt-1.5 pb-1 border-t border-neutral-800">
+                      <div className="flex justify-between items-center text-amber-400">
+                        <span className="font-semibold text-[11px]">Net Estimated Profit:</span>
+                        <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
+                          Pending / Inventory Not Found
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-amber-300/80 mt-1">
+                        Cart contains unregistered items with missing cost price. Arbitrary profit suppressed.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-emerald-400 font-semibold pt-1 border-t border-neutral-800">
+                      <div>
+                        <span>Net Estimated Profit:</span>
+                        <div className="text-[9px] text-neutral-400 font-sans font-normal">
+                          (Net Selling Price - COGS - Platform Fee)
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold">
+                        Rs. {netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0}
+                  className={`w-full py-2.5 px-4 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-xs shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    isCreditActive
+                      ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-900/30'
+                      : 'bg-purple-600 hover:bg-purple-500 shadow-purple-900/30'
+                  }`}
+                >
+                  {isCreditActive ? (
+                    <>
+                      <Clock className="w-4 h-4" />
+                      <span>
+                        Complete Credit Sale &amp; Send Due SMS (Rs. {finalGrossTotal.toLocaleString()})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="w-4 h-4" />
+                      <span>Complete POS Sale &amp; Print Invoice (Rs. {finalGrossTotal.toLocaleString()})</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
 
       {/* INVOICES & RETURNS MANAGEMENT VIEW */}
       {activeSubTab === 'invoices' && (

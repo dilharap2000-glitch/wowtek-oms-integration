@@ -270,6 +270,11 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                       </div>
                       <div>
                         Payment: <strong className="text-neutral-800">{order.paymentGatewayName}</strong>
+                        {order.isCreditSale && (
+                          <span className="ml-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            CREDIT DUE: {order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pay Later'}
+                          </span>
+                        )}
                       </div>
                       <div>
                         Channel: <strong className="text-neutral-800">{order.channelName}</strong>
@@ -422,6 +427,15 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                     </span>
                   </div>
 
+                  {order.totalDiscount && order.totalDiscount > 0 ? (
+                    <div className="flex justify-between text-emerald-600 font-medium">
+                      <span>Discount Applied:</span>
+                      <span className="font-mono tabular-nums">
+                        -Rs. {Number(order.totalDiscount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ) : null}
+
                   {order.courierFee > 0 && (
                     <div className="flex justify-between text-neutral-600">
                       <span>Delivery / Courier Fee:</span>
@@ -448,6 +462,15 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                       Rs. {Number(order.grossTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
+
+                  {order.isCreditSale && (
+                    <div className="mt-2 pt-2 border-t border-dashed border-amber-300 bg-amber-50 rounded p-2 text-amber-900 font-semibold text-xs flex justify-between items-center">
+                      <span>CREDIT SALE DUE:</span>
+                      <span className="font-mono font-bold">
+                        {order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Pay Later'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -567,7 +590,11 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span>PAYMENT:</span>
-                  <span>{order.paymentGatewayName}</span>
+                  <span className="font-bold">
+                    {order.isCreditSale
+                      ? `CREDIT (DUE: ${order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB') : 'Pay Later'})`
+                      : order.paymentGatewayName}
+                  </span>
                 </div>
               </div>
 
@@ -578,6 +605,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                       <div>{it.name}</div>
                       <div className="text-[9px] text-neutral-600">
                         {it.quantity} x Rs. {Number(it.unitPrice).toLocaleString()}
+                        {it.serialNumber && ` (SN: ${it.serialNumber})`}
                       </div>
                       <div className="text-[8px] text-purple-700">
                         Warranty: {getItemWarranty(it.sku, it.name)}
@@ -595,6 +623,12 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                   <span>SUBTOTAL:</span>
                   <span>Rs. {Number(subtotal).toLocaleString()}</span>
                 </div>
+                {order.totalDiscount && order.totalDiscount > 0 ? (
+                  <div className="flex justify-between text-neutral-600">
+                    <span>DISCOUNT:</span>
+                    <span>-Rs. {Number(order.totalDiscount).toLocaleString()}</span>
+                  </div>
+                ) : null}
                 {order.gatewayFeePercent > 0 && (
                   <div className="flex justify-between text-neutral-600">
                     <span>GATEWAY SURCHARGE ({order.gatewayFeePercent}%):</span>
@@ -611,6 +645,11 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                   <span>TOTAL PAYABLE:</span>
                   <span>Rs. {Number(order.grossTotal).toLocaleString()}</span>
                 </div>
+                {order.isCreditSale && (
+                  <div className="text-center font-bold text-[11px] pt-1 text-red-700 border-t border-dashed border-black">
+                    *** CREDIT SALE - DUE: {order.creditDueDate ? new Date(order.creditDueDate).toLocaleDateString('en-GB') : 'Pay Later'} ***
+                  </div>
+                )}
               </div>
 
               {/* Compact Warranty Notice */}

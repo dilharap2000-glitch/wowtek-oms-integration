@@ -36,6 +36,11 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   costPrice: number;
+  originalPrice?: number;
+  discountAmount?: number;
+  discountPercent?: number;
+  discountType?: 'fixed' | 'percent';
+  serialNumber?: string;
   isRegistered?: boolean;
   returned?: boolean;
   returnedQty?: number;
@@ -108,6 +113,13 @@ export interface Order {
   returnedAt?: string;
   returnReason?: string;
   smsConfirmationSent?: boolean;
+  isCreditSale?: boolean;
+  creditDueDate?: string;
+  creditSettled?: boolean;
+  billDiscountAmount?: number;
+  billDiscountPercent?: number;
+  billDiscountType?: 'fixed' | 'percent';
+  totalDiscount?: number;
 }
 
 export interface Supplier {
