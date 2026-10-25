@@ -22,11 +22,13 @@ import {
   PlusCircle,
   AlertTriangle,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { Product, Supplier, Order } from '@/types';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { BarcodeModal } from '@/components/BarcodeModal';
 import { AddProductGRNForm, RestockGRNForm } from '@/components/GRNForms';
+import { InventoryAuditView } from './InventoryAuditView';
 
 interface ProductsTabProps {
   products: Product[];

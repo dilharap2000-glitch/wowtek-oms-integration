@@ -27,10 +27,55 @@ export async function POST(req: Request) {
     const { db } = await connectToDatabase();
     const qty = Number(restockQty || 1);
 
-    // 1. Serials පාර්ස් කර ගැනීම
+    // 1. Serials parsing and strict uniqueness enforcement
     let serialsArray: string[] = [];
-    if (serialNumbersInput && typeof serialNumbersInput === 'string' && serialNumbersInput.trim() !== '') {
-      serialsArray = serialNumbersInput.split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (Array.isArray(body.serials)) {
+      serialsArray = body.serials.map((s: string) => String(s).trim()).filter(Boolean);
+    } else if (serialNumbersInput && typeof serialNumbersInput === 'string' && serialNumbersInput.trim() !== '') {
+      serialsArray = serialNumbersInput.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean);
+    }
+
+    // A. Detect duplicates within the newly submitted batch
+    const seenBatchSerials = new Set<string>();
+    for (const sn of serialsArray) {
+      const lower = sn.toLowerCase();
+      if (seenBatchSerials.has(lower)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Duplicate tracking number in GRN batch: '${sn}'. No two items can share the same Serial / IMEI.`,
+          },
+          { status: 400 }
+        );
+      }
+      seenBatchSerials.add(lower);
+    }
+
+    // B. Check against database: Prevent duplicate active/in-stock serials across inventory
+    if (serialsArray.length > 0) {
+      const existingConflict = await db.collection<any>('products').findOne({
+        'activeSerials': {
+          $elemMatch: {
+            serialNumber: { $in: serialsArray },
+            status: { $in: ['Available', 'In-Stock'] },
+          },
+        },
+      });
+
+      if (existingConflict) {
+        const conflictUnit = (existingConflict.activeSerials || []).find(
+          (u: any) =>
+            serialsArray.some((s) => s.toLowerCase() === (u.serialNumber || '').toLowerCase()) &&
+            ['Available', 'In-Stock'].includes(u.status)
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Serial / IMEI '${conflictUnit?.serialNumber || 'entered'}' is already registered and active in store stock under '${existingConflict.name || existingConflict.sku}'. Duplicate serial numbers are strictly prohibited.`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const processedUnits = [];
@@ -44,17 +89,23 @@ export async function POST(req: Request) {
         batchRef: batchRef || 'BATCH-GEN',
         costPrice: Number(costPrice || 0),
         sellingPrice: Number(sellingPrice || 0),
-        status: 'In-Stock',
+        status: 'Available',
+        source: 'GRN Inward',
+        supplier: supplier || 'Direct Supplier',
         addedDate: new Date(),
+        addedAt: new Date().toISOString(),
       });
     }
 
-    // 2. Product එක database එකේ තියෙනවද බලලා update හෝ insert කිරීම (Upsert)
+    // 2. Product upsert in MongoDB
     const targetTitle = productTitle || body.name || `Product ${sku}`;
     const targetCost = Number(costPrice || 0);
     const targetSelling = Number(sellingPrice || 0);
     const targetWarranty = Number(warrantyMonths || 0);
     const targetSupplier = supplier || 'Direct Supplier';
+    const isSerialized = Boolean(body.isSerialized || serialsArray.length > 0);
+
+    const validNewSerials = processedUnits.map((u) => u.serialNumber);
 
     await db.collection('products').updateOne(
       { $or: [{ sku: sku }, { skuCode: sku }] },
@@ -70,6 +121,7 @@ export async function POST(req: Request) {
           warrantyMonths: targetWarranty,
           warrantyPeriodMonths: targetWarranty,
           supplier: targetSupplier,
+          isSerialized: isSerialized,
           updatedAt: new Date().toISOString(),
         },
         $setOnInsert: {
@@ -81,6 +133,7 @@ export async function POST(req: Request) {
         $inc: { storeStock: qty, stockQuantity: qty },
         $push: {
           activeSerials: { $each: processedUnits },
+          serialNumbers: { $each: validNewSerials },
         } as any,
       },
       { upsert: true }

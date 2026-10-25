@@ -111,6 +111,20 @@ export function RestockGRNModal({
       return;
     }
 
+    if (serialNumbersInput.trim()) {
+      const serials = serialNumbersInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+      const seen = new Set<string>();
+      for (const s of serials) {
+        const lower = s.toLowerCase();
+        if (seen.has(lower)) {
+          setErrorMessage(`Duplicate serial number '${s}' entered. Each unit must have a unique tracking number.`);
+          setLoading(false);
+          return;
+        }
+        seen.add(lower);
+      }
+    }
+
     try {
       // Pass both id and sku in the JSON payload
       const payload = {

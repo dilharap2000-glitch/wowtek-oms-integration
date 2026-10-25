@@ -291,6 +291,29 @@ export async function saveOrder(order: Order): Promise<Order> {
       const availableStock = prod ? (prod.stockStore || 0) + (prod.stockWarehouse || 0) : 0;
 
       if (prod && availableStock >= item.quantity) {
+        // Lock specific serial as Sold if product is serialized
+        if (Array.isArray(prod.activeSerials)) {
+          const reqSerial = (item.serialNumber || '').trim().toLowerCase();
+          const targetUnit = reqSerial
+            ? prod.activeSerials.find((u: any) => ((typeof u === 'string' ? u : u.serialNumber) || '').toLowerCase() === reqSerial)
+            : prod.activeSerials.find((u: any) => typeof u === 'object' && (u.status === 'Available' || u.status === 'In-Stock'));
+
+          if (targetUnit && typeof targetUnit === 'object') {
+            targetUnit.status = 'Sold';
+            targetUnit.orderId = order.id;
+            targetUnit.invoiceNumber = order.invoiceNumber;
+            targetUnit.soldAt = new Date().toISOString();
+            targetUnit.customerName = order.customerName;
+            targetUnit.customerPhone = order.customerPhone;
+            item.serialNumber = targetUnit.serialNumber;
+          }
+        }
+        if (Array.isArray(prod.serialNumbers) && item.serialNumber) {
+          prod.serialNumbers = prod.serialNumbers.filter(
+            (s) => s.toLowerCase() !== item.serialNumber!.toLowerCase()
+          );
+        }
+
         // Deduct stock only when product actually exists and has sufficient stock
         if (prod.stockStore >= item.quantity) {
           prod.stockStore -= item.quantity;
@@ -1421,3 +1444,60 @@ export async function recordCreditPayment(
     return { success: false, error: err.message };
   }
 }
+
+export async function updateProductSerialStatus(
+  skuOrId: string,
+  serialNumber: string,
+  newStatus: string,
+  reason?: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const mock = initMockDb();
+  const prod = mock.products.find((p) => p.sku === skuOrId || p.id === skuOrId);
+  let changed = false;
+
+  if (prod && Array.isArray(prod.activeSerials)) {
+    const unit = prod.activeSerials.find(
+      (s: any) => ((typeof s === 'string' ? s : s.serialNumber) || '').toLowerCase() === serialNumber.trim().toLowerCase()
+    );
+    if (unit && typeof unit === 'object') {
+      const prevStatus = unit.status;
+      unit.status = newStatus;
+      if (newStatus === 'Missing') {
+        unit.discrepancyReason = reason || 'Reported missing during inventory audit';
+        unit.reportedMissingAt = new Date().toISOString();
+        if (prevStatus === 'Available' || prevStatus === 'In-Stock') {
+          prod.stockStore = Math.max(0, (prod.stockStore || prod.storeStock || 1) - 1);
+          prod.storeStock = prod.stockStore;
+          prod.stockQuantity = prod.stockStore;
+        }
+      } else if (newStatus === 'Available' || newStatus === 'In-Stock') {
+        unit.discrepancyReason = undefined;
+        unit.reportedMissingAt = undefined;
+        if (prevStatus === 'Missing') {
+          prod.stockStore = (prod.stockStore || prod.storeStock || 0) + 1;
+          prod.storeStock = prod.stockStore;
+          prod.stockQuantity = prod.stockStore;
+        }
+      }
+      persistMockDb();
+      changed = true;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch('/api/inventory/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: skuOrId, serialNumber, newStatus, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, message: data.message };
+      }
+    } catch {}
+  }
+
+  return { success: changed, message: `Serial ${serialNumber} status set to ${newStatus}` };
+}
+

@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
         }
 
         const activeSerials = product.activeSerials || [];
-        let availableUnits = activeSerials.filter((s: any) => s.status === 'In-Stock');
+        let availableUnits = activeSerials.filter((s: any) => s.status === 'In-Stock' || s.status === 'Available');
 
         // Legacy inventory compatibility: if storeStock exists but activeSerials hasn't been seeded
         if (availableUnits.length < qtyToBuy && (product.storeStock || product.stockQuantity || 0) >= qtyToBuy) {
@@ -193,8 +193,9 @@ export async function POST(req: NextRequest) {
               batchRef: product.lastBatchRef || 'INITIAL-STOCK',
               costPrice: Number(product.costPrice || 0),
               sellingPrice: Number(product.sellingPrice || 0),
-              status: 'In-Stock',
+              status: 'Available',
               addedDate: new Date(),
+              addedAt: new Date().toISOString(),
             });
           }
           await db.collection('products').updateOne(
@@ -202,10 +203,10 @@ export async function POST(req: NextRequest) {
             { $push: { activeSerials: { $each: autoUnits } } as any }
           );
           product.activeSerials = [...(product.activeSerials || []), ...autoUnits];
-          availableUnits = product.activeSerials.filter((s: any) => s.status === 'In-Stock');
+          availableUnits = product.activeSerials.filter((s: any) => s.status === 'In-Stock' || s.status === 'Available');
         }
 
-        // ස්ටොක් ප්රමාණවත් නැත්නම් Pending Stock ලෙස සලකයි
+        // If stock is insufficient, mark Pending Stock
         if (availableUnits.length < qtyToBuy) {
           isAnyItemPending = true;
           processedItems.push({
@@ -223,19 +224,56 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // බඩු තිබේ නම් Serials allocate කර Stock අඩු කිරීම
-        const allocatedUnits = availableUnits.slice(0, qtyToBuy);
+        // Exact Serial Number Allocation: prioritize cashier-selected / scanned serial number!
+        let allocatedUnits: any[] = [];
+        if (item.serialNumber && typeof item.serialNumber === 'string') {
+          const matchedExact = availableUnits.find(
+            (u: any) => (u.serialNumber || '').toLowerCase() === item.serialNumber.trim().toLowerCase()
+          );
+          if (matchedExact) {
+            allocatedUnits.push(matchedExact);
+          }
+        }
+        if (Array.isArray(item.allocatedSerials) && item.allocatedSerials.length > 0) {
+          const candidates = availableUnits.filter(
+            (u: any) =>
+              item.allocatedSerials.some((s: string) => s.toLowerCase() === (u.serialNumber || '').toLowerCase()) &&
+              !allocatedUnits.includes(u)
+          );
+          allocatedUnits = [...allocatedUnits, ...candidates];
+        }
+
+        // Fill remaining needed units if any
+        if (allocatedUnits.length < qtyToBuy) {
+          const remainingNeeded = qtyToBuy - allocatedUnits.length;
+          const unallocatedPool = availableUnits.filter((u: any) => !allocatedUnits.includes(u));
+          allocatedUnits = [...allocatedUnits, ...unallocatedPool.slice(0, remainingNeeded)];
+        }
+
         const allocatedSerialNumbers = allocatedUnits.map((u: any) => u.serialNumber);
         const unitIdsToUpdate = allocatedUnits.map((u: any) => u.serialNumber);
 
+        // Lock specific serial numbers as "Sold" and link customer's invoice
         await db.collection('products').updateOne(
           { _id: product._id, 'activeSerials.serialNumber': { $in: unitIdsToUpdate } },
           {
             $inc: { storeStock: -qtyToBuy, stockQuantity: -qtyToBuy },
-            $set: { 'activeSerials.$[elem].status': 'Sold' },
+            $set: {
+              'activeSerials.$[elem].status': 'Sold',
+              'activeSerials.$[elem].orderId': orderId,
+              'activeSerials.$[elem].invoiceNumber': orderId,
+              'activeSerials.$[elem].soldAt': new Date().toISOString(),
+              'activeSerials.$[elem].customerName': customerDetails.name,
+              'activeSerials.$[elem].customerPhone': customerDetails.phone,
+            },
+            $pull: { serialNumbers: { $in: unitIdsToUpdate } } as any,
           },
           { arrayFilters: [{ 'elem.serialNumber': { $in: unitIdsToUpdate } }] }
         );
+
+        // Attach allocated serial to item for customer invoice
+        item.serialNumber = allocatedSerialNumbers[0] || item.serialNumber;
+        item.allocatedSerials = allocatedSerialNumbers;
 
         const unitPrice = Number(item.sellingPrice || item.unitPrice || product.sellingPrice || 0);
         const costPrice = Number(allocatedUnits[0]?.costPrice || product.costPrice || 0);

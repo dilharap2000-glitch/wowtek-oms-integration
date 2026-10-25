@@ -29,6 +29,8 @@ import {
   Calendar,
   Send,
   UserCheck,
+  ShieldCheck,
+  Hash,
 } from 'lucide-react';
 import {
   Order,
@@ -116,8 +118,61 @@ export const PosTab: React.FC<PosTabProps> = ({
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null);
   const [returnReason, setReturnReason] = useState('Customer Return & Restock');
   const [editModalOrder, setEditModalOrder] = useState<Order | null>(null);
-  const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'terminal' | 'invoices' | 'credit'>('terminal');
+
+  // Serial Number Mandate & Selection States
+  const [serialPickerItem, setSerialPickerItem] = useState<OrderItem | null>(null);
+  const [pickerScanInput, setPickerScanInput] = useState<string>('');
+  const [pickerError, setPickerError] = useState<string | null>(null);
+
+  // Check if a product in inventory requires strict serial number tracking
+  const isItemSerialized = useCallback(
+    (sku: string, barcode?: string) => {
+      const prod = products.find(
+        (p) =>
+          p.sku.toLowerCase() === sku.toLowerCase() ||
+          (barcode && p.barcode && p.barcode.toLowerCase() === barcode.toLowerCase())
+      );
+      if (!prod) return false;
+      if (prod.isSerialized) return true;
+      if (Array.isArray((prod as any).activeSerials) && (prod as any).activeSerials.length > 0) return true;
+      if (Array.isArray(prod.serialNumbers) && prod.serialNumbers.length > 0) return true;
+      return false;
+    },
+    [products]
+  );
+
+  // Retrieve all currently available in-stock serial numbers for a given product
+  const getAvailableSerialsForSku = useCallback(
+    (sku: string, barcode?: string): string[] => {
+      const prod = products.find(
+        (p) =>
+          p.sku.toLowerCase() === sku.toLowerCase() ||
+          (barcode && p.barcode && p.barcode.toLowerCase() === barcode.toLowerCase())
+      );
+      if (!prod) return [];
+      const list: string[] = [];
+
+      if (Array.isArray((prod as any).activeSerials)) {
+        (prod as any).activeSerials.forEach((s: any) => {
+          const sn = typeof s === 'string' ? s : s?.serialNumber;
+          const status = typeof s === 'object' ? s.status : 'Available';
+          if (sn && (status === 'Available' || status === 'In-Stock' || !status)) {
+            list.push(sn);
+          }
+        });
+      }
+      if (Array.isArray(prod.serialNumbers)) {
+        prod.serialNumbers.forEach((sn) => {
+          if (sn && !list.includes(sn)) {
+            list.push(sn);
+          }
+        });
+      }
+      return list;
+    },
+    [products]
+  );
 
   // Count active credit orders with remaining balances
   const creditUnsettledCount = React.useMemo(() => {
@@ -526,6 +581,31 @@ export const PosTab: React.FC<PosTabProps> = ({
     e.preventDefault();
     if (cart.length === 0) {
       alert('Cart is empty. Please scan or select products.');
+      return;
+    }
+
+    // Requirement 2: Strict Serial Number Mandate for Serialized Items
+    for (const item of cart) {
+      if (isItemSerialized(item.sku, item.barcode)) {
+        if (!item.serialNumber || !item.serialNumber.trim()) {
+          setSerialPickerItem(item);
+          alert(
+            `Serial Number Required Before Checkout: "${item.name}" (${item.sku}) is a serialized product. Cashier must scan or select the exact unique Serial Number / IMEI being sold to the customer.`
+          );
+          return;
+        }
+      }
+    }
+
+    // Check duplicate serials in current cart
+    const allocatedSerialsInCart = cart
+      .map((i) => (i.serialNumber || '').trim().toLowerCase())
+      .filter(Boolean);
+    const uniqueSerialsSet = new Set(allocatedSerialsInCart);
+    if (uniqueSerialsSet.size !== allocatedSerialsInCart.length) {
+      alert(
+        'Duplicate Serial Number Alert: Two or more items in the cart share the exact same serial number. Every physical unit sold must have its own unique tracking number.'
+      );
       return;
     }
 
@@ -1078,10 +1158,44 @@ export const PosTab: React.FC<PosTabProps> = ({
                             <div className="font-semibold text-white truncate">{item.name}</div>
                             <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
                               <span>SKU: {item.sku}</span>
-                              {item.serialNumber && (
-                                <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-300 rounded border border-purple-500/30">
-                                  SN: {item.serialNumber}
-                                </span>
+                              {isItemSerialized(item.sku, item.barcode) ? (
+                                item.serialNumber ? (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30 text-[10px]">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                    <span>SN: {item.serialNumber}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setPickerError(null);
+                                        setPickerScanInput('');
+                                        setSerialPickerItem(item);
+                                      }}
+                                      className="text-slate-400 hover:text-white underline text-[9px] ml-1 cursor-pointer"
+                                      title="Change serial allocation"
+                                    >
+                                      Change
+                                    </button>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPickerError(null);
+                                      setPickerScanInput('');
+                                      setSerialPickerItem(item);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 text-[10px] font-bold animate-pulse cursor-pointer shadow-sm"
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                    <span>⚠️ Scan / Select S/N (Mandatory)</span>
+                                  </button>
+                                )
+                              ) : (
+                                item.serialNumber && (
+                                  <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-300 rounded border border-purple-500/30">
+                                    SN: {item.serialNumber}
+                                  </span>
+                                )
                               )}
                             </div>
                           </div>
@@ -2321,6 +2435,152 @@ export const PosTab: React.FC<PosTabProps> = ({
           products={products}
           onClose={() => setSelectedOrderForThermalPrint(null)}
         />
+      )}
+
+      {/* Mandatory Serial Number & IMEI Allocation Modal */}
+      {serialPickerItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <h3 className="text-sm font-semibold text-white">Allocate Unique Serial / IMEI</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSerialPickerItem(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+                <div className="font-semibold text-white text-sm">{serialPickerItem.name}</div>
+                <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+                  <span>SKU: {serialPickerItem.sku}</span>
+                  {serialPickerItem.barcode && <span>Barcode: {serialPickerItem.barcode}</span>}
+                </div>
+              </div>
+
+              <div className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-xl text-purple-200 text-[11px] leading-relaxed">
+                <strong className="text-purple-300">Mandatory Unique Tracking:</strong> Scan the physical barcode on the box or pick from available store stock. This locks the exact serial number as &quot;Sold&quot; on customer&apos;s invoice.
+              </div>
+
+              {/* Barcode scanner input inside modal */}
+              <div className="space-y-1">
+                <label className="block text-slate-300 font-medium text-[11px]">
+                  Scan Serial Barcode or Enter IMEI
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Barcode className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={pickerScanInput}
+                      onChange={(e) => setPickerScanInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const clean = pickerScanInput.trim();
+                          if (!clean) return;
+                          setCart((prev) =>
+                            prev.map((i) =>
+                              i.sku === serialPickerItem.sku ? { ...i, serialNumber: clean } : i
+                            )
+                          );
+                          setSerialPickerItem(null);
+                        }
+                      }}
+                      placeholder="Scan or type serial..."
+                      className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-purple-500/50 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = pickerScanInput.trim();
+                      if (!clean) return;
+                      setCart((prev) =>
+                        prev.map((i) =>
+                          i.sku === serialPickerItem.sku ? { ...i, serialNumber: clean } : i
+                        )
+                      );
+                      setSerialPickerItem(null);
+                    }}
+                    className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold cursor-pointer transition-colors"
+                  >
+                    Assign
+                  </button>
+                </div>
+              </div>
+
+              {/* Available In-Stock Serials */}
+              {(() => {
+                const available = getAvailableSerialsForSku(serialPickerItem.sku, serialPickerItem.barcode);
+                return (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                      <span>Available Store Shelf Serials ({available.length})</span>
+                      <span className="text-[10px]">Click to allocate</span>
+                    </div>
+
+                    {available.length === 0 ? (
+                      <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl text-center text-slate-500 text-[11px]">
+                        No pre-registered serials found in stock. You can type/scan any physical unit serial above.
+                      </div>
+                    ) : (
+                      <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-950 rounded-xl border border-slate-800">
+                        {available.map((sn) => {
+                          const isCurrentlyAssigned = serialPickerItem.serialNumber === sn;
+                          return (
+                            <button
+                              key={sn}
+                              type="button"
+                              onClick={() => {
+                                setCart((prev) =>
+                                  prev.map((i) =>
+                                    i.sku === serialPickerItem.sku ? { ...i, serialNumber: sn } : i
+                                  )
+                                );
+                                setSerialPickerItem(null);
+                              }}
+                              className={`w-full flex items-center justify-between p-2 rounded-lg border text-left font-mono transition-all cursor-pointer ${
+                                isCurrentlyAssigned
+                                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
+                                  : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-purple-500/50 hover:bg-slate-850'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Hash className="w-3.5 h-3.5 text-purple-400" />
+                                <span className="font-semibold text-xs">{sn}</span>
+                              </div>
+                              <span className="text-[10px] text-emerald-400 font-sans">
+                                {isCurrentlyAssigned ? '✓ Selected' : 'Select'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="flex justify-end pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSerialPickerItem(null)}
+                  className="px-4 py-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
