@@ -285,8 +285,21 @@ export const PosTab: React.FC<PosTabProps> = ({
     ? 0
     : Math.round(baseItemPrice - totalCostOfGoods - platformFeeAmount);
 
-  // Add product to cart by barcode or SKU
+  // Add product to cart by barcode, SKU, or serial number
   const handleAddProductToCart = (prod: Product, serialNumber?: string) => {
+    // If not explicitly provided, allocate available serial from activeSerials or serialNumbers if present
+    const allocatedSerial =
+      serialNumber ||
+      (Array.isArray((prod as any).activeSerials)
+        ? (prod as any).activeSerials.find((s: any) =>
+            typeof s === 'object' ? s.status === 'Available' || !s.status : Boolean(s)
+          )?.serialNumber ||
+          (typeof (prod as any).activeSerials[0] === 'string'
+            ? (prod as any).activeSerials[0]
+            : (prod as any).activeSerials[0]?.serialNumber)
+        : undefined) ||
+      (Array.isArray(prod.serialNumbers) && prod.serialNumbers.length > 0 ? prod.serialNumbers[0] : undefined);
+
     setCart((prev) => {
       const existing = prev.find((item) => item.sku === prod.sku);
       if (existing) {
@@ -295,7 +308,7 @@ export const PosTab: React.FC<PosTabProps> = ({
             ? {
                 ...item,
                 quantity: item.quantity + 1,
-                serialNumber: serialNumber || item.serialNumber,
+                serialNumber: allocatedSerial || item.serialNumber,
               }
             : item
         );
@@ -310,7 +323,7 @@ export const PosTab: React.FC<PosTabProps> = ({
           unitPrice: prod.sellingPrice,
           costPrice: prod.costPrice,
           originalPrice: prod.sellingPrice,
-          serialNumber: serialNumber,
+          serialNumber: allocatedSerial,
         },
       ];
     });
@@ -338,33 +351,43 @@ export const PosTab: React.FC<PosTabProps> = ({
         matchedProduct = p;
         break;
       }
-      // 3. Serial number in activeSerials
+      // 3. Serial number in activeSerials (both object and string shapes)
       const serials = (p as any).activeSerials;
       if (Array.isArray(serials)) {
-        const found = serials.find(
-          (s: any) => s.serialNumber && s.serialNumber.trim().toLowerCase() === clean.toLowerCase()
-        );
+        const found = serials.find((s: any) => {
+          const sn = typeof s === 'string' ? s : s?.serialNumber;
+          return sn && sn.trim().toLowerCase() === clean.toLowerCase();
+        });
         if (found) {
           matchedProduct = p;
-          matchedSerial = found.serialNumber;
+          matchedSerial = typeof found === 'string' ? found : found.serialNumber;
+          break;
+        }
+      }
+      // 4. Serial number in serialNumbers array
+      if (Array.isArray(p.serialNumbers)) {
+        const found = p.serialNumbers.find((s: string) => s && s.trim().toLowerCase() === clean.toLowerCase());
+        if (found) {
+          matchedProduct = p;
+          matchedSerial = found;
           break;
         }
       }
     }
 
     if (matchedProduct) {
-      handleAddProductToCart(matchedProduct, matchedSerial);
+      handleAddProductToCart(matchedProduct, matchedSerial || clean);
       setScanStatus({
         type: 'success',
         message: `Scanned & Added: ${matchedProduct.name} (Rs. ${matchedProduct.sellingPrice.toLocaleString()})${
-          matchedSerial ? ` [Allocated Serial: ${matchedSerial}]` : ''
+          matchedSerial ? ` [Allocated S/N: ${matchedSerial}]` : ''
         }`,
       });
       setActiveScanInput('');
     } else {
       setScanStatus({
         type: 'error',
-        message: `No inventory product or serial found for "${clean}". You can search or add as custom item.`,
+        message: `No inventory product or serial found for "${clean}". You can search catalog or add as custom item.`,
       });
     }
 
@@ -725,13 +748,32 @@ export const PosTab: React.FC<PosTabProps> = ({
     setReturnModalOrder(null);
   };
 
-  // Filter products for catalog search
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.barcode.includes(productSearch)
-  );
+  // Filter products for catalog search (Supports Name, SKU, Barcode, Replacement S/Ns, and Active Serials)
+  const filteredProducts = products.filter((p) => {
+    const q = (productSearch || '').trim().toLowerCase();
+    if (!q) return true;
+    if (p.name && p.name.toLowerCase().includes(q)) return true;
+    if (p.sku && p.sku.toLowerCase().includes(q)) return true;
+    if (p.barcode && p.barcode.toLowerCase().includes(q)) return true;
+
+    // Check active serial numbers (e.g. from Supplier RMA replacements)
+    const activeSerials = (p as any).activeSerials;
+    if (Array.isArray(activeSerials)) {
+      const match = activeSerials.some((s: any) => {
+        const sn = typeof s === 'string' ? s : s?.serialNumber;
+        return sn && sn.toLowerCase().includes(q);
+      });
+      if (match) return true;
+    }
+
+    // Check serialNumbers string array
+    if (Array.isArray(p.serialNumbers)) {
+      const match = p.serialNumbers.some((sn: string) => sn && sn.toLowerCase().includes(q));
+      if (match) return true;
+    }
+
+    return false;
+  });
 
   // Filter orders for Invoices view
   const filteredOrders = orders.filter(
@@ -949,6 +991,28 @@ export const PosTab: React.FC<PosTabProps> = ({
                           <h4 className="text-xs font-semibold text-white mt-2 line-clamp-2 group-hover:text-purple-200 transition-colors">
                             {prod.name}
                           </h4>
+                          {/* Active / Replacement S/N tags */}
+                          {Array.isArray((prod as any).activeSerials) && (prod as any).activeSerials.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {(prod as any).activeSerials.slice(0, 2).map((s: any, idx: number) => {
+                                const sn = typeof s === 'string' ? s : s?.serialNumber;
+                                const isReplacement = typeof s === 'object' && s?.source === 'Supplier RMA Replacement';
+                                return (
+                                  <span
+                                    key={idx}
+                                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                                      isReplacement
+                                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 shadow-xs'
+                                        : 'bg-purple-950/60 text-purple-300 border-purple-500/30'
+                                    }`}
+                                    title={isReplacement ? `Supplier RMA Replacement (${s.rmaRef || 'RMA'})` : 'Active Serial'}
+                                  >
+                                    {isReplacement ? '⚡ S/N: ' : 'S/N: '}{sn}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-3 pt-2.5 border-t border-slate-800/80">

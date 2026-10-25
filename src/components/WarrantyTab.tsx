@@ -25,6 +25,7 @@ import {
   Tag,
   RefreshCw,
   FileText,
+  Sparkles,
 } from 'lucide-react';
 import { WarrantyRecord, Product, Supplier, SupplierRmaClaim, SupplierRmaStatus } from '@/types';
 
@@ -349,7 +350,12 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
     };
 
     if (rmaStatus === 'Replaced') {
-      updates.replacementSerial = rmaReplacementSerial.trim();
+      const trimmedRepSerial = rmaReplacementSerial.trim();
+      if (!trimmedRepSerial) {
+        showNotification('Error: Please enter the new replacement serial number to sync stock inventory.');
+        return;
+      }
+      updates.replacementSerial = trimmedRepSerial;
     }
     if (rmaStatus === 'Repaired' || rmaStatus === 'Replaced' || rmaStatus === 'Rejected/Returned') {
       updates.actualReturnDate = rmaActualReturnDate || new Date().toISOString().split('T')[0];
@@ -357,7 +363,14 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
 
     onUpdateRmaClaim(editingRmaClaim.id, updates);
     setEditingRmaClaim(null);
-    showNotification(`RMA ${editingRmaClaim.rmaNumber} status updated to "${rmaStatus}"`);
+
+    if (rmaStatus === 'Replaced') {
+      showNotification(
+        `RMA ${editingRmaClaim.rmaNumber} Replaced! Unit (S/N: ${updates.replacementSerial}) automatically added to store stock & ready for POS scan.`
+      );
+    } else {
+      showNotification(`RMA ${editingRmaClaim.rmaNumber} status updated to "${rmaStatus}"`);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -1218,9 +1231,9 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
               </div>
 
               {rmaStatus === 'Replaced' && (
-                <div>
-                  <label className="block text-neutral-300 font-medium mb-1">
-                    New Replacement Unit Serial Number (S/N)
+                <div className="space-y-2">
+                  <label className="block text-neutral-300 font-medium">
+                    New Replacement Unit Serial Number (S/N) <span className="text-emerald-400">*</span>
                   </label>
                   <input
                     type="text"
@@ -1228,8 +1241,14 @@ export const WarrantyTab: React.FC<WarrantyTabProps> = ({
                     value={rmaReplacementSerial}
                     onChange={(e) => setRmaReplacementSerial(e.target.value)}
                     placeholder="e.g. SN-REPL-2026-90412"
-                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:border-emerald-500 focus:outline-none"
                   />
+                  <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="text-[11px] leading-relaxed">
+                      <strong className="text-emerald-200">Automated Stock Sync Active:</strong> Saving this replacement will automatically add this item (+1 store stock) into the active inventory database with serial <span className="font-mono text-white font-semibold underline">{rmaReplacementSerial.trim() || '[enter S/N]'}</span>. It instantly becomes searchable and scannable in the POS Checkout without requiring manual GRN entry.
+                    </div>
+                  </div>
                 </div>
               )}
 

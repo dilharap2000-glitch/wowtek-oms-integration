@@ -220,6 +220,16 @@ export interface Product {
   lastRestockedAt?: string | Date;
   minThreshold?: number;
   isActive?: boolean;
+  activeSerials?: Array<{
+    serialNumber: string;
+    addedAt?: string;
+    status?: string;
+    rmaRef?: string;
+    supplier?: string;
+    source?: string;
+    originalDefectiveSerial?: string;
+  }>;
+  serialNumbers?: string[];
   createdAt?: string;
   updatedAt?: string;
 }

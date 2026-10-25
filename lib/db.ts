@@ -1207,24 +1207,120 @@ export async function saveSupplierRmaClaim(claim: SupplierRmaClaim): Promise<Sup
   return claim;
 }
 
-export async function updateSupplierRmaClaim(id: string, updates: Partial<SupplierRmaClaim>): Promise<SupplierRmaClaim | null> {
+export async function updateSupplierRmaClaim(
+  id: string,
+  updates: Partial<SupplierRmaClaim>
+): Promise<{ claim: SupplierRmaClaim | null; replacedProduct?: Product }> {
   const mock = initMockDb();
   const index = mock.rmaClaims.findIndex((r: SupplierRmaClaim) => r.id === id);
+  let updatedClaim: SupplierRmaClaim | null = null;
+  let syncedProduct: Product | undefined = undefined;
+
   if (index !== -1) {
     mock.rmaClaims[index] = { ...mock.rmaClaims[index], ...updates, updatedAt: new Date().toISOString() };
+    updatedClaim = mock.rmaClaims[index];
+
+    // AUTOMATED REPLACEMENT INVENTORY SYNC IN LOCAL MOCK DB
+    if (updatedClaim.status === 'Replaced' && updatedClaim.replacementSerial) {
+      const repSerial = updatedClaim.replacementSerial.trim();
+      const targetSku = updatedClaim.productSku;
+      const targetName = updatedClaim.productName;
+
+      let prod = mock.products.find(
+        (p) =>
+          (targetSku && p.sku && p.sku.toLowerCase() === targetSku.toLowerCase()) ||
+          (targetName && p.name && p.name.toLowerCase() === targetName.toLowerCase())
+      );
+
+      if (prod) {
+        const curStore = Number(prod.storeStock ?? prod.stockStore ?? prod.stockQuantity ?? 0);
+        prod.storeStock = curStore + 1;
+        prod.stockStore = curStore + 1;
+        prod.stockQuantity = curStore + 1;
+        prod.stockWarehouse = 0;
+
+        const activeSerials = Array.isArray(prod.activeSerials) ? [...prod.activeSerials] : [];
+        if (!activeSerials.some((s: any) => (typeof s === 'string' ? s : s.serialNumber).toLowerCase() === repSerial.toLowerCase())) {
+          activeSerials.push({
+            serialNumber: repSerial,
+            status: 'Available',
+            addedAt: new Date().toISOString(),
+            rmaRef: updatedClaim.rmaNumber,
+            supplier: updatedClaim.supplierName,
+            source: 'Supplier RMA Replacement',
+            originalDefectiveSerial: updatedClaim.serialNumber,
+          });
+        }
+        prod.activeSerials = activeSerials;
+
+        const serialNums = Array.isArray(prod.serialNumbers) ? [...prod.serialNumbers] : [];
+        if (!serialNums.some((s: string) => s.toLowerCase() === repSerial.toLowerCase())) {
+          serialNums.push(repSerial);
+        }
+        prod.serialNumbers = serialNums;
+        prod.lastRestockedAt = new Date().toISOString();
+        prod.lastBatchRef = updatedClaim.rmaNumber;
+        syncedProduct = prod;
+      } else {
+        const newProd: Product = {
+          id: `prod-rma-${Date.now().toString().slice(-4)}`,
+          sku: targetSku || `WT-RMA-${Date.now().toString().slice(-4)}`,
+          name: targetName || 'Warranty Replacement Item',
+          barcode: repSerial,
+          category: 'Warranty Replacement',
+          costPrice: 0,
+          sellingPrice: 0,
+          storeStock: 1,
+          stockStore: 1,
+          stockQuantity: 1,
+          stockWarehouse: 0,
+          supplier: updatedClaim.supplierName || 'Supplier RMA',
+          grnBatch: `RMA-${updatedClaim.rmaNumber || 'REPL'}`,
+          activeSerials: [
+            {
+              serialNumber: repSerial,
+              status: 'Available',
+              addedAt: new Date().toISOString(),
+              rmaRef: updatedClaim.rmaNumber,
+              supplier: updatedClaim.supplierName,
+              source: 'Supplier RMA Replacement',
+              originalDefectiveSerial: updatedClaim.serialNumber,
+            },
+          ],
+          serialNumbers: [repSerial],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        mock.products.unshift(newProd);
+        syncedProduct = newProd;
+      }
+    }
     persistMockDb();
   }
 
   if (typeof window !== 'undefined') {
     try {
-      await fetch('/api/rma', {
+      const res = await fetch('/api/rma', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, updates }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.replacedProduct) {
+          syncedProduct = data.replacedProduct;
+          const pIdx = mock.products.findIndex((p) => p.sku === data.replacedProduct.sku || p.id === data.replacedProduct.id);
+          if (pIdx !== -1) {
+            mock.products[pIdx] = data.replacedProduct;
+          } else {
+            mock.products.unshift(data.replacedProduct);
+          }
+          persistMockDb();
+        }
+      }
     } catch {}
   }
-  return index !== -1 ? mock.rmaClaims[index] : null;
+  return { claim: updatedClaim, replacedProduct: syncedProduct };
 }
 
 export async function deleteSupplierRmaClaim(id: string): Promise<boolean> {

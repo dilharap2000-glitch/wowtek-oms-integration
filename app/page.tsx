@@ -570,8 +570,32 @@ export default function WowtekProApp() {
 
   const handleUpdateRmaClaim = async (id: string, updates: Partial<SupplierRmaClaim>) => {
     const updated = await updateSupplierRmaClaim(id, updates);
-    if (updated) {
+    if (updated?.claim) {
       setRmaClaims((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    }
+    if (updated?.replacedProduct) {
+      const rep = updated.replacedProduct;
+      setProducts((prev) => {
+        const idx = prev.findIndex((p) => p.sku === rep.sku || p.id === rep.id);
+        if (idx !== -1) {
+          const copy = [...prev];
+          copy[idx] = rep;
+          return copy;
+        }
+        return [rep, ...prev];
+      });
+    }
+    try {
+      const refreshedProds = await getProducts();
+      if (Array.isArray(refreshedProds) && refreshedProds.length > 0) {
+        setProducts(refreshedProds);
+      }
+      const refreshedWarranties = await getWarranties();
+      if (Array.isArray(refreshedWarranties) && refreshedWarranties.length > 0) {
+        setWarranties(refreshedWarranties);
+      }
+    } catch {
+      // Safe fallback
     }
   };
 
