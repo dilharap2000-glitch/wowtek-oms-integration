@@ -5,6 +5,9 @@ const nextConfig = {
     serverComponentsExternalPackages: ['mongodb'],
   },
   webpack: (config, { isServer }) => {
+    // Disable disk pack cache to prevent ENOENT vendor-chunks cache resolution errors in dev/build
+    config.cache = false;
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
