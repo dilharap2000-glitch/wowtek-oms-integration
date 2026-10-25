@@ -97,9 +97,9 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const processedCount = safeEvents.filter((e) => e?.status === 'success').length;
 
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-900/90 overflow-hidden shadow-lg">
+    <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md overflow-hidden shadow-xl">
       {/* Header Bar */}
-      <div className="p-4 sm:p-5 border-b border-neutral-800 bg-neutral-950/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <div className="relative flex items-center justify-center">
@@ -110,14 +110,14 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <Globe className="w-4 h-4 text-purple-400" />
               {title}
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
               Live Listener Active
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-950 text-purple-300 border border-purple-800">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-500/15 text-purple-300 border border-purple-500/30">
               Strict Policy: &apos;processing&apos; Only
             </span>
           </div>
-          <p className="text-xs text-neutral-400 mt-1">{subtitle}</p>
+          <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
         </div>
 
         {/* Action Buttons */}
@@ -125,7 +125,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {/* Copy Webhook URL button */}
           <button
             onClick={handleCopyWebhookUrl}
-            className="px-2.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-xs font-mono text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
             title="Copy Public WooCommerce Webhook URL"
           >
             {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
@@ -135,7 +135,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {/* Copy Secret Key button */}
           <button
             onClick={handleCopySecret}
-            className="px-2.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-xs font-mono text-neutral-300 hover:text-white transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
             title="Secret: WOWTEK-WC-Webhook-2026-9X7Kl42"
           >
             {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Key className="w-3.5 h-3.5 text-amber-400" />}
@@ -148,7 +148,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <button
                 onClick={() => handleRunTestOrder('processing')}
                 disabled={isSimulating}
-                className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="Test order with status 'processing' (triggers TE waybill + SMS)"
               >
                 {isSimulating ? (
@@ -162,7 +162,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <button
                 onClick={() => handleRunTestOrder('pending')}
                 disabled={isSimulating}
-                className="px-2.5 py-1.5 bg-neutral-950 hover:bg-neutral-800 disabled:opacity-50 text-amber-300 border border-amber-900/60 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 disabled:opacity-50 text-amber-300 border border-amber-900/60 rounded-xl text-xs font-medium shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="Test order with status 'pending' (verifies strict skip filter)"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
@@ -174,7 +174,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {onRefreshEvents && (
             <button
               onClick={onRefreshEvents}
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               title="Refresh Audit Stream"
             >
               <RefreshCw className="w-4 h-4" />
@@ -184,7 +184,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {onClearEvents && events.length > 0 && (
             <button
               onClick={onClearEvents}
-              className="p-1.5 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               title="Reset Audit Log"
             >
               <Trash2 className="w-4 h-4" />
@@ -194,24 +194,24 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="px-4 py-2 bg-neutral-950/40 border-b border-neutral-800 flex items-center gap-2 overflow-x-auto text-xs">
-        <span className="text-neutral-500 font-medium">Filter Audit Feed:</span>
+      <div className="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs">
+        <span className="text-slate-400 font-medium">Filter Audit Feed:</span>
         <button
           onClick={() => setFilterStatus('all')}
-          className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
             filterStatus === 'all'
-              ? 'bg-purple-600 text-white font-medium'
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
           All Events ({safeEvents.length})
         </button>
         <button
           onClick={() => setFilterStatus('processing')}
-          className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
             filterStatus === 'processing'
-              ? 'bg-emerald-600 text-white font-medium'
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
           <CheckCircle2 className="w-3 h-3 text-emerald-400" />
@@ -219,10 +219,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         </button>
         <button
           onClick={() => setFilterStatus('skipped')}
-          className={`px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+          className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
             filterStatus === 'skipped'
-              ? 'bg-amber-600 text-white font-medium'
-              : 'text-neutral-400 hover:text-white hover:bg-neutral-800'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
           <AlertTriangle className="w-3 h-3 text-amber-400" />
@@ -234,7 +234,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-neutral-800 bg-neutral-950/40 text-neutral-400 font-medium text-[11px]">
+            <tr className="border-b border-slate-800/80 bg-slate-950/80 text-slate-400 uppercase font-mono text-[10px] tracking-wider">
               <th className="py-2.5 px-4">Timestamp & Event</th>
               <th className="py-2.5 px-4">Order / Invoice Ref</th>
               <th className="py-2.5 px-4">Customer Details</th>

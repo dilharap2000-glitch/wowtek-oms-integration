@@ -229,161 +229,135 @@ export function SMSMarketingTab() {
   );
 
   return (
-    <div className="p-4 md:p-8 text-white min-h-screen bg-gray-950 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-gray-800 gap-4">
+    <div className="space-y-6 text-slate-100">
+      {/* Header & CRM Overview Strip */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800/80 gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2.5">
-            <span className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-purple-600/20 via-indigo-600/20 to-pink-500/20 text-purple-300 border border-purple-500/30 shadow-inner">
               <MessageSquare className="w-5 h-5" />
-            </span>
-            SMS Marketing &amp; Customer Database
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Manage contacts, add manual numbers, and broadcast promotional campaigns with SMSlenz.
-          </p>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
+                <span>SMS Marketing &amp; Customer CRM</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  SMSlenz Gateway Active
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Targeted SMS campaigns, de-duplicated Sri Lankan contact directory, and automated promotional broadcasts.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={fetchCustomers}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-sm text-gray-300 hover:text-white hover:bg-gray-800 transition self-start cursor-pointer"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh Contacts
-        </button>
+        {/* Quick KPI Counters & Actions */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-xs font-mono">
+            <Users className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-slate-400">Total Contacts:</span>
+            <span className="text-white font-bold">{customers.length}</span>
+          </div>
+          <button
+            onClick={fetchCustomers}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+            <span>Sync</span>
+          </button>
+        </div>
       </div>
 
       {notification && (
         <div
-          className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-sm animate-fadeIn ${
+          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs backdrop-blur-md animate-fadeIn shadow-lg ${
             notification.type === 'success'
-              ? 'bg-emerald-950/60 border-emerald-800 text-emerald-200'
-              : 'bg-rose-950/60 border-rose-800 text-rose-200'
+              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
+              : 'bg-rose-950/80 border-rose-500/40 text-rose-200'
           }`}
         >
           <div className="flex items-center gap-2.5">
             {notification.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </div>
           <button
             onClick={() => setNotification(null)}
-            className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-black/20"
+            className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
           >
-            Dismiss
+            ✕
           </button>
         </div>
       )}
 
-      {/* Top 2 Columns: Add Manual Customer & Send Promotional SMS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Manual Customer Add Form */}
-        <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-pink-400 flex items-center gap-2">
-                <UserPlus className="w-4 h-4" />
-                Add Manual Customer / Phone
+      {/* Balanced 2-Column Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: SMS Campaign Composer & Quick Add Contact (5 cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          {/* SMS Campaign Composer Card */}
+          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Send className="w-4 h-4 text-purple-400" />
+                <span>Dispatch Promotional SMS</span>
               </h2>
-              <span className="text-[10px] bg-pink-500/10 text-pink-300 border border-pink-500/20 px-2 py-0.5 rounded-full font-mono">
-                Direct Upsert
-              </span>
-            </div>
-            <p className="text-xs text-gray-400 mb-4">
-              Add walk-in or phone-order customer numbers into the de-duplicated marketing database.
-            </p>
-
-            <form onSubmit={handleAddManualCustomer} className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Customer Name</label>
-                <input
-                  type="text"
-                  value={manualName}
-                  onChange={(e) => setManualName(e.target.value)}
-                  placeholder="e.g. Nimal Perera"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-pink-500"
-                />
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs text-gray-400">Phone Number *</label>
-                  <span className="text-[10px] text-pink-400 font-mono">Format: +947XXXXXXXX</span>
-                </div>
-                <input
-                  type="text"
-                  value={manualPhone}
-                  onChange={handlePhoneChange}
-                  onBlur={handlePhoneBlur}
-                  placeholder="0715330724 (auto-converts to +94715330724)"
-                  required
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2.5 text-sm text-white font-mono focus:outline-none focus:border-pink-500"
-                />
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Numbers starting with <span className="text-pink-300 font-mono">0</span> automatically convert to <span className="text-green-400 font-mono">+94</span>. Spaces and hyphens are cleaned.
-                </p>
-              </div>
-              <button
-                type="submit"
-                disabled={manualLoading}
-                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-bold text-sm text-white hover:opacity-90 disabled:opacity-50 transition cursor-pointer shadow-md mt-2 flex items-center justify-center gap-2"
-              >
-                {manualLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    Save Customer
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        {/* Right: SMS Campaign Dispatch Form */}
-        <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl shadow-xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-purple-400 flex items-center gap-2">
-                <Send className="w-4 h-4" />
-                Send Promotional SMS / Offers
-              </h2>
-              <span className="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-full font-mono">
+              <span className="text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
                 Sender: WOWTEK
               </span>
             </div>
 
-            <form onSubmit={handleSendSMS} className="space-y-3">
+            <form onSubmit={handleSendSMS} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Campaign Mode</label>
-                <select
-                  value={campaignType}
-                  onChange={(e) => setCampaignType(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-500"
-                >
-                  <option value="single">Single Customer (Select below)</option>
-                  <option value="selected">
-                    Selected Customers ({selectedCustomers.length} checked in table)
-                  </option>
-                  <option value="bulk">Bulk SMS (All {customers.length} Customers in DB)</option>
-                </select>
+                <label className="block text-slate-300 font-semibold mb-1.5">Audience Target</label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setCampaignType('single')}
+                    className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
+                      campaignType === 'single'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Single
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCampaignType('selected')}
+                    className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
+                      campaignType === 'selected'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Selected ({selectedCustomers.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCampaignType('bulk')}
+                    className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
+                      campaignType === 'bulk'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All ({customers.length})
+                  </button>
+                </div>
               </div>
 
               {campaignType === 'single' && (
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Select Customer</label>
+                  <label className="block text-slate-300 font-medium mb-1">Select Target Recipient</label>
                   <select
                     value={selectedPhone}
                     onChange={(e) => setSelectedPhone(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono shadow-inner"
                   >
-                    <option value="">-- Choose Customer --</option>
+                    <option value="">-- Choose Customer from Directory --</option>
                     {customers.map((c, i) => (
                       <option key={i} value={c.phone}>
                         {c.name || 'Customer'} ({c.phone}) - {c.source || 'POS'}
@@ -393,193 +367,289 @@ export function SMSMarketingTab() {
                 </div>
               )}
 
+              {campaignType === 'selected' && (
+                <div className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 text-[11px] text-purple-200 flex items-center justify-between">
+                  <span>
+                    <strong>{selectedCustomers.length}</strong> contacts checked in customer list.
+                  </span>
+                  {selectedCustomers.length === 0 && (
+                    <span className="text-amber-400 text-[10px]">Select via checkboxes</span>
+                  )}
+                </div>
+              )}
+
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs text-gray-400">Offer Message</label>
-                  <span className="text-[10px] text-gray-500 font-mono">{message.length} chars</span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-slate-300 font-semibold">Promotion Message Content</label>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {message.length} chars · {Math.max(1, Math.ceil(message.length / 160))} SMS segment(s)
+                  </span>
                 </div>
                 <textarea
-                  rows={2}
+                  rows={3}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="e.g. WOWTEK: 15% OFF on all accessories this weekend! Visit wowtek.lk"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-xs resize-none"
+                  placeholder="e.g. WOWTEK: 15% OFF on all gaming accessories this weekend! Visit wowtek.lk or show this SMS at checkout."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-xs resize-none shadow-inner leading-relaxed"
                   required
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage('WOWTEK Promo: 10% OFF on all gaming accessories this week! Show this SMS at billing.')
-                  }
-                  className="text-[11px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded border border-gray-700 transition"
-                >
-                  + Promo
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMessage('WOWTEK VIP: Exclusive 15% discount coupon: VIP15 at checkout on store.wowtek.lk.')
-                  }
-                  className="text-[11px] bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 rounded border border-gray-700 transition"
-                >
-                  + VIP
-                </button>
+              {/* Sri Lankan SMS Template Presets */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                  Quick Sri Lankan Presets:
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessage('WOWTEK Promo: 10% OFF on all gaming accessories this week! Show this SMS at billing in Colombo store.')
+                    }
+                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
+                  >
+                    + 10% Promo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessage('WOWTEK VIP: Exclusive 15% discount coupon: VIP15 at checkout on store.wowtek.lk.')
+                    }
+                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
+                  >
+                    + VIP Coupon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setMessage('WOWTEK Alert: Your item order is packed and dispatched via Trans Express Courier. Tracking will follow.')
+                    }
+                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
+                  >
+                    + Dispatch Notice
+                  </button>
+                </div>
               </div>
 
               <button
                 type="submit"
                 disabled={loading || (campaignType === 'bulk' && customers.length === 0)}
-                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-bold p-2.5 rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 cursor-pointer text-sm"
+                className="w-full py-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 disabled:opacity-40 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-950/50 border border-purple-400/30 cursor-pointer text-xs active:scale-[0.99] mt-2"
               >
                 {loading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Sending SMS...
+                    <span>Dispatching via Gateway...</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    Dispatch Campaign
+                    <span>
+                      {campaignType === 'bulk'
+                        ? `Broadcast to All (${customers.length} Contacts)`
+                        : campaignType === 'selected'
+                        ? `Dispatch to ${selectedCustomers.length} Selected`
+                        : 'Dispatch SMS to Customer'}
+                    </span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Quick Add Manual Contact Card */}
+          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-pink-400" />
+                <span>Add Walk-In / Phone Contact</span>
+              </h2>
+              <span className="text-[10px] bg-pink-500/15 text-pink-300 border border-pink-500/30 px-2 py-0.5 rounded-full font-mono">
+                Direct Sync
+              </span>
+            </div>
+
+            <form onSubmit={handleAddManualCustomer} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Customer Full Name</label>
+                <input
+                  type="text"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="e.g. Kasun Chamara"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-pink-500 shadow-inner"
+                />
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-slate-300 font-medium">Sri Lankan Phone Number *</label>
+                  <span className="text-[10px] text-pink-400 font-mono">Auto +94</span>
+                </div>
+                <input
+                  type="text"
+                  value={manualPhone}
+                  onChange={handlePhoneChange}
+                  onBlur={handlePhoneBlur}
+                  placeholder="0715330724 (auto-converts to +94715330724)"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-pink-500 shadow-inner"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={manualLoading}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-pink-300 border border-pink-500/30 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+              >
+                {manualLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving Contact...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Save to Customer Directory</span>
                   </>
                 )}
               </button>
             </form>
           </div>
         </div>
-      </div>
 
-      {/* Bottom Full-Width Table: Saved Customers List with Checkbox Selection & Bulk Delete */}
-      <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+        {/* Right Column: Saved Customers Directory & Management (7 cols) */}
+        <div className="lg:col-span-7 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5">
               <Users className="w-4 h-4 text-purple-400" />
-              Saved Customers ({customers.length})
-            </h2>
-            {selectedCustomers.length > 0 && (
-              <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full font-mono">
-                {selectedCustomers.length} selected
-              </span>
-            )}
-          </div>
+              <h2 className="text-sm font-bold text-white">
+                Saved Contacts Directory ({customers.length})
+              </h2>
+              {selectedCustomers.length > 0 && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-mono font-bold">
+                  {selectedCustomers.length} selected
+                </span>
+              )}
+            </div>
 
-          <div className="flex items-center gap-2.5">
-            {selectedCustomers.length > 0 && (
-              <button
-                type="button"
-                onClick={handleDeleteSelected}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete Selected ({selectedCustomers.length})
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedCustomers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete ({selectedCustomers.length})</span>
+                </button>
+              )}
 
-            <div className="relative w-56">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search phone or name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
+              <div className="relative w-52">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search name or phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Select All Row */}
-        <div className="flex items-center justify-between px-3 py-2 bg-gray-800/80 rounded-t-lg border-b border-gray-700/60 text-xs text-gray-300">
-          <label className="flex items-center gap-2 cursor-pointer font-medium">
-            <input
-              type="checkbox"
-              onChange={handleSelectAll}
-              checked={customers.length > 0 && selectedCustomers.length === customers.length}
-              className="rounded bg-gray-900 border-gray-700 accent-purple-600 cursor-pointer"
-            />
-            <span>Select All Customers ({customers.length})</span>
-          </label>
-          <span className="text-[11px] text-gray-400">
-            Click checkbox to select customers for bulk operations
-          </span>
-        </div>
+          {/* Select All Row */}
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300">
+            <label className="flex items-center gap-2.5 cursor-pointer font-medium">
+              <input
+                type="checkbox"
+                onChange={handleSelectAll}
+                checked={customers.length > 0 && selectedCustomers.length === customers.length}
+                className="w-4 h-4 rounded bg-slate-900 border-slate-700 accent-purple-600 cursor-pointer"
+              />
+              <span className="text-white text-xs">Select All ({customers.length})</span>
+            </label>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Use checkboxes to batch-select for targeted broadcast
+            </span>
+          </div>
 
-        {/* Customer List Table */}
-        <div className="overflow-x-auto max-h-96 overflow-y-auto rounded-b-lg border border-gray-800">
-          <table className="w-full text-left text-sm text-gray-300">
-            <thead className="border-b border-gray-800 bg-gray-850 sticky top-0 text-gray-400 text-xs uppercase tracking-wider">
-              <tr>
-                <th className="p-3 w-10 text-center">#</th>
-                <th className="p-3">Customer Name</th>
-                <th className="p-3">Phone Number</th>
-                <th className="p-3">Source Channel</th>
-                <th className="p-3 text-center">Total Orders</th>
-                <th className="p-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/40">
-              {filteredCustomers.length === 0 ? (
+          {/* Customer List Table */}
+          <div className="overflow-x-auto max-h-[580px] overflow-y-auto rounded-xl border border-slate-800/80">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="border-b border-slate-800 bg-slate-950/90 sticky top-0 text-slate-400 text-[10px] uppercase tracking-wider font-semibold">
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500 text-sm">
-                    {customers.length === 0
-                      ? 'No customers in database yet. Add manual customers above or place orders via POS / Website.'
-                      : 'No matching customers found for search query.'}
-                  </td>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-3">Customer</th>
+                  <th className="py-3 px-3">Phone Number</th>
+                  <th className="py-3 px-3">Source Channel</th>
+                  <th className="py-3 px-3 text-center">Orders</th>
+                  <th className="py-3 px-3 text-right">Quick Action</th>
                 </tr>
-              ) : (
-                filteredCustomers.map((c, idx) => {
-                  const isChecked = selectedCustomers.includes(c.phone);
-                  return (
-                    <tr
-                      key={idx}
-                      className={`hover:bg-gray-850/80 transition ${
-                        isChecked ? 'bg-purple-950/20' : ''
-                      }`}
-                    >
-                      <td className="p-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleSelect(c.phone)}
-                          className="rounded bg-gray-800 border-gray-700 accent-purple-600 cursor-pointer"
-                        />
-                      </td>
-                      <td className="p-3 font-semibold text-white">
-                        {c.name || 'Walk-in Customer'}
-                      </td>
-                      <td className="p-3 font-mono text-purple-300 text-xs">
-                        {c.phone}
-                      </td>
-                      <td className="p-3">
-                        <span className="text-[10px] bg-gray-800 border border-gray-700 px-2 py-0.5 rounded text-gray-300">
-                          {c.source || 'POS'}
-                        </span>
-                      </td>
-                      <td className="p-3 text-center font-mono font-bold text-pink-400">
-                        {c.totalOrders ?? 1}
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedPhone(c.phone);
-                            setCampaignType('single');
-                            window.scrollTo({ top: 0, behavior: 'smooth' });
-                          }}
-                          className="text-xs text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
-                        >
-                          Send SMS
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center text-slate-500 text-xs">
+                      {customers.length === 0
+                        ? 'No contacts in CRM database yet. Add manual contacts or place orders via POS / Website.'
+                        : 'No matching customers found for your search query.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map((c, idx) => {
+                    const isChecked = selectedCustomers.includes(c.phone);
+                    return (
+                      <tr
+                        key={idx}
+                        className={`hover:bg-slate-850/60 transition-colors ${
+                          isChecked ? 'bg-purple-950/20' : ''
+                        }`}
+                      >
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleSelect(c.phone)}
+                            className="w-4 h-4 rounded bg-slate-800 border-slate-700 accent-purple-600 cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-3 px-3 font-semibold text-white">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-600/30 to-indigo-600/30 text-purple-300 flex items-center justify-center font-bold text-[11px] border border-purple-500/30">
+                              {(c.name || 'C').charAt(0).toUpperCase()}
+                            </div>
+                            <span>{c.name || 'Walk-in Customer'}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-purple-300 font-semibold text-xs">
+                          {c.phone}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-slate-300 font-mono">
+                            {c.source || 'POS'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center font-mono font-bold text-pink-400">
+                          {c.totalOrders ?? 1}
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhone(c.phone);
+                              setCampaignType('single');
+                            }}
+                            className="text-xs text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 px-2.5 py-1 rounded-lg border border-purple-500/30 transition-all font-semibold cursor-pointer shadow-sm"
+                          >
+                            Send SMS
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

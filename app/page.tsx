@@ -727,50 +727,51 @@ export default function WowtekProApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col antialiased">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-purple-500/30 selection:text-purple-200">
       {/* Top Bar Contract: 3 zones */}
-      <header className="h-16 border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between">
+      <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between shadow-sm">
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 lg:hidden"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 lg:hidden transition-colors"
             aria-label="Toggle navigation"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          {/* Brand / Logo Section */}
+          {/* Brand / Logo Section with subtle gradient accent & ring */}
           <div className="flex items-center space-x-3">
-            <div className="bg-purple-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-xl shadow-lg">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-bold flex items-center justify-center shadow-lg shadow-purple-950/50 ring-1 ring-white/20">
               W
             </div>
             <div>
-              {/* මෙන්න මෙතන Pro කියන එක අයින් කරලා WOWTEK කියලා දාලා තියෙන්නේ */}
-              <h1 className="text-lg font-bold tracking-wide text-white leading-tight">WOWTEK</h1>
-              <p className="text-xs text-gray-400">Order Management System</p>
+              <h1 className="text-lg font-bold tracking-wide text-white leading-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+                WOWTEK
+              </h1>
+              <p className="text-[11px] text-slate-400 font-medium">Order Management System</p>
             </div>
           </div>
         </div>
 
         {/* Zone 2: Navigation Breadcrumb */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-neutral-400">
-          <span>Enterprise</span>
-          <ChevronRight className="w-3.5 h-3.5 text-neutral-600" />
-          <span className="text-white font-medium capitalize">
+        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
+          <span className="text-slate-400">Enterprise</span>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+          <span className="text-purple-300 font-semibold capitalize bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
             {navItems.find((n) => n.id === activeTab)?.label}
           </span>
         </div>
 
         {/* Zone 3: Database & Actions */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800/80 backdrop-blur-md text-xs shadow-inner">
             <span
               className={`w-2 h-2 rounded-full ${
-                dbHealth.status === 'connected' ? 'bg-emerald-400' : 'bg-amber-400'
+                dbHealth.status === 'connected' ? 'bg-emerald-400 ring-2 ring-emerald-500/30 animate-pulse' : 'bg-amber-400 ring-2 ring-amber-500/30'
               }`}
             />
-            <span className="font-mono text-neutral-300">
+            <span className="font-mono text-slate-300 text-[11px]">
               {dbHealth.status === 'connected'
                 ? 'MongoDB Atlas Connected (Live)'
                 : 'Mock DB Fallback (Offline)'}
@@ -779,7 +780,7 @@ export default function WowtekProApp() {
 
           <div className="text-right hidden sm:block">
             <div className="text-xs font-semibold text-white">Colombo Hub</div>
-            <div className="text-[10px] text-neutral-400 font-mono">LKR Sri Lanka</div>
+            <div className="text-[10px] text-slate-400 font-mono">LKR Sri Lanka</div>
           </div>
         </div>
       </header>
@@ -788,25 +789,24 @@ export default function WowtekProApp() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Nav */}
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-neutral-950 border-r border-neutral-800 transition-transform duration-200 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-950/95 backdrop-blur-xl border-r border-slate-800/80 transition-transform duration-200 lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } flex flex-col justify-between`}
         >
           <div>
-            {/* Brand / Logo Section */}
-            <div className="flex items-center space-x-3 px-6 py-5 border-b border-gray-800">
-              <div className="bg-purple-600 text-white font-bold w-9 h-9 flex items-center justify-center rounded-xl shadow-lg">
+            {/* Brand / Logo Section in Sidebar (Mobile View) */}
+            <div className="flex items-center space-x-3 px-6 py-5 border-b border-slate-800/80 lg:hidden">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-bold flex items-center justify-center shadow-lg shadow-purple-950/50 ring-1 ring-white/20">
                 W
               </div>
               <div>
-                {/* මෙන්න මෙතන Pro කියන එක අයින් කරලා WOWTEK කියලා දාලා තියෙන්නේ */}
                 <h1 className="text-lg font-bold tracking-wide text-white">WOWTEK</h1>
-                <p className="text-xs text-gray-400">Order Management System</p>
+                <p className="text-xs text-slate-400">Order Management System</p>
               </div>
             </div>
 
             <div className="p-4 space-y-1">
-              <div className="px-3 py-2 text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">
+              <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Management Modules
               </div>
 
@@ -820,20 +820,22 @@ export default function WowtekProApp() {
                     setActiveTab(item.id);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                     isActive
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-purple-950/50 border border-purple-400/30'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-neutral-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                     <span>{item.label}</span>
                   </div>
                   {item.badge !== undefined && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        isActive ? 'bg-purple-700 text-white' : 'bg-neutral-800 text-neutral-300'
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold ${
+                        isActive
+                          ? 'bg-white/20 text-white border border-white/30'
+                          : 'bg-slate-800/80 text-slate-300 border border-slate-700/60'
                       }`}
                     >
                       {item.badge}
@@ -847,23 +849,23 @@ export default function WowtekProApp() {
 
           {/* Quick Rates Banner */}
           <div className="p-4 pt-0">
-            <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 text-xs space-y-1">
-              <div className="flex items-center justify-between text-neutral-400 text-[10px]">
-                <span className="font-semibold text-neutral-300">ACTIVE FEE RATES</span>
+            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md text-xs space-y-1 shadow-sm">
+              <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                <span className="font-semibold text-slate-300">ACTIVE FEE RATES</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               </div>
-              <div className="text-[11px] text-neutral-300 font-mono">
+              <div className="text-[11px] text-slate-300 font-mono">
                 PickMe: {platforms.find((p) => p.code === 'pickme')?.feePercent ?? 20}% · Uber: {platforms.find((p) => p.code === 'ubereats')?.feePercent ?? 15.4}%
               </div>
-              <div className="text-[10px] text-neutral-400 font-mono">
+              <div className="text-[10px] text-slate-400 font-mono">
                 Payzy/Koko/Mintpay: 12% · Cash: 0%
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Content Viewport */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        {/* Content Viewport with subtle gradient ambiance */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.1),rgba(2,6,23,0))]">
           <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && (
               <DashboardTab
