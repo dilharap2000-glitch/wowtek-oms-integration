@@ -65,6 +65,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'audit'>('catalog');
 
   // Inward Restock (GRN) Modal State
   const [restockProductTarget, setRestockProductTarget] = useState<Product | null>(null);
@@ -233,27 +234,53 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
   const handleAddProductFromGRNForm = (formData: any) => {
     const matchedSup = suppliers.find((s) => s.name === formData.supplier);
+    const serialsList: string[] = Array.isArray(formData.serials)
+      ? formData.serials
+      : (formData.serialNumbersInput
+          ? formData.serialNumbersInput.split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean)
+          : []);
+
+    const grnBatchRef = `GRN-${new Date().getFullYear()}-OCT-${Math.floor(100 + Math.random() * 900)}`;
+
+    const activeSerials = serialsList.map((sn) => ({
+      serialNumber: sn,
+      status: 'Available',
+      addedAt: new Date().toISOString(),
+      source: 'GRN Inward',
+      batchRef: grnBatchRef,
+      supplier: formData.supplier || matchedSup?.name || 'WOWTEK Direct Import',
+      costPrice: Number(formData.costPrice) || 0,
+      sellingPrice: Number(formData.sellingPrice) || 0,
+    }));
+
+    const finalStockQty = serialsList.length > 0 ? serialsList.length : (Number(formData.stockQuantity) || 1);
+
     const newProd: Product = {
       id: `prod-${Date.now().toString().slice(-4)}`,
       sku: (formData.skuCode || `WT-${Date.now().toString().slice(-5)}`).toUpperCase().trim(),
       barcode: `479${Math.floor(1000000000 + Math.random() * 9000000000)}`,
       name: (formData.productTitle || '').trim(),
-      category: formData.category || 'Mobile Accessories',
+      category: formData.category || 'Electronics',
       costPrice: Number(formData.costPrice) || 0,
       sellingPrice: Number(formData.sellingPrice) || 0,
-      stockWarehouse: 0, // Warehouse removed, Store Stock only as requested
-      stockStore: Number(formData.stockQuantity) || 0,
+      stockWarehouse: 0,
+      stockStore: finalStockQty,
+      storeStock: finalStockQty,
+      stockQuantity: finalStockQty,
       stockReserved: 0,
-      grnBatch: `GRN-${new Date().getFullYear()}-OCT-${Math.floor(100 + Math.random() * 900)}`,
+      grnBatch: grnBatchRef,
       supplier: formData.supplier || matchedSup?.name || 'WOWTEK Direct Import',
       supplierId: matchedSup?.id,
-      warrantyPeriodMonths: Number(formData.warrantyMonths) || 0,
+      warrantyPeriodMonths: Number(formData.warrantyMonths) || 12,
+      isSerialized: formData.isSerialized ?? (serialsList.length > 0),
+      activeSerials: activeSerials,
+      serialNumbers: serialsList,
     };
 
     onAddProduct(newProd);
     setShowAddModal(false);
     setRestockToast(
-      `Product ${newProd.sku} (${newProd.name}) added to Store Front! GRN Inward logged & pending backlog orders auto-checked.`
+      `Product ${newProd.sku} (${newProd.name}) added to Store Front! GRN logged with ${serialsList.length} unique serial(s).`
     );
     setTimeout(() => setRestockToast(null), 7000);
   };
@@ -311,8 +338,42 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Sub Navigation: Catalog Valuation vs Inventory Audit & Missing Stock Tracker */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
+        <div className="flex items-center gap-2 p-1 bg-slate-900/80 border border-slate-800/80 rounded-xl backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('catalog')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'catalog'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Warehouse className="w-3.5 h-3.5" />
+            <span>Product Catalog &amp; Valuation</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('audit')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeSubTab === 'audit'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+            <span>Inventory Audit &amp; Missing Stock Tracker</span>
+          </button>
+        </div>
+      </div>
+
+      {activeSubTab === 'audit' ? (
+        <InventoryAuditView products={products} orders={orders} />
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">
             Inventory Valuation & Product Profit Margins
@@ -653,6 +714,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           </table>
         </div>
       </div>
+        </>
+      )}
 
       {/* Barcode Scanner Modal */}
       <BarcodeScannerModal

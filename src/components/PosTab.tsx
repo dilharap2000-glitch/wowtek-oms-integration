@@ -113,6 +113,7 @@ export const PosTab: React.FC<PosTabProps> = ({
   // Modals & General state
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<Order | null>(null);
   const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = useState<Order | null>(null);
   const [returnModalOrder, setReturnModalOrder] = useState<Order | null>(null);
