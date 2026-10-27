@@ -649,10 +649,11 @@
       "courierFee": 0,
       "costOfGoods": 16500,
       "netProfit": 6300,
-      "status": "Completed",
+      "status": "Ready",
       "createdAt": "2026-10-08T08:40:00Z",
-      "updatedAt": "2026-10-08T08:40:00Z",
-      "waybillGenerated": false
+      "updatedAt": "2026-10-27T14:43:59.527Z",
+      "waybillGenerated": false,
+      "notes": "Accepted via POS / Delivery Integration | Customer request | Order marked ready for delivery pickup"
     },
     {
       "id": "ord-wc-92104-4739",
@@ -1009,6 +1010,117 @@
     }
   ],
   "webhookEvents": [
+    {
+      "id": "evt-menu-1793112246514",
+      "source": "ubereats",
+      "event": "menu.uploaded",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "menu-sync",
+      "storeName": "Uber Eats Store",
+      "branchName": "Main Branch",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "path": "/api/v2/eats/stores/store-01/menus",
+        "itemCount": 0
+      },
+      "receivedAt": "2026-10-27T14:44:06.514Z"
+    },
+    {
+      "id": "evt-menu-1793112239641",
+      "source": "ubereats",
+      "event": "menu.uploaded",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "menu-sync",
+      "storeName": "Uber Eats Store",
+      "branchName": "Main Branch",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "path": "/v2/eats/stores/store-01/menus",
+        "itemCount": 0
+      },
+      "receivedAt": "2026-10-27T14:43:59.641Z"
+    },
+    {
+      "id": "evt-pos-del-1793112239615",
+      "source": "ubereats",
+      "event": "store.deprovisioned",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "store-deprovision",
+      "storeName": "Uber Eats Store",
+      "branchName": "Main Branch",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Cancelled",
+      "rawPayload": {
+        "path": "/v1/eats/stores/store-01/pos_data"
+      },
+      "receivedAt": "2026-10-27T14:43:59.615Z"
+    },
+    {
+      "id": "evt-pos-patch-1793112239590",
+      "source": "ubereats",
+      "event": "store.pos_data_updated",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "store-config",
+      "storeName": "Uber Eats Store",
+      "branchName": "Main Branch",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "path": "/v1/eats/stores/store-01/pos_data",
+        "body": {
+          "status": "active"
+        }
+      },
+      "receivedAt": "2026-10-27T14:43:59.590Z"
+    },
+    {
+      "id": "evt-del-1793112239560-828",
+      "source": "ubereats",
+      "event": "orders.notification",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "store-primary",
+      "storeName": "Delivery Hub",
+      "branchName": "Main Branch",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Pending",
+      "rawPayload": {
+        "event": "orders.notification"
+      },
+      "receivedAt": "2026-10-27T14:43:59.560Z"
+    },
+    {
+      "id": "evt-pos-act-1793112239433",
+      "source": "ubereats",
+      "event": "store.provisioned",
+      "orderId": "N/A",
+      "invoiceNumber": "N/A",
+      "storeId": "store-01",
+      "storeName": "Uber Eats Store",
+      "branchName": "Primary Hub",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "action": "activate_pos_data",
+        "storeId": "store-01",
+        "body": {
+          "provider": "wowtek"
+        }
+      },
+      "receivedAt": "2026-10-27T14:43:59.433Z"
+    },
     {
       "id": "evt-1792773166792-133",
       "source": "woocommerce",
@@ -2327,5 +2439,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-23T16:32:46.933Z"
+  "lastUpdated": "2026-10-27T14:44:06.514Z"
 }
