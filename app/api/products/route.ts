@@ -5,12 +5,60 @@ import { resolvePendingBacklogOrders } from '@/lib/inventoryBacklog';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const sku = searchParams.get('sku')?.trim();
+    const batch = searchParams.get('batch')?.trim();
+    const date = searchParams.get('date')?.trim();
+
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
-      const products = await mongoConn.db.collection('products').find({}).toArray();
-      const clean = products.map(({ _id, ...rest }) => rest as Product);
+      let query: any = {};
+      if (sku) {
+        query.$or = [{ sku }, { skuCode: sku }, { barcode: sku }, { id: sku }];
+      }
+      if (batch && batch !== 'all') {
+        const batchConditions = [
+          { grnBatch: batch },
+          { lastBatchRef: batch },
+          { 'activeSerials.batchRef': batch },
+        ];
+        if (query.$or) {
+          query.$and = [{ $or: query.$or }, { $or: batchConditions }];
+          delete query.$or;
+        } else {
+          query.$or = batchConditions;
+        }
+      }
+
+      const products = await mongoConn.db.collection('products').find(query).toArray();
+      let clean = products.map(({ _id, ...rest }) => rest as Product);
+
+      // If batch or date is specified, filter activeSerials for precision
+      if ((batch && batch !== 'all') || (date && date !== 'all')) {
+        clean = clean.map((p) => {
+          if (!Array.isArray(p.activeSerials)) return p;
+          const filteredSerials = p.activeSerials.filter((s: any) => {
+            let match = true;
+            if (batch && batch !== 'all') {
+              const bRef = s.batchRef || (s as any).grnBatch || p.grnBatch || '';
+              if (bRef.toLowerCase() !== batch.toLowerCase()) match = false;
+            }
+            if (date && date !== 'all') {
+              const itemDate = s.addedAt || (s as any).addedDate || p.createdAt || '';
+              const dateStr = typeof itemDate === 'string' ? itemDate : new Date(itemDate).toISOString();
+              if (!dateStr.startsWith(date)) match = false;
+            }
+            return match;
+          });
+          return {
+            ...p,
+            activeSerials: filteredSerials,
+          };
+        });
+      }
+
       return NextResponse.json({ success: true, products: clean, source: 'mongodb' });
     }
   } catch (err: any) {

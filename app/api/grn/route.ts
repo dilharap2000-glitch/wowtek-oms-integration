@@ -3,6 +3,116 @@ import { connectToDatabase } from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const sku = searchParams.get('sku')?.trim();
+    const productId = searchParams.get('productId')?.trim();
+    const batch = searchParams.get('batch')?.trim();
+    const date = searchParams.get('date')?.trim();
+
+    const { db } = await connectToDatabase();
+
+    // 1. Locate product if sku or productId provided
+    let productMatch: any = null;
+    if (sku || productId) {
+      productMatch = await db.collection<any>('products').findOne({
+        $or: [
+          ...(sku ? [{ sku: sku }, { skuCode: sku }, { barcode: sku }] : []),
+          ...(productId ? [{ id: productId }] : []),
+        ],
+      });
+    }
+
+    // 2. Query grns history
+    const grnQuery: Record<string, any> = {};
+    if (sku) {
+      grnQuery.$or = [{ sku: sku }, { skuCode: sku }];
+    }
+    if (batch && batch !== 'all') {
+      grnQuery.batchRef = batch;
+    }
+    if (date && date !== 'all') {
+      const startOfDay = new Date(`${date}T00:00:00.000Z`);
+      const endOfDay = new Date(`${date}T23:59:59.999Z`);
+      grnQuery.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    const grnRecords = await db
+      .collection('grns')
+      .find(grnQuery)
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // 3. Aggregate unique batches and add dates
+    const batchesMap = new Map<string, { batchRef: string; date?: string; count: number; supplier?: string }>();
+    const datesMap = new Map<string, { date: string; count: number }>();
+
+    for (const record of grnRecords) {
+      const bRef = (record as any).batchRef || 'GRN-OCT';
+      const rDate = (record as any).createdAt ? new Date((record as any).createdAt).toISOString().slice(0, 10) : '';
+      const existingB = batchesMap.get(bRef) || { batchRef: bRef, date: rDate, count: 0, supplier: (record as any).supplier };
+      existingB.count += Number((record as any).qtyAdded || 1);
+      batchesMap.set(bRef, existingB);
+
+      if (rDate) {
+        const existingD = datesMap.get(rDate) || { date: rDate, count: 0 };
+        existingD.count += Number((record as any).qtyAdded || 1);
+        datesMap.set(rDate, existingD);
+      }
+    }
+
+    // Also parse from product activeSerials if present
+    let filteredSerials: any[] = [];
+    if (productMatch && Array.isArray(productMatch.activeSerials)) {
+      for (const item of productMatch.activeSerials) {
+        const itemBatch = item.batchRef || item.grnBatch || productMatch.grnBatch || 'GRN-OCT';
+        const rawDate = item.addedAt || item.addedDate || item.receivedAt || productMatch.lastRestockedAt || productMatch.createdAt;
+        const itemDate = rawDate ? (typeof rawDate === 'string' ? rawDate.slice(0, 10) : new Date(rawDate).toISOString().slice(0, 10)) : '';
+
+        if (!batchesMap.has(itemBatch)) {
+          batchesMap.set(itemBatch, { batchRef: itemBatch, date: itemDate, count: 1, supplier: item.supplier });
+        } else if (grnRecords.length === 0) {
+          batchesMap.get(itemBatch)!.count++;
+        }
+
+        if (itemDate) {
+          if (!datesMap.has(itemDate)) {
+            datesMap.set(itemDate, { date: itemDate, count: 1 });
+          } else if (grnRecords.length === 0) {
+            datesMap.get(itemDate)!.count++;
+          }
+        }
+
+        // Apply filters
+        let matches = true;
+        if (batch && batch !== 'all' && itemBatch.toLowerCase() !== batch.toLowerCase()) {
+          matches = false;
+        }
+        if (date && date !== 'all' && itemDate !== date) {
+          matches = false;
+        }
+        if (matches) {
+          filteredSerials.push(item);
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      batches: Array.from(batchesMap.values()),
+      dates: Array.from(datesMap.values()),
+      grnRecords: grnRecords.map(({ _id, ...rest }) => rest),
+      serials: filteredSerials,
+      totalSerialsCount: productMatch?.activeSerials?.length || 0,
+      matchedSerialsCount: filteredSerials.length,
+    });
+  } catch (error: any) {
+    console.error('[GRN GET Error]:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
