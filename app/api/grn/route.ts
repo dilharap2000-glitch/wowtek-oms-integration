@@ -97,8 +97,18 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2. Product upsert in MongoDB
-    const targetTitle = productTitle || body.name || `Product ${sku}`;
+    // 2. Product update in MongoDB without modifying or touching existing product name
+    const existingProduct = await db.collection<any>('products').findOne({
+      $or: [
+        { sku: sku },
+        { skuCode: sku },
+        ...(body.id ? [{ id: body.id }] : []),
+        ...(body.productId ? [{ id: body.productId }] : []),
+        ...(body.barcode ? [{ barcode: body.barcode }] : []),
+      ],
+    });
+
+    const targetTitle = productTitle || body.name || (existingProduct ? (existingProduct.name || existingProduct.title) : `Product ${sku}`);
     const targetCost = Number(costPrice || 0);
     const targetSelling = Number(sellingPrice || 0);
     const targetWarranty = Number(warrantyMonths || 0);
@@ -107,30 +117,55 @@ export async function POST(req: Request) {
 
     const validNewSerials = processedUnits.map((u) => u.serialNumber);
 
+    // Build update set: Strictly DO NOT include 'name', 'title', or 'product_name' to prevent accidental overwrite!
+    const updateSet: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+      lastRestockedAt: new Date(),
+    };
+
+    if (targetCost > 0) updateSet.costPrice = targetCost;
+    if (targetSelling > 0) updateSet.sellingPrice = targetSelling;
+    if (targetWarranty > 0) {
+      updateSet.warrantyMonths = targetWarranty;
+      updateSet.warrantyPeriodMonths = targetWarranty;
+    }
+    if (supplier) updateSet.supplier = targetSupplier;
+    if (batchRef) {
+      updateSet.grnBatch = batchRef;
+      updateSet.lastBatchRef = batchRef;
+    }
+    if (isSerialized) updateSet.isSerialized = true;
+
+    // $setOnInsert ONLY sets product name if this is a completely new product being inserted for the first time
+    const setOnInsertFields: Record<string, any> = {
+      id: body.id || body.productId || `prod-${Date.now()}`,
+      sku: sku,
+      skuCode: sku,
+      name: targetTitle,
+      title: targetTitle,
+      product_name: targetTitle,
+      category: category || 'Mobile Accessories',
+      barcode: body.barcode || `BC-${sku}`,
+      stockWarehouse: 0,
+      createdAt: new Date().toISOString(),
+      costPrice: targetCost,
+      sellingPrice: targetSelling,
+      supplier: targetSupplier,
+      warrantyMonths: targetWarranty || 12,
+      warrantyPeriodMonths: targetWarranty || 12,
+      isSerialized: isSerialized,
+    };
+
     await db.collection('products').updateOne(
       { $or: [{ sku: sku }, { skuCode: sku }] },
       {
-        $set: {
-          sku: sku,
-          skuCode: sku,
-          name: targetTitle,
-          title: targetTitle,
-          category: category || 'Mobile Accessories',
-          costPrice: targetCost,
-          sellingPrice: targetSelling,
-          warrantyMonths: targetWarranty,
-          warrantyPeriodMonths: targetWarranty,
-          supplier: targetSupplier,
-          isSerialized: isSerialized,
-          updatedAt: new Date().toISOString(),
+        $set: updateSet,
+        $setOnInsert: setOnInsertFields,
+        $inc: {
+          storeStock: qty,
+          stockStore: qty,
+          stockQuantity: qty,
         },
-        $setOnInsert: {
-          id: `prod-${Date.now()}`,
-          barcode: body.barcode || `BC-${sku}`,
-          stockWarehouse: 0,
-          createdAt: new Date().toISOString(),
-        },
-        $inc: { storeStock: qty, stockQuantity: qty },
         $push: {
           activeSerials: { $each: processedUnits },
           serialNumbers: { $each: validNewSerials },
@@ -198,9 +233,14 @@ export async function POST(req: Request) {
       }
     }
 
+    const updatedProduct = await db.collection<any>('products').findOne({
+      $or: [{ sku: sku }, { skuCode: sku }],
+    });
+
     return NextResponse.json({
       success: true,
-      message: `GRN saved successfully! ${serialsArray.length > 0 ? 'Custom Serials Added.' : 'Auto Barcodes Generated.'} Pending orders checked & auto-settled.`,
+      product: updatedProduct,
+      message: `GRN saved successfully! Stock and unique serials updated without modifying product name. Pending orders checked & auto-settled.`,
     });
   } catch (error: any) {
     console.error('GRN Error:', error);

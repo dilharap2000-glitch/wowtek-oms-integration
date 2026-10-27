@@ -707,6 +707,7 @@ export async function restockProduct(
           productId: prod?.id || cleanId || undefined,
           sku: prod?.sku || sku,
           skuCode: prod?.skuCode || prod?.sku || sku,
+          productTitle: prod?.name || prod?.title,
           barcode: prod?.barcode,
           restockQty: storeIncrement,
           addedStore: storeIncrement,
@@ -720,7 +721,13 @@ export async function restockProduct(
         if (data.product) {
           const idx = mock.products.findIndex((p) => p.sku === data.product.sku || p.id === data.product.id);
           if (idx !== -1) {
-            mock.products[idx] = { ...mock.products[idx], ...data.product };
+            const preservedName = mock.products[idx].name || mock.products[idx].title;
+            mock.products[idx] = {
+              ...mock.products[idx],
+              ...data.product,
+              name: preservedName || data.product.name,
+              title: preservedName || data.product.title,
+            };
           } else {
             mock.products.unshift(data.product);
           }
