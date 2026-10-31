@@ -49,6 +49,8 @@ const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   pickmeApiKey: 'pkm_live_9a87d091fb726c11a',
   pickmeBranchId: 'BR-BAMBALAPITIYA-01',
   uberEatsStoreId: 'eats-store-srilanka-0914',
+  uberEatsClientId: 'uber_client_id_lk_881920',
+  oauthClientId: 'uber_client_id_lk_881920',
   uberEatsClientSecret: 'ubr_sec_9941a87b003',
   transExpressAccountId: 'TX-ACCT-SL-9082',
   transExpressApiKey: 'tx_live_e9914bca88172c',

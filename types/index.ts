@@ -320,6 +320,8 @@ export interface ApiIntegrationConfig {
   pickmeApiKey: string;
   pickmeBranchId: string;
   uberEatsStoreId: string;
+  uberEatsClientId?: string;
+  oauthClientId?: string;
   uberEatsClientSecret: string;
   transExpressAccountId: string;
   transExpressApiKey: string;

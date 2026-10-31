@@ -70,9 +70,22 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
 }) => {
   const [config, setConfig] = useState<ApiIntegrationConfig>({
     ...apiConfig,
+    uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || 'uber_client_id_lk_881920',
+    oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || 'uber_client_id_lk_881920',
     smsUserId: apiConfig.smsUserId || '588',
     smsAutoNotifyOrder: apiConfig.smsAutoNotifyOrder ?? true,
   });
+
+  React.useEffect(() => {
+    if (apiConfig) {
+      setConfig((prev) => ({
+        ...prev,
+        ...apiConfig,
+        uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || prev.uberEatsClientId || 'uber_client_id_lk_881920',
+        oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || prev.oauthClientId || 'uber_client_id_lk_881920',
+      }));
+    }
+  }, [apiConfig]);
   const [showSecrets, setShowSecrets] = useState<{ [key: string]: boolean }>({});
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingStatus, setTestingStatus] = useState<{ [key: string]: string | null }>({});
@@ -645,9 +658,13 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                 <label className="block text-neutral-300 font-medium mb-1">OAuth Client ID</label>
                 <input
                   type="text"
-                  value="uber_client_id_lk_881920"
-                  readOnly
-                  className="w-full px-3 py-1.5 bg-neutral-950/60 border border-neutral-800 rounded-lg text-neutral-400 font-mono text-[11px]"
+                  value={config.uberEatsClientId ?? config.oauthClientId ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setConfig({ ...config, uberEatsClientId: val, oauthClientId: val });
+                  }}
+                  placeholder="Enter OAuth Client ID"
+                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-purple-500 transition-colors"
                 />
               </div>
 
