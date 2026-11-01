@@ -135,6 +135,30 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const [simStoreDeliveryAddress, setSimStoreDeliveryAddress] = useState('No. 45/A Station Road, Colombo');
   const [simStoreSubmitting, setSimStoreSubmitting] = useState(false);
   const [simStoreResponse, setSimStoreResponse] = useState<any | null>(null);
+  const [orderActionMsg, setOrderActionMsg] = useState<{ message: string; isError: boolean } | null>(null);
+
+  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel', storeId: string) => {
+    try {
+      const response = await fetch('/api/ubereats/order-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, action, storeId }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setOrderActionMsg({ message: `Order successfully ${action}ed on Uber Eats!`, isError: false });
+        setTimeout(() => setOrderActionMsg(null), 5000);
+      } else {
+        setOrderActionMsg({ message: `Failed: ${data.error || 'Action failed'}`, isError: true });
+        setTimeout(() => setOrderActionMsg(null), 5000);
+      }
+    } catch (err: any) {
+      console.error('Action failed', err);
+      setOrderActionMsg({ message: 'Something went wrong!', isError: true });
+      setTimeout(() => setOrderActionMsg(null), 5000);
+    }
+  };
 
   const handleOpenAddStore = () => {
     setEditingStoreId(null);
@@ -1472,6 +1496,43 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                   </span>
                   <span className="text-emerald-400">Inventory Auto-Deducted & Live SSE Broadcasted</span>
                 </div>
+              )}
+
+              {simStoreResponse.data?.order && (
+                (() => {
+                  const order = {
+                    orderId: simStoreResponse.data.order.id || simStoreResponse.data.order.orderId || simStoreResponse.data.order.invoiceNumber,
+                    storeId: simStoreResponse.data.order.externalStoreId || simStoreResponse.data.order.storeId || 'eats-store-01',
+                  };
+                  return (
+                    <div className="pt-2 border-t border-neutral-800">
+                      <div className="flex gap-2 mt-4">
+                        <button 
+                          onClick={() => handleOrderAction(order.orderId, 'accept', order.storeId)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 cursor-pointer transition-colors"
+                        >
+                          Accept on Uber
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleOrderAction(order.orderId, 'cancel', order.storeId)}
+                          className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 cursor-pointer transition-colors"
+                        >
+                          Cancel Order
+                        </button>
+                      </div>
+                      {orderActionMsg && (
+                        <div
+                          className={`mt-2 text-xs font-semibold ${
+                            orderActionMsg.isError ? 'text-red-400' : 'text-emerald-400'
+                          }`}
+                        >
+                          {orderActionMsg.message}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
           )}

@@ -1,0 +1,58 @@
+{
+  "pages": {
+    "/not-found": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/972-3970c3e490207029.js",
+      "static/chunks/app/not-found-71cd8339366b69fb.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/app/_not-found/page-c1bbe1b4bc8170a6.js"
+    ],
+    "/layout": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/css/83b9e2e8857cbfe8.css",
+      "static/chunks/app/layout-c993f75db60217d1.js"
+    ],
+    "/error": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/app/error-6c7da3270ab3f6f7.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/482-046b8e6597c5d7b4.js",
+      "static/chunks/11-8dddd8b827243d8e.js",
+      "static/chunks/app/page-703ea9126a4a23b4.js"
+    ],
+    "/sms/page": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/11-8dddd8b827243d8e.js",
+      "static/chunks/app/sms/page-192f6f6edc6b75df.js"
+    ],
+    "/sms-marketing/page": [
+      "static/chunks/webpack-c8441f2d519541e3.js",
+      "static/chunks/fd9d1056-492374e25eee495c.js",
+      "static/chunks/117-31c49e5e4a3ba663.js",
+      "static/chunks/main-app-4145b7cd5ba28a3e.js",
+      "static/chunks/app/sms-marketing/page-8ab9e8b009b246c4.js"
+    ]
+  }
+}
