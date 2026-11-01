@@ -179,7 +179,7 @@ export async function handleV1Post(request: NextRequest | Request) {
   saveServerWebhookEvent(evt);
   broadcastLiveUpdate({ type: 'webhook_event', event: evt, timestamp: now });
 
-  return NextResponse.json({ received: true }, { status: 200, headers: CORS_HEADERS });
+  return NextResponse.json({ status: 'success', received: true }, { status: 200, headers: CORS_HEADERS });
 }
 
 /**
