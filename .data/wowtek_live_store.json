@@ -1,6 +1,49 @@
 {
   "orders": [
     {
+      "id": "ord-ubr-UBER-202-7170",
+      "invoiceNumber": "WT-UBR-UBER-202",
+      "channel": "ubereats",
+      "channelName": "Uber Eats Retail (Bambalapitiya / Col 03)",
+      "storeId": "store-ubr-col03-01",
+      "storeName": "WOWTEK Electronics - Colombo 03",
+      "branchName": "Bambalapitiya / Col 03",
+      "externalStoreId": "eats-store-srilanka-0914",
+      "paymentGateway": "card_online",
+      "paymentGatewayName": "Uber In-App Payment",
+      "customerName": "Uber Eats Customer",
+      "customerPhone": "+94 77 222 3344",
+      "deliveryAddress": "Bambalapitiya / Col 03 Express Zone",
+      "city": "Colombo 03",
+      "items": [
+        {
+          "sku": "WT-UBR-DIRECT",
+          "barcode": "4790000000000",
+          "name": "Uber Eats Retail Item",
+          "quantity": 1,
+          "unitPrice": 3500,
+          "costPrice": 0,
+          "isRegistered": false
+        }
+      ],
+      "grossTotal": 3500,
+      "platformFeePercent": 15.4,
+      "platformFeeAmount": 539,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 0,
+      "costOfGoods": 0,
+      "netProfit": 0,
+      "profitStatus": "Pending / Inventory Not Found",
+      "hasUnregisteredItems": true,
+      "unregisteredItemsCount": 1,
+      "status": "Pending",
+      "createdAt": "2026-11-01T06:07:57.030Z",
+      "updatedAt": "2026-11-01T06:07:57.239Z",
+      "waybillGenerated": false,
+      "notes": "Uber Eats Live Order #UBER-202 tagged to branch: [Bambalapitiya / Col 03] (eats-store-srilanka-0914). Fee: 15.4%. default_platform_branch: Assigned to primary branch \"Bambalapitiya / Col 03\""
+    },
+    {
       "id": "ord-wc-9810-4871",
       "invoiceNumber": "WT-WC-9810",
       "channel": "woocommerce",
@@ -1010,6 +1053,46 @@
     }
   ],
   "webhookEvents": [
+    {
+      "id": "evt-stream-1793513276051-682",
+      "source": "stream",
+      "event": "stream.test",
+      "orderId": "STREAM-101",
+      "invoiceNumber": "WT-STREAM-101",
+      "storeId": "stream-hub",
+      "storeName": "Live Webhook Stream",
+      "branchName": "Central Hub",
+      "amount": 1500,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "event": "stream.test",
+        "order_id": "STREAM-101",
+        "total": 1500
+      },
+      "receivedAt": "2026-11-01T06:07:56.050Z"
+    },
+    {
+      "id": "evt-ubr-1793513262736-245",
+      "source": "ubereats",
+      "event": "orders.notification",
+      "orderId": "ord-ubr-UBER-202-2651",
+      "invoiceNumber": "WT-UBR-UBER-202",
+      "storeId": "store-ubr-col03-01",
+      "storeName": "WOWTEK Electronics - Colombo 03",
+      "branchName": "Bambalapitiya / Col 03",
+      "customerName": "Uber Eats Customer",
+      "customerPhone": "+94 77 222 3344",
+      "amount": 3500,
+      "status": "success",
+      "orderStatus": "Pending",
+      "rawPayload": {
+        "event": "orders.notification",
+        "order_id": "UBER-202",
+        "total": 3500
+      },
+      "receivedAt": "2026-11-01T06:07:42.188Z"
+    },
     {
       "id": "evt-menu-1793112246514",
       "source": "ubereats",
@@ -2439,5 +2522,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-10-27T14:44:06.514Z"
+  "lastUpdated": "2026-11-01T06:07:57.239Z"
 }

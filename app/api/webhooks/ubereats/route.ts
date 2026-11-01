@@ -411,15 +411,19 @@ export async function POST(req: NextRequest) {
       req.headers.get('x-location-id') ||
       req.headers.get('x-restaurant-id');
 
-    // 2. Execute background processing asynchronously (saving to DB, stock deduction, live SSE)
+    // 1. මුලින්ම Uber එකට හෝ Stream එකට ක්ෂණිකව 200 OK එකක් යවන්න (Timeout නොවී තියෙන්න)
+    // මේකෙන් Vercel එකේ තත්පර 300 කන්ට්රෝල් ලීමිට් එක පැනගන්න පුළුවන්.
+    const immediateResponse = NextResponse.json({ status: 'success' }, { status: 200, headers: corsHeaders });
+
+    // 2. ඊටපස්සේ ඩේටාබේස් අප්ඩේට් කිරීම් හෝ අනෙකුත් බැක්ග්රවුන්ඩ් වැඩ ටික කරගන්න
+    // (අවශ්ය නම් මේවා async විදිහට හෝ background task එකක රන් කරන්න පුළුවන්)
     processUberEatsWebhookAsync(body, { queryStoreId, headerStoreId, receivedAt }).catch((err) => {
-      console.error('[Uber Eats Webhook Background Error]:', err);
+      console.error('Background Task Error:', err);
     });
 
-    // 3. මුලින්ම Uber එකට ඉක්මනට 200 OK එකක් යවන්න (Timeout නොවී තියෙන්න)
-    return NextResponse.json({ status: 'success' }, { status: 200, headers: corsHeaders });
+    return immediateResponse;
   } catch (error) {
-    console.error('Webhook Error:', error);
+    console.error('Webhook Stream Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: corsHeaders });
   }
 }

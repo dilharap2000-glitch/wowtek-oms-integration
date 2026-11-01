@@ -1,7 +1,77 @@
-import { NextRequest } from 'next/server';
-import { subscribeToLiveUpdates } from '@/lib/serverStore';
+import { NextRequest, NextResponse } from 'next/server';
+import { subscribeToLiveUpdates, broadcastLiveUpdate, saveServerWebhookEvent } from '@/lib/serverStore';
+import { connectToMongoDB } from '@/lib/mongodb';
+import { WebhookEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Background processor for stream events:
+ * Dispatches SSE live broadcasts and persists audit log to MongoDB asynchronously
+ * without holding the HTTP response open.
+ */
+async function processBackgroundTasks(body: any) {
+  const now = new Date().toISOString();
+
+  // 1. Live SSE Broadcast across connected dashboards
+  broadcastLiveUpdate(body?.type ? body : { type: 'webhook_stream_event', data: body, timestamp: now });
+
+  // 2. Persist to MongoDB webhook events if applicable
+  try {
+    const evt: WebhookEvent = {
+      id: `evt-stream-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      source: body.source || (body.channel === 'ubereats' ? 'ubereats' : 'stream'),
+      event: body.event || body.event_type || 'stream.message',
+      orderId: body.order_id || body.id || 'N/A',
+      invoiceNumber: body.invoiceNumber || (body.order_id ? `WT-${body.order_id}` : 'N/A'),
+      storeId: body.store_id || 'stream-hub',
+      storeName: body.store_name || 'Live Webhook Stream',
+      branchName: body.branch_name || 'Central Hub',
+      amount: parseFloat(body.total || body.amount || 0),
+      status: 'success',
+      orderStatus: body.status || 'Completed',
+      rawPayload: body,
+      receivedAt: now,
+    };
+
+    saveServerWebhookEvent(evt);
+
+    const mongoConn = await connectToMongoDB();
+    if (mongoConn) {
+      await mongoConn.db.collection('webhook_events').updateOne(
+        { id: evt.id },
+        { $set: evt },
+        { upsert: true }
+      );
+    }
+  } catch (err: any) {
+    console.warn('[Webhook Stream Background Task Warn]:', err?.message);
+  }
+}
+
+/**
+ * POST /api/webhooks/stream
+ * Handles instant webhook & stream event ingestion:
+ * Immediately returns 200 OK to the sender, then runs background tasks asynchronously.
+ */
+export async function POST(req: NextRequest | Request) {
+  try {
+    const body = await req.json();
+
+    // 1. මුලින්ම Uber එකට හෝ Stream එකට ක්ෂණිකව 200 OK එකක් යවන්න (Timeout නොවී තියෙන්න)
+    // මේකෙන් Vercel එකේ තත්පර 300 කන්ට්රෝල් ලීමිට් එක පැනගන්න පුළුවන්.
+    const immediateResponse = NextResponse.json({ status: 'success' }, { status: 200 });
+
+    // 2. ඊටපස්සේ ඩේටාබේස් අප්ඩේට් කිරීම් හෝ අනෙකුත් බැක්ග්රවුන්ඩ් වැඩ ටික කරගන්න
+    // (අවශ්ය නම් මේවා async විදිහට හෝ background task එකක රන් කරන්න පුළුවන්)
+    processBackgroundTasks(body).catch((err) => console.error('Background Task Error:', err));
+
+    return immediateResponse;
+  } catch (error) {
+    console.error('Webhook Stream Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 /**
  * GET /api/webhooks/stream
