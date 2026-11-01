@@ -1054,6 +1054,25 @@
   ],
   "webhookEvents": [
     {
+      "id": "evt-stream-1793514366893-955",
+      "source": "stream",
+      "event": "stream.verified",
+      "orderId": "STREAM-999",
+      "invoiceNumber": "WT-STREAM-999",
+      "storeId": "stream-hub",
+      "storeName": "Live Webhook Stream",
+      "branchName": "Central Hub",
+      "amount": 4500,
+      "status": "success",
+      "orderStatus": "Completed",
+      "rawPayload": {
+        "event": "stream.verified",
+        "order_id": "STREAM-999",
+        "total": 4500
+      },
+      "receivedAt": "2026-11-01T06:26:06.893Z"
+    },
+    {
       "id": "evt-stream-1793513276051-682",
       "source": "stream",
       "event": "stream.test",
@@ -2522,5 +2541,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-11-01T06:07:57.239Z"
+  "lastUpdated": "2026-11-01T06:26:06.893Z"
 }

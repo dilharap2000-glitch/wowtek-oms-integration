@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { subscribeToLiveUpdates, broadcastLiveUpdate, saveServerWebhookEvent } from '@/lib/serverStore';
+import { broadcastLiveUpdate, saveServerWebhookEvent, subscribeToLiveUpdates } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { WebhookEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Background processor for stream events:
- * Dispatches SSE live broadcasts and persists audit log to MongoDB asynchronously
- * without holding the HTTP response open.
+ * Hintergrundverarbeitung für Stream-Events:
+ * Führt MongoDB-Updates und Live-Broadcasting im Hintergrund aus.
  */
 async function processBackgroundTasks(body: any) {
-  const now = new Date().toISOString();
-
-  // 1. Live SSE Broadcast across connected dashboards
-  broadcastLiveUpdate(body?.type ? body : { type: 'webhook_stream_event', data: body, timestamp: now });
-
-  // 2. Persist to MongoDB webhook events if applicable
   try {
+    const now = new Date().toISOString();
+
+    // 1. Live SSE Broadcast across connected dashboards
+    broadcastLiveUpdate(body?.type ? body : { type: 'webhook_stream_event', data: body, timestamp: now });
+
+    // 2. Persist to MongoDB webhook events if applicable
     const evt: WebhookEvent = {
       id: `evt-stream-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
       source: body.source || (body.channel === 'ubereats' ? 'ubereats' : 'stream'),
@@ -51,19 +50,16 @@ async function processBackgroundTasks(body: any) {
 
 /**
  * POST /api/webhooks/stream
- * Handles instant webhook & stream event ingestion:
- * Immediately returns 200 OK to the sender, then runs background tasks asynchronously.
+ * Sendet sofort eine 200 OK Antwort an Uber/Stream, um Vercel-Timeouts zu verhindern.
  */
 export async function POST(req: NextRequest | Request) {
   try {
     const body = await req.json();
 
-    // 1. මුලින්ම Uber එකට හෝ Stream එකට ක්ෂණිකව 200 OK එකක් යවන්න (Timeout නොවී තියෙන්න)
-    // මේකෙන් Vercel එකේ තත්පර 300 කන්ට්රෝල් ලීමිට් එක පැනගන්න පුළුවන්.
+    // 1. Sofortige 200 OK Antwort zurückgeben
     const immediateResponse = NextResponse.json({ status: 'success' }, { status: 200 });
 
-    // 2. ඊටපස්සේ ඩේටාබේස් අප්ඩේට් කිරීම් හෝ අනෙකුත් බැක්ග්රවුන්ඩ් වැඩ ටික කරගන්න
-    // (අවශ්ය නම් මේවා async විදිහට හෝ background task එකක රන් කරන්න පුළුවන්)
+    // 2. Hintergrundprozesse starten, ohne auf deren Beendigung zu warten
     processBackgroundTasks(body).catch((err) => console.error('Background Task Error:', err));
 
     return immediateResponse;
