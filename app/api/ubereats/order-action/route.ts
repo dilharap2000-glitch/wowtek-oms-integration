@@ -12,56 +12,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing orderId or action' }, { status: 400 });
     }
 
-    // Uber API Token එක ලබා ගැනීම (OAuth 2.0 token management)
-    const accessToken = process.env.UBER_EATS_ACCESS_TOKEN || process.env.UBER_ACCESS_TOKEN;
+    // Uber API Base URL from OpenAPI specs
+    const baseUrl = 'https://api.uber.com';
+    let endpoint = '';
+    let payload: any = {};
 
+    // Map actions to OpenAPI endpoints
+    switch (action) {
+      case 'accept':
+        endpoint = `/v1/delivery/order/${orderId}/accept`;
+        payload = {
+          accepted_by: 'WOWTEK OMS Admin',
+          external_reference_id: orderId,
+        };
+        break;
+      case 'cancel':
+        endpoint = `/v1/delivery/order/${orderId}/cancel`;
+        payload = {
+          cancellation_reason: {
+            type: 'RESTAURANT_TOO_BUSY',
+            info: 'Cancelled via WOWTEK OMS',
+          },
+        };
+        break;
+      case 'ready':
+        endpoint = `/v1/delivery/order/${orderId}/ready`;
+        payload = {};
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid action type' }, { status: 400 });
+    }
+
+    // Call Uber Eats API
+    const accessToken = process.env.UBER_ACCESS_TOKEN || process.env.UBER_EATS_ACCESS_TOKEN;
     if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
-      if (action === 'accept') {
-        // OpenAPI spec එකේ ඇති පරිදි Accept Endpoint එකට Call කිරීම
-        const uberResponse = await fetch(`https://api.uber.com/v1/delivery/order/${orderId}/accept`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            accepted_by: 'WOWTEK OMS Admin',
-            external_reference_id: orderId,
-          }),
-        });
+      const uberResponse = await fetch(`${baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
-        if (!uberResponse.ok) {
-          const errText = await uberResponse.text();
-          console.error('Uber Accept Error:', errText);
-          return NextResponse.json({ error: 'Failed to accept order on Uber Eats' }, { status: 500 });
-        }
-      } else if (action === 'cancel') {
-        // Cancel Endpoint එකට Call කිරීම (openapi spec: /v1/delivery/order/{order_id}/cancel)
-        const uberResponse = await fetch(`https://api.uber.com/v1/delivery/order/${orderId}/cancel`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            cancellation_reason: {
-              type: 'RESTAURANT_TOO_BUSY',
-              info: 'Cancelled via WOWTEK OMS',
-            },
-          }),
-        });
-
-        if (!uberResponse.ok) {
-          const errText = await uberResponse.text();
-          console.error('Uber Cancel Error:', errText);
-          return NextResponse.json({ error: 'Failed to cancel order on Uber Eats' }, { status: 500 });
-        }
+      if (!uberResponse.ok && uberResponse.status !== 204) {
+        const errText = await uberResponse.text();
+        console.error(`Uber API Error (${action}):`, errText);
+        return NextResponse.json({ error: `Failed to ${action} order on Uber Eats: ${errText}` }, { status: 500 });
       }
     }
 
-    // Update local OMS order state & broadcast SSE for immediate UI responsiveness
+    // Update local OMS order state & broadcast live update
     const now = new Date().toISOString();
-    const newStatus = action === 'accept' ? 'Processing' : 'Cancelled';
+    const newStatus = action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled';
 
     try {
       const serverStore = getServerStore();
@@ -99,15 +102,16 @@ export async function POST(req: NextRequest) {
         );
       }
     } catch (syncErr: any) {
-      console.warn('[Uber Order Action Local Sync]:', syncErr?.message);
+      console.warn('[Order Action Local Sync Notice]:', syncErr?.message);
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `Order ${orderId} ${action}ed successfully on Uber Eats`,
+    return NextResponse.json({ 
+      success: true, 
+      message: `Order ${orderId} successfully ${action}ed on Uber Eats` 
     });
+
   } catch (error: any) {
-    console.error('Order Action Error:', error);
+    console.error('OMS Order Action Exception:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

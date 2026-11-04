@@ -67,6 +67,7 @@ export type OrderStatus =
   | 'Pending'
   | 'PENDING_ACCEPTANCE'
   | 'Processing'
+  | 'Ready for Pickup'
   | 'Completed'
   | 'Delivered'
   | 'Returned'

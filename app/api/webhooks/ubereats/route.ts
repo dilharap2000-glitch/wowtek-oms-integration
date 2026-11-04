@@ -20,6 +20,18 @@ async function processBackgroundTasks(body: any) {
   try {
     const now = new Date().toISOString();
     
+    // Handle Uber Eats Financial Settlement Report Event
+    if (body.event_type === 'eats.report.success') {
+      const { report_type, report_metadata } = body;
+      broadcastLiveUpdate({
+        type: 'ubereats_report_processed',
+        reportType: report_type,
+        workflowId: report_metadata?.workflow_id,
+        timestamp: now,
+      });
+      return;
+    }
+
     // 1. Extract details from Uber Eats Payload (handling different schema formats)
     const rawOrderId = body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
     const orderId = String(rawOrderId);

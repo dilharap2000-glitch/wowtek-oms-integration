@@ -12,72 +12,106 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing orderId or action' }, { status: 400 });
     }
 
-    // Uber Eats Developer API Endpoints (Sandbox/Production)
-    // action එක 'accept' නම් හෝ 'cancel' නම් අදාළ endpoint එක තෝරා ගැනීම
-    const UBER_API_BASE = process.env.UBER_API_BASE_URL || 'https://api.uber.com/v1/eats';
+    // Uber API Base URL from OpenAPI specs
+    const baseUrl = 'https://api.uber.com';
     let endpoint = '';
-    let bodyPayload: any = null;
+    let payload: any = {};
 
-    if (action === 'accept') {
-      endpoint = `${UBER_API_BASE}/stores/${storeId || 'default'}/orders/${orderId}/accept`;
-    } else if (action === 'cancel') {
-      endpoint = `${UBER_API_BASE}/stores/${storeId || 'default'}/orders/${orderId}/cancel`;
-      bodyPayload = { reason: 'Accepted via WOWTEK OMS Dashboard' };
-    } else {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    // Map actions to OpenAPI endpoints
+    switch (action) {
+      case 'accept':
+        endpoint = `/v1/delivery/order/${orderId}/accept`;
+        payload = {
+          accepted_by: 'WOWTEK OMS Admin',
+          external_reference_id: orderId,
+        };
+        break;
+      case 'cancel':
+        endpoint = `/v1/delivery/order/${orderId}/cancel`;
+        payload = {
+          cancellation_reason: {
+            type: 'RESTAURANT_TOO_BUSY',
+            info: 'Cancelled via WOWTEK OMS',
+          },
+        };
+        break;
+      case 'ready':
+        endpoint = `/v1/delivery/order/${orderId}/ready`;
+        payload = {};
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid action type' }, { status: 400 });
     }
 
-    // Uber API Access Token එක ලබා ගැනීම (환경변වල් වලින් හෝ database එකෙන්)
-    const accessToken = process.env.UBER_EATS_ACCESS_TOKEN;
-
-    if (accessToken) {
-      const uberResponse = await fetch(endpoint, {
+    // Call Uber Eats API
+    const accessToken = process.env.UBER_ACCESS_TOKEN || process.env.UBER_EATS_ACCESS_TOKEN;
+    if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
+      const uberResponse = await fetch(`${baseUrl}${endpoint}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: bodyPayload ? JSON.stringify(bodyPayload) : undefined,
+        body: JSON.stringify(payload),
       });
 
-      if (!uberResponse.ok) {
-        const errorText = await uberResponse.text();
-        return NextResponse.json({ error: `Uber API Error: ${errorText}` }, { status: uberResponse.status });
+      if (!uberResponse.ok && uberResponse.status !== 204) {
+        const errText = await uberResponse.text();
+        console.error(`Uber API Error (${action}):`, errText);
+        return NextResponse.json({ error: `Failed to ${action} order on Uber Eats: ${errText}` }, { status: 500 });
       }
     }
 
-    // Update local OMS order status so dashboard reflects changes instantly
+    // Update local OMS order state & broadcast live update
+    const now = new Date().toISOString();
+    const newStatus = action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled';
+
     try {
       const serverStore = getServerStore();
       const existing = serverStore.orders.find(
-        (o) => o.id === orderId || o.invoiceNumber === orderId || o.id.includes(orderId)
+        (o) => o.id === orderId || o.invoiceNumber === orderId || o.id.includes(orderId) || (o as any).orderId === orderId
       );
       if (existing) {
-        existing.status = action === 'accept' ? 'Processing' : 'Cancelled';
-        existing.updatedAt = new Date().toISOString();
+        existing.status = newStatus;
+        existing.updatedAt = now;
         saveServerOrder(existing);
-        broadcastLiveUpdate({
-          type: 'order_status_updated',
-          orderId: existing.id,
-          status: existing.status,
-          timestamp: existing.updatedAt,
-        });
       }
+
+      broadcastLiveUpdate({
+        type: 'order_status_updated',
+        orderId: orderId,
+        status: newStatus,
+        timestamp: now,
+      });
 
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
         await mongoConn.db.collection('orders').updateOne(
-          { $or: [{ id: orderId }, { invoiceNumber: orderId }] },
-          { $set: { status: action === 'accept' ? 'Processing' : 'Cancelled', updatedAt: new Date().toISOString() } }
+          { $or: [{ id: orderId }, { invoiceNumber: orderId }, { orderId: orderId }] },
+          { $set: { status: newStatus, updatedAt: now } }
+        );
+
+        await mongoConn.db.collection('oms_orders').updateOne(
+          { orderId: orderId },
+          { $set: { status: newStatus, updatedAt: now } }
+        );
+
+        await mongoConn.db.collection('webhook_events').updateOne(
+          { orderId: orderId },
+          { $set: { orderStatus: newStatus } }
         );
       }
-    } catch (dbErr: any) {
-      console.warn('[Order Action] OMS Local State Sync Notice:', dbErr?.message);
+    } catch (syncErr: any) {
+      console.warn('[Order Action Local Sync Notice]:', syncErr?.message);
     }
 
-    return NextResponse.json({ success: true, message: `Order successfully ${action}ed` });
+    return NextResponse.json({ 
+      success: true, 
+      message: `Order ${orderId} successfully ${action}ed on Uber Eats` 
+    });
+
   } catch (error: any) {
-    console.error('Order Action Error:', error);
+    console.error('OMS Order Action Exception:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

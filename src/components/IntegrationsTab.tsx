@@ -137,17 +137,17 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const [simStoreResponse, setSimStoreResponse] = useState<any | null>(null);
   const [orderActionMsg, setOrderActionMsg] = useState<{ message: string; isError: boolean } | null>(null);
 
-  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel', storeId: string) => {
+  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId: string) => {
     try {
-      const response = await fetch('/api/ubereats/order-action', {
+      const response = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId, action, storeId }),
       });
 
       const data = await response.json();
-      if (response.ok) {
-        setOrderActionMsg({ message: `Order successfully ${action}ed on Uber Eats!`, isError: false });
+      if (response.ok && data.success) {
+        setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
         setTimeout(() => setOrderActionMsg(null), 5000);
       } else {
         setOrderActionMsg({ message: `Failed: ${data.error || 'Action failed'}`, isError: true });

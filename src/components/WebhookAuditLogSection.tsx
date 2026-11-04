@@ -54,24 +54,26 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
 
-  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel', storeId?: string) => {
+  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId?: string) => {
     try {
-      const res = await fetch('/api/ubereats/order-action', {
+      const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, action, storeId: storeId || 'uber-store' }),
+        body: JSON.stringify({ orderId, action, storeId }),
       });
+
       const data = await res.json();
-      if (res.ok) {
-        setOrderActionFeedback({ message: `Order #${orderId} ${action}ed successfully on Uber Eats!`, isError: false });
+      if (data.success) {
+        setOrderActionFeedback({ message: data.message || `Success: Order ${orderId} ${action}ed successfully`, isError: false });
         setTimeout(() => setOrderActionFeedback(null), 4000);
         if (onRefreshEvents) onRefreshEvents();
       } else {
-        setOrderActionFeedback({ message: `Failed: ${data.error || 'Server error'}`, isError: true });
+        setOrderActionFeedback({ message: data.error || 'Action failed', isError: true });
         setTimeout(() => setOrderActionFeedback(null), 5000);
       }
     } catch (err: any) {
-      setOrderActionFeedback({ message: `Action failed: ${err.message}`, isError: true });
+      console.error('Action failed:', err);
+      setOrderActionFeedback({ message: 'Network error while processing order action.', isError: true });
       setTimeout(() => setOrderActionFeedback(null), 5000);
     }
   };
@@ -467,16 +469,25 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                       <div className="flex items-center justify-center gap-2">
                         {/* Feed Row එක ඇතුළේ Action column එකට මේ කොටස දාන්න */}
                         {item.source === 'ubereats' && (
-                          <div className="flex gap-2 justify-end items-center">
+                          <div className="flex gap-1.5 justify-end items-center">
                             <button
                               onClick={() => handleOrderAction(item.orderId, 'accept', item.storeId)}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded font-medium transition cursor-pointer"
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                              title="Accept on Uber"
                             >
                               Accept
                             </button>
                             <button
+                              onClick={() => handleOrderAction(item.orderId, 'ready', item.storeId)}
+                              className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                              title="Mark Order Ready for Delivery"
+                            >
+                              Ready
+                            </button>
+                            <button
                               onClick={() => handleOrderAction(item.orderId, 'cancel', item.storeId)}
-                              className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-1.5 rounded font-medium transition cursor-pointer"
+                              className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                              title="Cancel Order"
                             >
                               Cancel
                             </button>
