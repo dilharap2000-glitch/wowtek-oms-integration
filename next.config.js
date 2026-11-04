@@ -1,12 +1,12 @@
+const { PHASE_DEVELOPMENT_SERVER } = require('next/constants');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  distDir: process.env.NEXT_DIST_DIR || '.next',
   experimental: {
     serverComponentsExternalPackages: ['mongodb'],
   },
   webpack: (config, { isServer }) => {
-
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -43,4 +43,9 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = (phase) => {
+  return {
+    ...nextConfig,
+    distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next_dev' : '.next',
+  };
+};
