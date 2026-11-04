@@ -1,6 +1,49 @@
 {
   "orders": [
     {
+      "id": "ord-ubr-88776655",
+      "invoiceNumber": "UBER-776655",
+      "channel": "ubereats",
+      "channelName": "Uber Eats Retail (Central Hub)",
+      "storeId": "store-colombo-main",
+      "storeName": "Uber Eats Store",
+      "branchName": "Central Hub",
+      "externalStoreId": "store-colombo-main",
+      "paymentGateway": "card_online",
+      "paymentGatewayName": "Uber In-App Payment",
+      "customerName": "Uber Customer",
+      "customerPhone": "+94 77 123 4567",
+      "deliveryAddress": "Delivery Address",
+      "city": "Colombo",
+      "items": [
+        {
+          "sku": "WT-UBR-ITM-1",
+          "barcode": "4790000000000",
+          "name": "Baseus 65W GaN Charger",
+          "quantity": 1,
+          "unitPrice": 12500,
+          "costPrice": 0,
+          "isRegistered": true
+        }
+      ],
+      "grossTotal": 12500,
+      "platformFeePercent": 15.4,
+      "platformFeeAmount": 1925,
+      "gatewayFeePercent": 0,
+      "gatewayFeeAmount": 0,
+      "courierFee": 0,
+      "costOfGoods": 0,
+      "netProfit": 10575,
+      "profitStatus": "Calculated",
+      "hasUnregisteredItems": false,
+      "unregisteredItemsCount": 0,
+      "status": "PENDING_ACCEPTANCE",
+      "createdAt": "2026-11-04T10:36:37.720Z",
+      "updatedAt": "2026-11-04T10:36:37.720Z",
+      "waybillGenerated": false,
+      "notes": "Uber Eats Live Order: UBER-776655"
+    },
+    {
       "id": "ord-ubr-993322",
       "invoiceNumber": "UBER-993322",
       "channel": "ubereats",
@@ -1139,6 +1182,40 @@
     }
   ],
   "webhookEvents": [
+    {
+      "id": "evt-uber-1793788597721-806",
+      "source": "ubereats",
+      "event": "orders.notification",
+      "orderId": "88776655",
+      "invoiceNumber": "UBER-776655",
+      "storeId": "store-colombo-main",
+      "storeName": "Uber Eats Store",
+      "branchName": "Central Hub",
+      "amount": 12500,
+      "status": "success",
+      "orderStatus": "PENDING_ACCEPTANCE",
+      "rawPayload": {
+        "order_id": "88776655",
+        "meta": {
+          "user_id": "store-colombo-main"
+        },
+        "current_order_state": {
+          "status": "PENDING_ACCEPTANCE",
+          "total_price": {
+            "amount": 1250000
+          },
+          "items": [
+            {
+              "id": "ITM-1",
+              "title": "Baseus 65W GaN Charger",
+              "quantity": 1,
+              "price": 12500
+            }
+          ]
+        }
+      },
+      "receivedAt": "2026-11-04T10:36:37.720Z"
+    },
     {
       "id": "evt-uber-1793787219619-380",
       "source": "ubereats",
@@ -2678,5 +2755,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-11-04T10:13:39.621Z"
+  "lastUpdated": "2026-11-04T10:36:37.724Z"
 }
