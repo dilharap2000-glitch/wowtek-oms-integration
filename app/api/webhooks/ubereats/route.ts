@@ -22,18 +22,21 @@ async function processBackgroundTasks(body: any) {
     
     broadcastLiveUpdate(body?.type ? body : { type: 'webhook_ubereats_event', data: body, timestamp: now });
 
+    const orderId = body.order_id || body.meta?.resource_id || body.id || 'N/A';
+    const storeId = body.store_id || body.meta?.user_id || 'uber-store';
+
     const evt: WebhookEvent = {
       id: `evt-uber-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
       source: 'ubereats',
-      event: body.event || body.event_type || 'orders.notification',
-      orderId: body.order_id || body.id || 'N/A',
-      invoiceNumber: body.invoiceNumber || (body.order_id ? `WT-${body.order_id}` : 'N/A'),
-      storeId: body.store_id || 'uber-store',
+      event: body.event_type || body.event || 'orders.notification',
+      orderId: orderId,
+      invoiceNumber: orderId !== 'N/A' ? `UBER-${orderId.slice(-6)}` : 'N/A',
+      storeId: storeId,
       storeName: body.store_name || 'Uber Eats Store',
-      branchName: body.branch_name || 'Central Hub',
-      amount: parseFloat(body.total || body.amount || 0),
+      branchName: 'Central Hub',
+      amount: parseFloat(body.order?.current_order_state?.total_price?.amount || body.amount || 0) / 100 || 0,
       status: 'success',
-      orderStatus: body.status || 'New',
+      orderStatus: 'PENDING_ACCEPTANCE', // Action Buttons පෙන්නන්න මේ status එක set කරනවා
       rawPayload: body,
       receivedAt: now,
     };
@@ -41,9 +44,8 @@ async function processBackgroundTasks(body: any) {
     saveServerWebhookEvent(evt);
 
     // If order details exist, sync to OMS orders so it displays in Recent Orders
-    const orderId = body.order_id || body.id;
     if (orderId && orderId !== 'N/A') {
-      const grossTotal = parseFloat(body.total || body.amount || 0);
+      const grossTotal = evt.amount > 0 ? evt.amount : parseFloat(body.total || body.amount || 0);
       const feeAmount = Math.round((grossTotal * 15.4) / 100);
       const rawItems = Array.isArray(body.items) ? body.items : [];
       const items: OrderItem[] = rawItems.length > 0
@@ -70,13 +72,13 @@ async function processBackgroundTasks(body: any) {
 
       const newOrder: Order = {
         id: `ord-ubr-${orderId}`,
-        invoiceNumber: body.invoiceNumber || (body.order_id ? `WT-${body.order_id}` : `WT-UBR-${orderId}`),
+        invoiceNumber: evt.invoiceNumber !== 'N/A' ? evt.invoiceNumber : (body.invoiceNumber || `UBER-${String(orderId).slice(-6)}`),
         channel: 'ubereats',
-        channelName: `Uber Eats Retail (${body.branch_name || 'Central Hub'})`,
-        storeId: body.store_id || 'uber-store',
-        storeName: body.store_name || 'Uber Eats Store',
-        branchName: body.branch_name || 'Central Hub',
-        externalStoreId: body.store_id || 'uber-store',
+        channelName: `Uber Eats Retail (${evt.storeName})`,
+        storeId: storeId,
+        storeName: evt.storeName,
+        branchName: evt.branchName,
+        externalStoreId: storeId,
         paymentGateway: 'card_online',
         paymentGatewayName: 'Uber In-App Payment',
         customerName: body.customer_name || body.customer?.name || 'Uber Customer',
@@ -95,11 +97,11 @@ async function processBackgroundTasks(body: any) {
         profitStatus: 'Calculated',
         hasUnregisteredItems: false,
         unregisteredItemsCount: 0,
-        status: (body.status === 'Processing' || body.status === 'Completed' || body.status === 'Cancelled') ? body.status : 'Pending',
+        status: (body.status === 'Processing' || body.status === 'Completed' || body.status === 'Cancelled') ? body.status : 'PENDING_ACCEPTANCE',
         createdAt: now,
         updatedAt: now,
         waybillGenerated: false,
-        notes: `Uber Eats Webhook processed: ${body.event || 'orders.notification'}`,
+        notes: `Uber Eats Webhook processed: ${body.event_type || body.event || 'orders.notification'}`,
       };
 
       saveServerOrder(newOrder);

@@ -52,6 +52,29 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
+  const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
+
+  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel', storeId?: string) => {
+    try {
+      const res = await fetch('/api/ubereats/order-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, action, storeId: storeId || 'uber-store' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOrderActionFeedback({ message: `Order #${orderId} ${action}ed successfully on Uber Eats!`, isError: false });
+        setTimeout(() => setOrderActionFeedback(null), 4000);
+        if (onRefreshEvents) onRefreshEvents();
+      } else {
+        setOrderActionFeedback({ message: `Failed: ${data.error || 'Server error'}`, isError: true });
+        setTimeout(() => setOrderActionFeedback(null), 5000);
+      }
+    } catch (err: any) {
+      setOrderActionFeedback({ message: `Action failed: ${err.message}`, isError: true });
+      setTimeout(() => setOrderActionFeedback(null), 5000);
+    }
+  };
 
   const handleCopyPayload = (payload: any) => {
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
@@ -277,6 +300,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               </tr>
             ) : (
               (filteredEvents || []).slice(0, compact ? 6 : 25).map((evt) => {
+                const item = evt;
                 const isSuccess = evt.status === 'success';
                 const isSkipped = evt.status === 'skipped';
                 const timeStr = new Date(evt.receivedAt).toLocaleTimeString([], {
@@ -438,16 +462,36 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                       )}
                     </td>
 
-                    {/* Raw Payload View Button */}
+                    {/* Action Column with Uber Eats Accept/Cancel & Raw Payload Button */}
                     <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => setSelectedEventForPayload(evt)}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white rounded-lg text-[11px] font-mono transition-colors"
-                        title="Inspect Raw WooCommerce JSON Payload"
-                      >
-                        <Code className="w-3 h-3 text-purple-400" />
-                        <span>View JSON</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        {/* Feed Row එක ඇතුළේ Action column එකට මේ කොටස දාන්න */}
+                        {item.source === 'ubereats' && (
+                          <div className="flex gap-2 justify-end items-center">
+                            <button
+                              onClick={() => handleOrderAction(item.orderId, 'accept', item.storeId)}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded font-medium transition cursor-pointer"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleOrderAction(item.orderId, 'cancel', item.storeId)}
+                              className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-3 py-1.5 rounded font-medium transition cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => setSelectedEventForPayload(evt)}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white rounded-lg text-[11px] font-mono transition-colors cursor-pointer"
+                          title="Inspect Raw JSON Payload"
+                        >
+                          <Code className="w-3 h-3 text-purple-400" />
+                          <span>View JSON</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -533,6 +577,24 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Action Feedback Toast */}
+      {orderActionFeedback && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 border ${
+            orderActionFeedback.isError
+              ? 'bg-rose-950 text-rose-200 border-rose-700/60'
+              : 'bg-emerald-950 text-emerald-200 border-emerald-700/60'
+          }`}
+        >
+          {orderActionFeedback.isError ? (
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          ) : (
+            <Check className="w-4 h-4 text-emerald-400" />
+          )}
+          <span>{orderActionFeedback.message}</span>
         </div>
       )}
     </div>

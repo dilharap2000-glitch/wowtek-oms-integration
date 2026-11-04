@@ -570,7 +570,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 {/* Live Pending Uber Eats Action Items */}
-                {ubrOrders.filter((o) => o?.status === 'Pending').slice(0, 2).map((order) => {
+                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE').slice(0, 3).map((order) => {
                   const orderPayload = {
                     ...order,
                     orderId: (order as any).orderId || order.id,
@@ -751,7 +751,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       <td className="py-3 px-3.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           {/* Uber Eats Real-Time API Accept / Cancel Controls */}
-                          {order.channel === 'ubereats' && order.status === 'Pending' && (
+                          {order.channel === 'ubereats' && (order.status === 'Pending' || order.status === 'PENDING_ACCEPTANCE') && (
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => handleOrderAction(order.id, 'accept', order.externalStoreId || order.storeId)}
