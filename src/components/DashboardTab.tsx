@@ -580,34 +580,50 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 {/* Live Pending Uber Eats Action Items */}
-                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE').slice(0, 3).map((order) => {
-                  const orderPayload = {
-                    ...order,
-                    orderId: (order as any).orderId || order.id,
-                    storeId: order.storeId || order.externalStoreId || 'eats-store-01',
-                  };
+                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE' || o?.status === 'Processing').slice(0, 4).map((order) => {
+                  const uberOriginalUuid = (order as any).uber_order_id || (order as any).orderId || order.id;
+                  const rawDisplayId = (order as any).display_id || (order as any).short_display_id || order.invoiceNumber || '';
+                  const cleanDisplayId = String(rawDisplayId).replace('UBER-', '');
 
                   return (
-                    <div key={order.id} className="mt-3 pt-3 border-t border-slate-800">
+                    <div key={order.id || uberOriginalUuid} className="mt-3 pt-3 border-t border-slate-800 order-card">
                       <div className="flex justify-between items-center text-[11px]">
-                        <span className="font-mono text-purple-300 font-bold">{order.invoiceNumber}</span>
+                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම (උදා: UBER-06289) */}
+                        <h3 className="font-mono text-purple-300 font-bold text-xs">UBER-{cleanDisplayId}</h3>
                         <span className="text-emerald-400 font-mono font-semibold">Rs. {order.grossTotal.toLocaleString()}</span>
                       </div>
-                      <div className="text-[11px] text-slate-300 truncate mt-0.5">{order.customerName} ({order.branchName || 'Colombo'})</div>
+                      <div className="flex items-center justify-between mt-1 text-[11px]">
+                        <span className="text-slate-300 truncate">{order.customerName} ({order.branchName || 'Colombo'})</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${order.status === 'Processing' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                          {order.status}
+                        </span>
+                      </div>
 
-                      <div className="flex gap-2 mt-4">
+                      <div className="flex gap-2 mt-3">
+                        {/* 2. Accept බටන් එක ඔබද්දී Backend එකට දිග uber_order_id (UUID) එක යැවීම */}
                         <button 
-                          onClick={() => handleOrderAction(orderPayload.orderId, 'accept', orderPayload.storeId)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 cursor-pointer text-xs"
+                          onClick={() => handleOrderAction('accept', uberOriginalUuid)}
+                          disabled={orderActionLoading === `${uberOriginalUuid}-accept`}
+                          className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-green-700 cursor-pointer text-xs flex-1 transition-colors disabled:opacity-50"
                         >
-                          Accept on Uber
+                          {orderActionLoading === `${uberOriginalUuid}-accept` ? '...' : 'Accept'}
                         </button>
                         
+                        {/* 3. Ready බටන් එක ඔබද්දී */}
                         <button 
-                          onClick={() => handleOrderAction(orderPayload.orderId, 'cancel', orderPayload.storeId)}
-                          className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 cursor-pointer text-xs"
+                          onClick={() => handleOrderAction('ready', uberOriginalUuid)}
+                          disabled={orderActionLoading === `${uberOriginalUuid}-ready`}
+                          className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-700 cursor-pointer text-xs flex-1 transition-colors disabled:opacity-50"
                         >
-                          Cancel Order
+                          {orderActionLoading === `${uberOriginalUuid}-ready` ? '...' : 'Ready'}
+                        </button>
+
+                        <button 
+                          onClick={() => handleOrderAction('cancel', uberOriginalUuid)}
+                          disabled={orderActionLoading === `${uberOriginalUuid}-cancel`}
+                          className="bg-red-600/80 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-red-700 cursor-pointer text-xs transition-colors disabled:opacity-50"
+                        >
+                          {orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}
                         </button>
                       </div>
                     </div>
@@ -760,41 +776,47 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       </td>
                       <td className="py-3 px-3.5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Uber Eats Real-Time API Accept / Cancel Controls */}
-                          {order.channel === 'ubereats' && (order.status === 'Pending' || order.status === 'PENDING_ACCEPTANCE') && (
+                          {/* Uber Eats Real-Time API Accept / Ready / Cancel Controls */}
+                          {order.channel === 'ubereats' && (
                             <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleOrderAction(order.id, 'accept', order.externalStoreId || order.storeId)}
-                                disabled={orderActionLoading === `${order.id}-accept`}
-                                className="px-2 py-1 text-emerald-300 hover:text-white bg-emerald-600/25 hover:bg-emerald-600 border border-emerald-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
-                                title="Accept Uber Eats Order via Developer API"
-                              >
-                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                <span>{orderActionLoading === `${order.id}-accept` ? '...' : 'Accept'}</span>
-                              </button>
+                              {/* 1. Accept button */}
+                              {(order.status === 'Pending' || order.status === 'PENDING_ACCEPTANCE') && (
+                                <button
+                                  onClick={() => handleOrderAction('accept', (order as any).uber_order_id || order.id)}
+                                  disabled={orderActionLoading === `${(order as any).uber_order_id || order.id}-accept`}
+                                  className="px-2 py-1 text-emerald-300 hover:text-white bg-emerald-600/25 hover:bg-emerald-600 border border-emerald-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Accept Uber Eats Order"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                  <span>{orderActionLoading === `${(order as any).uber_order_id || order.id}-accept` ? '...' : 'Accept'}</span>
+                                </button>
+                              )}
 
-                              <button
-                                onClick={() => handleOrderAction(order.id, 'cancel', order.externalStoreId || order.storeId)}
-                                disabled={orderActionLoading === `${order.id}-cancel`}
-                                className="px-2 py-1 text-rose-300 hover:text-white bg-rose-600/25 hover:bg-rose-600 border border-rose-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
-                                title="Reject / Cancel Uber Eats Order via Developer API"
-                              >
-                                <X className="w-3 h-3 text-rose-400" />
-                                <span>{orderActionLoading === `${order.id}-cancel` ? '...' : 'Cancel'}</span>
-                              </button>
+                              {/* 2. Ready button */}
+                              {(order.status === 'Pending' || order.status === 'PENDING_ACCEPTANCE' || order.status === 'Processing') && (
+                                <button
+                                  onClick={() => handleOrderAction('ready', (order as any).uber_order_id || order.id)}
+                                  disabled={orderActionLoading === `${(order as any).uber_order_id || order.id}-ready`}
+                                  className="px-2 py-1 text-blue-300 hover:text-white bg-blue-600/25 hover:bg-blue-600 border border-blue-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Mark Ready on Uber Eats"
+                                >
+                                  <span>{orderActionLoading === `${(order as any).uber_order_id || order.id}-ready` ? '...' : 'Ready'}</span>
+                                </button>
+                              )}
+
+                              {/* 3. Cancel button */}
+                              {order.status !== 'Cancelled' && order.status !== 'Completed' && (
+                                <button
+                                  onClick={() => handleOrderAction('cancel', (order as any).uber_order_id || order.id)}
+                                  disabled={orderActionLoading === `${(order as any).uber_order_id || order.id}-cancel`}
+                                  className="px-2 py-1 text-rose-300 hover:text-white bg-rose-600/25 hover:bg-rose-600 border border-rose-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                  title="Cancel Uber Eats Order"
+                                >
+                                  <X className="w-3 h-3 text-rose-400" />
+                                  <span>{orderActionLoading === `${(order as any).uber_order_id || order.id}-cancel` ? '...' : 'Cancel'}</span>
+                                </button>
+                              )}
                             </div>
-                          )}
-
-                          {order.channel === 'ubereats' && order.status === 'Processing' && (
-                            <button
-                              onClick={() => handleOrderAction(order.id, 'cancel', order.externalStoreId || order.storeId)}
-                              disabled={orderActionLoading === `${order.id}-cancel`}
-                              className="px-2 py-1 text-rose-300 hover:text-white bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[10px] font-medium cursor-pointer disabled:opacity-50"
-                              title="Cancel Uber Eats Order via Developer API"
-                            >
-                              <X className="w-2.5 h-2.5" />
-                              <span>{orderActionLoading === `${order.id}-cancel` ? '...' : 'Cancel'}</span>
-                            </button>
                           )}
 
                           <button
@@ -924,30 +946,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
             {/* User's Exact Action Button Group */}
             {(() => {
-              const order = {
-                orderId: selectedUberOrder.id || selectedUberOrder.invoiceNumber,
-                storeId: selectedUberOrder.externalStoreId || selectedUberOrder.storeId || 'eats-store-srilanka-0914',
-              };
+              const uberUuid = (selectedUberOrder as any).uber_order_id || selectedUberOrder.id;
+              const storeId = selectedUberOrder.externalStoreId || selectedUberOrder.storeId || 'eats-store-srilanka-0914';
               return (
                 <div className="flex gap-2 mt-4">
                   <button 
                     onClick={() => {
-                      handleOrderAction(order.orderId, 'accept', order.storeId);
+                      handleOrderAction('accept', uberUuid, storeId);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 flex-1 cursor-pointer transition-colors"
+                    className="bg-green-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-green-700 flex-1 cursor-pointer transition-colors text-xs"
                   >
-                    Accept on Uber
+                    Accept
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      handleOrderAction('ready', uberUuid, storeId);
+                      setSelectedUberOrder(null);
+                    }}
+                    className="bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-blue-700 flex-1 cursor-pointer transition-colors text-xs"
+                  >
+                    Ready
                   </button>
                   
                   <button 
                     onClick={() => {
-                      handleOrderAction(order.orderId, 'cancel', order.storeId);
+                      handleOrderAction('cancel', uberUuid, storeId);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 flex-1 cursor-pointer transition-colors"
+                    className="bg-red-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-red-700 flex-1 cursor-pointer transition-colors text-xs"
                   >
-                    Cancel Order
+                    Cancel
                   </button>
                 </div>
               );

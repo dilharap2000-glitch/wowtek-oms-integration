@@ -5,10 +5,10 @@
       "invoiceNumber": "UBER-06289",
       "channel": "ubereats",
       "channelName": "Uber Eats Retail (Central Hub)",
-      "storeId": "store-123",
+      "storeId": "uber-store",
       "storeName": "Uber Eats Store",
       "branchName": "Central Hub",
-      "externalStoreId": "store-123",
+      "externalStoreId": "uber-store",
       "paymentGateway": "card_online",
       "paymentGatewayName": "Uber In-App Payment",
       "customerName": "Uber Customer",
@@ -19,11 +19,11 @@
         {
           "sku": "WT-UBR-ITEM",
           "barcode": "4790000000000",
-          "name": "Uber Eats Retail Order",
+          "name": "Uber Eats Item",
           "quantity": 1,
           "unitPrice": 0,
           "costPrice": 0,
-          "isRegistered": false
+          "isRegistered": true
         }
       ],
       "grossTotal": 0,
@@ -37,9 +37,9 @@
       "profitStatus": "Calculated",
       "hasUnregisteredItems": false,
       "unregisteredItemsCount": 0,
-      "status": "Cancelled",
-      "createdAt": "2026-11-05T09:31:21.955Z",
-      "updatedAt": "2026-11-05T09:32:02.049Z",
+      "status": "PENDING_ACCEPTANCE",
+      "createdAt": "2026-11-05T13:44:32.018Z",
+      "updatedAt": "2026-11-05T13:44:32.020Z",
       "waybillGenerated": false,
       "notes": "Uber Eats Live Order: UBER-06289"
     },
@@ -1268,6 +1268,39 @@
     }
   ],
   "webhookEvents": [
+    {
+      "id": "evt-uber-1793886272018-751",
+      "source": "ubereats",
+      "event": "orders.notification",
+      "orderId": "06289",
+      "invoiceNumber": "UBER-06289",
+      "storeId": "uber-store",
+      "storeName": "Uber Eats Store",
+      "branchName": "Central Hub",
+      "amount": 0,
+      "status": "success",
+      "orderStatus": "PENDING",
+      "rawPayload": {
+        "order": {
+          "id": "c7e05234-04ca-4460-a43b-123456789abc",
+          "display_id": "06289",
+          "state": "CREATED",
+          "status": "PENDING",
+          "carts": [
+            {
+              "items": [
+                {
+                  "name": "Kottu Roti",
+                  "quantity": 2,
+                  "price": 8.5
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "receivedAt": "2026-11-05T13:44:32.018Z"
+    },
     {
       "id": "evt-uber-1793871081955-838",
       "source": "ubereats",
@@ -2902,5 +2935,5 @@
       "receivedAt": "2026-10-06T09:00:00.000Z"
     }
   ],
-  "lastUpdated": "2026-11-05T09:32:02.049Z"
+  "lastUpdated": "2026-11-05T13:44:32.020Z"
 }

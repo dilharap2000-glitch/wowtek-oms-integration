@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastLiveUpdate, saveServerWebhookEvent, saveServerOrder } from '@/lib/serverStore';
-import { connectToMongoDB } from '@/lib/mongodb';
+import clientPromise, { connectToMongoDB } from '@/lib/mongodb';
 import { WebhookEvent, Order, OrderItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -32,27 +32,40 @@ async function processBackgroundTasks(body: any) {
       return;
     }
 
-    // 1. Extract details from Uber Eats Payload (handling different schema formats)
-    const rawOrderId = body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
+    // 1. Extract details from Uber Eats Payload (handling both nested body.order and flat schemas)
+    const orderData = body.order || body;
+    const rawOrderId = orderData.id || body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
     const rawUberId = String(rawOrderId).trim();
 
-    // මෙතැනදී ඉස්සරහින් වැටෙන අනවශ්‍ය අකුර (උදා: 'c') අයින් කර, 
-    // හරියටම Uber එකේ තියෙන ඔරිජිනල් නම්බරය පමණක් ලබා ගැනීම:
-    let cleanOrderId = rawUberId;
-    if (rawUberId.toLowerCase().startsWith('c') && rawUberId.length > 5) {
-      cleanOrderId = rawUberId.substring(1); // 'c' එක ඉවත් කරයි
+    // uberUuid: දිග UUID එක (API actions සඳහා, e.g. "c7e05234-04ca-4460-...")
+    const uberUuid = rawUberId;
+
+    // shortDisplayId: කෙටි අංකය (උදා: 06289 - UI එකේ පෙන්වීමට)
+    let shortDisplayId = orderData.display_id ? String(orderData.display_id).trim() : '';
+    if (!shortDisplayId) {
+      if (rawUberId.toLowerCase().startsWith('c') && rawUberId.length > 5) {
+        shortDisplayId = rawUberId.substring(1); // 'c' එක ඉවත් කරයි
+      } else if (rawUberId.length > 8) {
+        shortDisplayId = rawUberId.slice(-5);
+      } else {
+        shortDisplayId = rawUberId;
+      }
+    }
+    if (shortDisplayId.startsWith('UBER-')) {
+      shortDisplayId = shortDisplayId.replace('UBER-', '');
     }
 
-    const uberOriginalUuid = cleanOrderId; // "06289" විදිහට හරියටම සේව් වෙයි
-    const displayId = `UBER-${cleanOrderId}`; // ඩෑෂ්බෝඩ් එකේ "UBER-06289" විදිහට පෙන්වීමට
+    const cleanOrderId = shortDisplayId;
+    const uberOriginalUuid = uberUuid; // API actions සඳහා යොදාගන්නා exact UUID එක
+    const displayId = `UBER-${shortDisplayId}`; // ඩෑෂ්බෝඩ් එකේ පෙන්වීමට "UBER-06289"
 
     const orderId = cleanOrderId;
-    const storeId = body.store_id || body.meta?.user_id || 'uber-store';
-    const currentStatus = body.status || body.current_order_state?.status || 'PENDING';
+    const storeId = body.store_id || orderData.store_id || body.meta?.user_id || 'uber-store';
+    const currentStatus = orderData.status || orderData.state || body.current_order_state?.status || 'PENDING';
     
     // Extracting item details & totals
-    const items = body.items || body.current_order_state?.items || [];
-    const rawTotal = body.total || body.current_order_state?.total_price?.amount || 0;
+    const items = orderData.items || orderData.carts || orderData.cart?.items || body.current_order_state?.items || [];
+    const rawTotal = orderData.total || body.total || body.current_order_state?.total_price?.amount || 0;
     const amount = typeof rawTotal === 'number' ? (rawTotal > 1000 ? rawTotal / 100 : rawTotal) : parseFloat(rawTotal) || 0;
     
     const invoiceNumber = displayId;
@@ -164,30 +177,35 @@ async function processBackgroundTasks(body: any) {
         { upsert: true }
       );
 
-      // ඊටපස්සේ ඩේටාබේස් එකට සේව් කරද්දී මේ cleanOrderId එක පාවිච්චි කරන්න:
+      // MongoDB එකේ upsert කිරීම (ඩේටා ඩබල් වෙන එක වළක්වයි)
       const orderDocument = {
-        uber_order_id: cleanOrderId, // "06289" විදිහට හරියටම සේව් වෙයි
-        display_id: `UBER-${cleanOrderId}`, // ඩෑෂ්බෝඩ් එකේ "UBER-06289" විදිහට පෙන්වීමට
-        raw_uber_id: rawUberId, // original raw identifier with prefix if any
+        uber_order_id: uberUuid, // දිග UUID එක (API actions සඳහා)
+        display_id: shortDisplayId || uberUuid.slice(-5), // කෙටි අංකය (උදා: 06289 - UI එකේ පෙන්වීමට)
+        short_display_id: shortDisplayId,
+        clean_order_id: cleanOrderId,
+        state: orderData.state || currentStatus,
+        status: orderData.status || currentStatus,
+        carts: orderData.carts || (orderData.cart ? [orderData.cart] : items),
         items: orderItems,
-        status: currentStatus || 'NEW',
         orderId: cleanOrderId,
         invoiceNumber: displayId,
         storeId,
         source: 'ubereats',
         amount,
-        customerName: body.customer_name || body.customer?.name || 'Uber Customer',
-        customerPhone: body.customer_phone || body.customer?.phone || '+94 77 123 4567',
-        deliveryAddress: body.delivery_address || 'Delivery Address',
+        customerName: body.customer_name || body.customer?.name || orderData.customer?.name || 'Uber Customer',
+        customerPhone: body.customer_phone || body.customer?.phone || orderData.customer?.phone || '+94 77 123 4567',
+        deliveryAddress: body.delivery_address || orderData.delivery_address || 'Delivery Address',
         rawPayload: body,
+        updated_at: new Date(),
         updatedAt: now,
       };
 
       await mongoConn.db.collection('oms_orders').updateOne(
-        { $or: [{ uber_order_id: cleanOrderId }, { uber_order_id: rawUberId }, { orderId: cleanOrderId }] },
+        { $or: [{ uber_order_id: uberUuid }, { uber_order_id: cleanOrderId }, { orderId: cleanOrderId }] },
         {
           $set: orderDocument,
           $setOnInsert: {
+            created_at: new Date(),
             createdAt: now,
           }
         },
@@ -196,8 +214,8 @@ async function processBackgroundTasks(body: any) {
 
       // Also upsert in main orders collection
       await mongoConn.db.collection('orders').updateOne(
-        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: cleanOrderId }, { uber_order_id: rawUberId }] },
-        { $set: { ...newOrder, uber_order_id: cleanOrderId, display_id: displayId } },
+        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: uberUuid }, { uber_order_id: cleanOrderId }] },
+        { $set: { ...newOrder, uber_order_id: uberUuid, display_id: displayId } },
         { upsert: true }
       );
     }
