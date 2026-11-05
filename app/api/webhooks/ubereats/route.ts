@@ -34,11 +34,19 @@ async function processBackgroundTasks(body: any) {
 
     // 1. Extract details from Uber Eats Payload (handling different schema formats)
     const rawOrderId = body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
-    const uberOriginalUuid = String(rawOrderId); // Raw UUID for Uber API calls (e.g. "c7e05234-04ca-4460-...")
-    const shortHash = String(uberOriginalUuid).slice(-6);
-    const displayId = `UBER-${shortHash}`; // Human-friendly display ID for UI (e.g. "UBER-9bc264")
+    const rawUberId = String(rawOrderId).trim();
 
-    const orderId = uberOriginalUuid;
+    // මෙතැනදී ඉස්සරහින් වැටෙන අනවශ්‍ය අකුර (උදා: 'c') අයින් කර, 
+    // හරියටම Uber එකේ තියෙන ඔරිජිනල් නම්බරය පමණක් ලබා ගැනීම:
+    let cleanOrderId = rawUberId;
+    if (rawUberId.toLowerCase().startsWith('c') && rawUberId.length > 5) {
+      cleanOrderId = rawUberId.substring(1); // 'c' එක ඉවත් කරයි
+    }
+
+    const uberOriginalUuid = cleanOrderId; // "06289" විදිහට හරියටම සේව් වෙයි
+    const displayId = `UBER-${cleanOrderId}`; // ඩෑෂ්බෝඩ් එකේ "UBER-06289" විදිහට පෙන්වීමට
+
+    const orderId = cleanOrderId;
     const storeId = body.store_id || body.meta?.user_id || 'uber-store';
     const currentStatus = body.status || body.current_order_state?.status || 'PENDING';
     
@@ -156,13 +164,14 @@ async function processBackgroundTasks(body: any) {
         { upsert: true }
       );
 
-      // Create or update dedicated OMS Order and Invoice record
+      // ඊටපස්සේ ඩේටාබේස් එකට සේව් කරද්දී මේ cleanOrderId එක පාවිච්චි කරන්න:
       const orderDocument = {
-        uber_order_id: uberOriginalUuid, // මෙන්න මේක තමයි Uber API එකට යන්න ඕන (e.g. "c7e05234-04ca-4460-...")
-        display_id: displayId,            // මේක තමයි ඔයාගේ UI එකේ පේන නම (e.g. "UBER-9bc264")
+        uber_order_id: cleanOrderId, // "06289" විදිහට හරියටම සේව් වෙයි
+        display_id: `UBER-${cleanOrderId}`, // ඩෑෂ්බෝඩ් එකේ "UBER-06289" විදිහට පෙන්වීමට
+        raw_uber_id: rawUberId, // original raw identifier with prefix if any
         items: orderItems,
         status: currentStatus || 'NEW',
-        orderId: uberOriginalUuid,
+        orderId: cleanOrderId,
         invoiceNumber: displayId,
         storeId,
         source: 'ubereats',
@@ -175,7 +184,7 @@ async function processBackgroundTasks(body: any) {
       };
 
       await mongoConn.db.collection('oms_orders').updateOne(
-        { uber_order_id: uberOriginalUuid },
+        { $or: [{ uber_order_id: cleanOrderId }, { uber_order_id: rawUberId }, { orderId: cleanOrderId }] },
         {
           $set: orderDocument,
           $setOnInsert: {
@@ -187,8 +196,8 @@ async function processBackgroundTasks(body: any) {
 
       // Also upsert in main orders collection
       await mongoConn.db.collection('orders').updateOne(
-        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: uberOriginalUuid }] },
-        { $set: { ...newOrder, uber_order_id: uberOriginalUuid, display_id: displayId } },
+        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: cleanOrderId }, { uber_order_id: rawUberId }] },
+        { $set: { ...newOrder, uber_order_id: cleanOrderId, display_id: displayId } },
         { upsert: true }
       );
     }

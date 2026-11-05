@@ -16,11 +16,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing order_id or action' }, { status: 400 });
     }
 
-    let uberOriginalId = String(order_id);
+    let rawInputId = String(order_id).trim();
+    if (rawInputId.startsWith('UBER-')) {
+      rawInputId = rawInputId.replace('UBER-', '');
+    }
+    let cleanInputId = rawInputId;
+    if (rawInputId.toLowerCase().startsWith('c') && rawInputId.length > 5) {
+      cleanInputId = rawInputId.substring(1);
+    }
+
+    let uberOriginalId = cleanInputId;
     try {
       const serverStore = getServerStore();
       const existing = serverStore.orders.find(
-        (o) => o.id === order_id || o.invoiceNumber === order_id || (o as any).display_id === order_id || (o as any).uber_order_id === order_id
+        (o) => o.id === order_id || o.id === cleanInputId || o.invoiceNumber === order_id || o.invoiceNumber === `UBER-${cleanInputId}` || (o as any).display_id === `UBER-${cleanInputId}` || (o as any).uber_order_id === cleanInputId
       );
       if (existing && (existing as any).uber_order_id) {
         uberOriginalId = (existing as any).uber_order_id;
@@ -28,7 +37,15 @@ export async function POST(req: NextRequest) {
         const mongoConn = await connectToMongoDB();
         if (mongoConn) {
           const doc = await mongoConn.db.collection('oms_orders').findOne({
-            $or: [{ display_id: order_id }, { invoiceNumber: order_id }, { orderId: order_id }, { uber_order_id: order_id }]
+            $or: [
+              { uber_order_id: cleanInputId },
+              { uber_order_id: rawInputId },
+              { uber_order_id: order_id },
+              { display_id: `UBER-${cleanInputId}` },
+              { display_id: order_id },
+              { orderId: cleanInputId },
+              { orderId: order_id },
+            ]
           });
           if (doc?.uber_order_id) {
             uberOriginalId = doc.uber_order_id;
