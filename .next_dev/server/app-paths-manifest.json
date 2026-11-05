@@ -1,6 +1,5 @@
 {
   "/api/sync/live/route": "app/api/sync/live/route.js",
-  "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
-  "/api/orders/action/route": "app/api/orders/action/route.js",
-  "/page": "app/page.js"
+  "/page": "app/page.js",
+  "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js"
 }

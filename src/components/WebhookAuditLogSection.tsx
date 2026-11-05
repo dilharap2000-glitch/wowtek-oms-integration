@@ -54,25 +54,35 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
 
-  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId?: string) => {
+  // Frontend button click handler
+  const handleOrderAction = async (arg1: string, arg2: string, storeId?: string) => {
+    // Supports both handleOrderAction(actionType, uberOriginalUuid) and handleOrderAction(orderId, actionType)
+    const isFirstArgAction = arg1 === 'accept' || arg1 === 'ready' || arg1 === 'cancel';
+    const actionType = isFirstArgAction ? arg1 : arg2;
+    const uberOriginalUuid = isFirstArgAction ? arg2 : arg1;
+
     try {
       const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, action, storeId }),
+        body: JSON.stringify({
+          action: actionType, // 'accept' | 'ready' | 'cancel'
+          order_id: uberOriginalUuid, // මෙතැනට යන්න ඕන Uber එකේ ඔරිජිනල් UUID එකයි!
+          storeId: storeId || 'uber-store',
+        }),
       });
 
       const data = await res.json();
-      if (data.success) {
-        setOrderActionFeedback({ message: data.message || `Success: Order ${orderId} ${action}ed successfully`, isError: false });
+      if (!res.ok || !data.success) {
+        setOrderActionFeedback({ message: `Error: ${data.error || 'Action failed'}`, isError: true });
+        setTimeout(() => setOrderActionFeedback(null), 5000);
+      } else {
+        setOrderActionFeedback({ message: data.message || `Order successfully ${actionType}ed!`, isError: false });
         setTimeout(() => setOrderActionFeedback(null), 4000);
         if (onRefreshEvents) onRefreshEvents();
-      } else {
-        setOrderActionFeedback({ message: data.error || 'Action failed', isError: true });
-        setTimeout(() => setOrderActionFeedback(null), 5000);
       }
     } catch (err: any) {
-      console.error('Action failed:', err);
+      console.error(err);
       setOrderActionFeedback({ message: 'Network error while processing order action.', isError: true });
       setTimeout(() => setOrderActionFeedback(null), 5000);
     }
@@ -471,21 +481,21 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                         {item.source === 'ubereats' && (
                           <div className="flex gap-1.5 justify-end items-center">
                             <button
-                              onClick={() => handleOrderAction(item.orderId, 'accept', item.storeId)}
+                              onClick={() => handleOrderAction('accept', (item as any).uber_order_id || item.orderId)}
                               className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
                               title="Accept on Uber"
                             >
                               Accept
                             </button>
                             <button
-                              onClick={() => handleOrderAction(item.orderId, 'ready', item.storeId)}
+                              onClick={() => handleOrderAction('ready', (item as any).uber_order_id || item.orderId)}
                               className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
                               title="Mark Order Ready for Delivery"
                             >
                               Ready
                             </button>
                             <button
-                              onClick={() => handleOrderAction(item.orderId, 'cancel', item.storeId)}
+                              onClick={() => handleOrderAction('cancel', (item as any).uber_order_id || item.orderId)}
                               className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
                               title="Cancel Order"
                             >

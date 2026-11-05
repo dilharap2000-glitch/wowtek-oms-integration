@@ -86,29 +86,39 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [orderActionLoading, setOrderActionLoading] = React.useState<string | null>(null);
   const [orderActionToast, setOrderActionToast] = React.useState<{ message: string; isError: boolean } | null>(null);
 
-  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId?: string) => {
-    setOrderActionLoading(`${orderId}-${action}`);
+  // Frontend button click handler
+  const handleOrderAction = async (arg1: string, arg2: string, storeId?: string) => {
+    // Supports both handleOrderAction(actionType, uberOriginalUuid) and handleOrderAction(orderId, actionType)
+    const isFirstArgAction = arg1 === 'accept' || arg1 === 'ready' || arg1 === 'cancel';
+    const actionType = isFirstArgAction ? arg1 : arg2;
+    const uberOriginalUuid = isFirstArgAction ? arg2 : arg1;
+
+    setOrderActionLoading(`${uberOriginalUuid}-${actionType}`);
     try {
-      const response = await fetch('/api/orders/action', {
+      const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, action, storeId: storeId || 'eats-store-srilanka-0914' }),
+        body: JSON.stringify({
+          action: actionType, // 'accept' | 'ready' | 'cancel'
+          order_id: uberOriginalUuid, // මෙතැනට යන්න ඕන Uber එකේ ඔරිජිනල් UUID එකයි!
+          storeId: storeId || 'uber-store',
+        }),
       });
 
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setOrderActionToast({ message: data.message || `Order successfully ${action}ed!`, isError: false });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setOrderActionToast({ message: `Error: ${data.error || 'Action failed'}`, isError: true });
+        setTimeout(() => setOrderActionToast(null), 5000);
+      } else {
+        setOrderActionToast({ message: data.message || `Order successfully ${actionType}ed!`, isError: false });
         setTimeout(() => setOrderActionToast(null), 4000);
         if (typeof window !== 'undefined') {
           fetch('/api/sync/live').catch(() => {});
         }
-      } else {
-        setOrderActionToast({ message: `Failed: ${data.error || 'Server error'}`, isError: true });
-        setTimeout(() => setOrderActionToast(null), 5000);
       }
     } catch (err: any) {
-      console.error('Action failed', err);
-      setOrderActionToast({ message: 'Something went wrong!', isError: true });
+      console.error(err);
+      setOrderActionToast({ message: 'Network error while processing order action.', isError: true });
       setTimeout(() => setOrderActionToast(null), 5000);
     } finally {
       setOrderActionLoading(null);

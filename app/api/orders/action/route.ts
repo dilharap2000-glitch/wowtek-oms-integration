@@ -16,19 +16,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing order_id or action' }, { status: 400 });
     }
 
+    let uberOriginalId = String(order_id);
+    try {
+      const serverStore = getServerStore();
+      const existing = serverStore.orders.find(
+        (o) => o.id === order_id || o.invoiceNumber === order_id || (o as any).display_id === order_id || (o as any).uber_order_id === order_id
+      );
+      if (existing && (existing as any).uber_order_id) {
+        uberOriginalId = (existing as any).uber_order_id;
+      } else {
+        const mongoConn = await connectToMongoDB();
+        if (mongoConn) {
+          const doc = await mongoConn.db.collection('oms_orders').findOne({
+            $or: [{ display_id: order_id }, { invoiceNumber: order_id }, { orderId: order_id }, { uber_order_id: order_id }]
+          });
+          if (doc?.uber_order_id) {
+            uberOriginalId = doc.uber_order_id;
+          }
+        }
+      }
+    } catch {}
+
     let endpoint = '';
     let payload: any = {};
 
-    // Map actions to Uber API Endpoints
+    // Map actions to Uber API Endpoints using raw uberOriginalId
     switch (action) {
       case 'accept':
-        endpoint = `/v1/delivery/order/${order_id}/accept`;
+        endpoint = `/v1/delivery/order/${uberOriginalId}/accept`;
         break;
       case 'ready':
-        endpoint = `/v1/delivery/order/${order_id}/ready`;
+        endpoint = `/v1/delivery/order/${uberOriginalId}/ready`;
         break;
       case 'cancel':
-        endpoint = `/v1/delivery/order/${order_id}/cancel`;
+        endpoint = `/v1/delivery/order/${uberOriginalId}/cancel`;
         payload = {
           cancellation_reason: cancellation_reason || {
             type: 'RESTAURANT_TOO_BUSY',

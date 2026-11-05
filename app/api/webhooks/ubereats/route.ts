@@ -34,7 +34,11 @@ async function processBackgroundTasks(body: any) {
 
     // 1. Extract details from Uber Eats Payload (handling different schema formats)
     const rawOrderId = body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
-    const orderId = String(rawOrderId);
+    const uberOriginalUuid = String(rawOrderId); // Raw UUID for Uber API calls (e.g. "c7e05234-04ca-4460-...")
+    const shortHash = String(uberOriginalUuid).slice(-6);
+    const displayId = `UBER-${shortHash}`; // Human-friendly display ID for UI (e.g. "UBER-9bc264")
+
+    const orderId = uberOriginalUuid;
     const storeId = body.store_id || body.meta?.user_id || 'uber-store';
     const currentStatus = body.status || body.current_order_state?.status || 'PENDING';
     
@@ -43,18 +47,20 @@ async function processBackgroundTasks(body: any) {
     const rawTotal = body.total || body.current_order_state?.total_price?.amount || 0;
     const amount = typeof rawTotal === 'number' ? (rawTotal > 1000 ? rawTotal / 100 : rawTotal) : parseFloat(rawTotal) || 0;
     
-    const invoiceNumber = `UBER-${orderId.slice(-6)}`;
+    const invoiceNumber = displayId;
 
     // 2. Broadcast live update to OMS frontend
     broadcastLiveUpdate({
       type: 'webhook_ubereats_event',
       data: {
-        orderId,
+        orderId: uberOriginalUuid,
+        uber_order_id: uberOriginalUuid,
+        display_id: displayId,
         storeId,
         status: currentStatus,
         items,
         amount,
-        invoiceNumber,
+        invoiceNumber: displayId,
         rawPayload: body
       },
       timestamp: now
@@ -151,19 +157,27 @@ async function processBackgroundTasks(body: any) {
       );
 
       // Create or update dedicated OMS Order and Invoice record
+      const orderDocument = {
+        uber_order_id: uberOriginalUuid, // මෙන්න මේක තමයි Uber API එකට යන්න ඕන (e.g. "c7e05234-04ca-4460-...")
+        display_id: displayId,            // මේක තමයි ඔයාගේ UI එකේ පේන නම (e.g. "UBER-9bc264")
+        items: orderItems,
+        status: currentStatus || 'NEW',
+        orderId: uberOriginalUuid,
+        invoiceNumber: displayId,
+        storeId,
+        source: 'ubereats',
+        amount,
+        customerName: body.customer_name || body.customer?.name || 'Uber Customer',
+        customerPhone: body.customer_phone || body.customer?.phone || '+94 77 123 4567',
+        deliveryAddress: body.delivery_address || 'Delivery Address',
+        rawPayload: body,
+        updatedAt: now,
+      };
+
       await mongoConn.db.collection('oms_orders').updateOne(
-        { orderId: orderId },
+        { uber_order_id: uberOriginalUuid },
         {
-          $set: {
-            orderId,
-            storeId,
-            source: 'ubereats',
-            status: currentStatus,
-            items,
-            amount,
-            invoiceNumber,
-            updatedAt: now,
-          },
+          $set: orderDocument,
           $setOnInsert: {
             createdAt: now,
           }
@@ -173,8 +187,8 @@ async function processBackgroundTasks(body: any) {
 
       // Also upsert in main orders collection
       await mongoConn.db.collection('orders').updateOne(
-        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }] },
-        { $set: newOrder },
+        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: uberOriginalUuid }] },
+        { $set: { ...newOrder, uber_order_id: uberOriginalUuid, display_id: displayId } },
         { upsert: true }
       );
     }
