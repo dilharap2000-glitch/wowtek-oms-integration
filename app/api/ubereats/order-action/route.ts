@@ -2,74 +2,89 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerStore, saveServerOrder, broadcastLiveUpdate } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
 
+export const maxDuration = 30; // Max 30 seconds
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderId, action, storeId } = await req.json();
+    const body = await req.json();
+    const action = body.action;
+    const order_id = body.order_id || body.orderId;
+    const cancellation_reason = body.cancellation_reason;
 
-    if (!orderId || !action) {
-      return NextResponse.json({ error: 'Missing orderId or action' }, { status: 400 });
+    if (!order_id || !action) {
+      return NextResponse.json({ error: 'Missing order_id or action' }, { status: 400 });
     }
 
-    // Uber API Base URL from OpenAPI specs
-    const baseUrl = 'https://api.uber.com';
     let endpoint = '';
     let payload: any = {};
 
-    // Map actions to OpenAPI endpoints
+    // Map actions to Uber API Endpoints
     switch (action) {
       case 'accept':
-        endpoint = `/v1/delivery/order/${orderId}/accept`;
-        payload = {
-          accepted_by: 'WOWTEK OMS Admin',
-          external_reference_id: orderId,
-        };
+        endpoint = `/v1/delivery/order/${order_id}/accept`;
+        break;
+      case 'ready':
+        endpoint = `/v1/delivery/order/${order_id}/ready`;
         break;
       case 'cancel':
-        endpoint = `/v1/delivery/order/${orderId}/cancel`;
+        endpoint = `/v1/delivery/order/${order_id}/cancel`;
         payload = {
-          cancellation_reason: {
+          cancellation_reason: cancellation_reason || {
             type: 'RESTAURANT_TOO_BUSY',
             info: 'Cancelled via WOWTEK OMS',
           },
         };
         break;
-      case 'ready':
-        endpoint = `/v1/delivery/order/${orderId}/ready`;
-        payload = {};
-        break;
       default:
-        return NextResponse.json({ error: 'Invalid action type' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    // Call Uber Eats API
+    const baseUrl = process.env.UBER_BASE_URL || 'https://api.uber.com';
     const accessToken = process.env.UBER_ACCESS_TOKEN || process.env.UBER_EATS_ACCESS_TOKEN;
-    if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
-      const uberResponse = await fetch(`${baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
 
-      if (!uberResponse.ok && uberResponse.status !== 204) {
-        const errText = await uberResponse.text();
-        console.error(`Uber API Error (${action}):`, errText);
-        return NextResponse.json({ error: `Failed to ${action} order on Uber Eats: ${errText}` }, { status: 500 });
+    // Only dispatch to live Uber API if token is configured
+    if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
+      // Setup AbortController to timeout after 8 seconds if Uber doesn't respond
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        const uberResponse = await fetch(`${baseUrl}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined,
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!uberResponse.ok && uberResponse.status !== 204) {
+          const errorText = await uberResponse.text();
+          console.error(`Uber API Error [${action}]:`, errorText);
+          return NextResponse.json({ error: `Uber API failed: ${errorText}` }, { status: uberResponse.status });
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          console.error('Uber API Request Timed Out');
+          return NextResponse.json({ error: 'Uber API request timed out. Please try again.' }, { status: 504 });
+        }
+        throw fetchErr;
       }
     }
 
-    // Update local OMS order state & broadcast live update
+    // Sync state locally in OMS & broadcast live update
     const now = new Date().toISOString();
     const newStatus = action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled';
 
     try {
       const serverStore = getServerStore();
       const existing = serverStore.orders.find(
-        (o) => o.id === orderId || o.invoiceNumber === orderId || o.id.includes(orderId) || (o as any).orderId === orderId
+        (o) => o.id === order_id || o.invoiceNumber === order_id || o.id.includes(order_id) || (o as any).orderId === order_id
       );
       if (existing) {
         existing.status = newStatus;
@@ -79,7 +94,7 @@ export async function POST(req: NextRequest) {
 
       broadcastLiveUpdate({
         type: 'order_status_updated',
-        orderId: orderId,
+        orderId: order_id,
         status: newStatus,
         timestamp: now,
       });
@@ -87,31 +102,32 @@ export async function POST(req: NextRequest) {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
         await mongoConn.db.collection('orders').updateOne(
-          { $or: [{ id: orderId }, { invoiceNumber: orderId }, { orderId: orderId }] },
+          { $or: [{ id: order_id }, { invoiceNumber: order_id }, { orderId: order_id }] },
           { $set: { status: newStatus, updatedAt: now } }
         );
 
         await mongoConn.db.collection('oms_orders').updateOne(
-          { orderId: orderId },
-          { $set: { status: newStatus, updatedAt: now } }
+          { $or: [{ orderId: order_id }, { external_order_id: order_id }] },
+          { $set: { status: newStatus, updated_at: new Date() } }
         );
 
         await mongoConn.db.collection('webhook_events').updateOne(
-          { orderId: orderId },
+          { orderId: order_id },
           { $set: { orderStatus: newStatus } }
         );
       }
     } catch (syncErr: any) {
-      console.warn('[Order Action Local Sync Notice]:', syncErr?.message);
+      console.warn('[Order Action OMS State Sync Notice]:', syncErr?.message);
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `Order ${orderId} successfully ${action}ed on Uber Eats` 
-    });
+    return NextResponse.json({ success: true, message: `Order successfully ${action}ed` });
 
   } catch (error: any) {
-    console.error('OMS Order Action Exception:', error);
+    if (error.name === 'AbortError') {
+      console.error('Uber API Request Timed Out');
+      return NextResponse.json({ error: 'Uber API request timed out. Please try again.' }, { status: 504 });
+    }
+    console.error('Action Handler Exception:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }
