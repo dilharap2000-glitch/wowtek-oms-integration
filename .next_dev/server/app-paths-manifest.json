@@ -1,7 +1,6 @@
 {
-  "/api/sync/live/route": "app/api/sync/live/route.js",
-  "/api/ubereats/reports/route": "app/api/ubereats/reports/route.js",
   "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
+  "/api/sync/live/route": "app/api/sync/live/route.js",
   "/api/webhooks/ubereats/report/route": "app/api/webhooks/ubereats/report/route.js",
   "/page": "app/page.js"
 }
