@@ -140,17 +140,17 @@ export async function POST(req: NextRequest) {
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
         await mongoConn.db.collection('orders').updateOne(
-          { $or: [{ id: order_id }, { invoiceNumber: order_id }, { orderId: order_id }] },
+          { $or: [{ id: order_id }, { invoiceNumber: order_id }, { invoiceNumber: `UBER-${cleanInputId}` }, { orderId: order_id }, { orderId: cleanInputId }] },
           { $set: { status: newStatus, updatedAt: now } }
         );
 
         await mongoConn.db.collection('oms_orders').updateOne(
-          { $or: [{ orderId: order_id }, { external_order_id: order_id }] },
+          { $or: [{ orderId: order_id }, { orderId: cleanInputId }, { external_order_id: order_id }, { uber_order_id: uberOriginalId }, { uber_order_id: cleanInputId }, { display_id: order_id }, { display_id: `UBER-${cleanInputId}` }] },
           { $set: { status: newStatus, updated_at: new Date() } }
         );
 
         await mongoConn.db.collection('webhook_events').updateOne(
-          { orderId: order_id },
+          { $or: [{ orderId: order_id }, { orderId: cleanInputId }, { invoiceNumber: order_id }] },
           { $set: { orderStatus: newStatus } }
         );
       }
