@@ -40,15 +40,16 @@ async function processBackgroundTasks(body: any) {
     // uberUuid: දිග UUID එක (API actions සඳහා, e.g. "c7e05234-04ca-4460-...")
     const uberUuid = rawUberId;
 
-    // shortDisplayId: කෙටි අංකය (උදා: 06289 - UI එකේ පෙන්වීමට)
-    let shortDisplayId = orderData.display_id ? String(orderData.display_id).trim() : '';
+    // shortDisplayId: කෙටි අංකය (උදා: 06289 හෝ 95CF3 - UI එකේ පෙන්වීමට)
+    // මෙතැනදී .toUpperCase() දාලා හරියටම Capital කරගන්නවා
+    let shortDisplayId = orderData.display_id ? String(orderData.display_id).trim().toUpperCase() : '';
     if (!shortDisplayId) {
       if (rawUberId.toLowerCase().startsWith('c') && rawUberId.length > 5) {
-        shortDisplayId = rawUberId.substring(1); // 'c' එක ඉවත් කරයි
+        shortDisplayId = rawUberId.substring(1).toUpperCase(); // 'c' එක ඉවත් කර Capital කරයි
       } else if (rawUberId.length > 8) {
-        shortDisplayId = rawUberId.slice(-5);
+        shortDisplayId = rawUberId.slice(-5).toUpperCase();
       } else {
-        shortDisplayId = rawUberId;
+        shortDisplayId = rawUberId.toUpperCase();
       }
     }
     if (shortDisplayId.startsWith('UBER-')) {
@@ -57,7 +58,7 @@ async function processBackgroundTasks(body: any) {
 
     const cleanOrderId = shortDisplayId;
     const uberOriginalUuid = uberUuid; // API actions සඳහා යොදාගන්නා exact UUID එක
-    const displayId = `UBER-${shortDisplayId}`; // ඩෑෂ්බෝඩ් එකේ පෙන්වීමට "UBER-06289"
+    const displayId = `UBER-${shortDisplayId}`; // ඩෑෂ්බෝඩ් එකේ පෙන්වීමට "UBER-95CF3"
 
     const orderId = cleanOrderId;
     const storeId = body.store_id || orderData.store_id || body.meta?.user_id || 'uber-store';
@@ -180,7 +181,8 @@ async function processBackgroundTasks(body: any) {
       // MongoDB එකේ upsert කිරීම (ඩේටා ඩබල් වෙන එක වළක්වයි)
       const orderDocument = {
         uber_order_id: uberUuid, // දිග UUID එක (API actions සඳහා)
-        display_id: shortDisplayId || uberUuid.slice(-5), // කෙටි අංකය (උදා: 06289 - UI එකේ පෙන්වීමට)
+        display_id: shortDisplayId || (uberUuid ? uberUuid.slice(-5).toUpperCase() : ''), // දැන් ඩේටාබේස් එකේ "95CF3" වගේ Capital විදිහට සේව් වෙයි
+        formatted_display_id: displayId, // "UBER-95CF3"
         short_display_id: shortDisplayId,
         clean_order_id: cleanOrderId,
         state: orderData.state || currentStatus,

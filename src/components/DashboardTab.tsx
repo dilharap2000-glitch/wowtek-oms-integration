@@ -588,8 +588,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   return (
                     <div key={order.id || uberOriginalUuid} className="mt-3 pt-3 border-t border-slate-800 order-card">
                       <div className="flex justify-between items-center text-[11px]">
-                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම (උදා: UBER-06289) */}
-                        <h3 className="font-mono text-purple-300 font-bold text-xs">UBER-{cleanDisplayId}</h3>
+                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම (උදා: UBER-95CF3) */}
+                        <h3 className="font-mono text-purple-300 font-bold text-xs">
+                          UBER-{(order as any).display_id ? String((order as any).display_id).replace('UBER-', '').toUpperCase() : cleanDisplayId.toUpperCase()}
+                        </h3>
                         <span className="text-emerald-400 font-mono font-semibold">Rs. {order.grossTotal.toLocaleString()}</span>
                       </div>
                       <div className="flex items-center justify-between mt-1 text-[11px]">
@@ -710,7 +712,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   (safeOrders || []).slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-slate-800/40 transition-colors duration-150">
                       <td className="py-3 px-3.5 font-mono font-medium text-white">
-                        <div className="font-bold text-purple-400">{order.invoiceNumber}</div>
+                        <div className="font-bold text-purple-400">
+                          {order.channel === 'ubereats'
+                            ? `UBER-${String((order as any).display_id || order.invoiceNumber || '').replace('UBER-', '').toUpperCase()}`
+                            : order.invoiceNumber}
+                        </div>
                         {order.waybillNumber ? (
                           <div className="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
                             <Truck className="w-2.5 h-2.5" />
@@ -919,7 +925,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <div className="flex justify-between">
                 <span className="text-slate-400">Order ID:</span>
                 <span className="font-mono font-bold text-purple-400">
-                  {selectedUberOrder.invoiceNumber || selectedUberOrder.id}
+                  {selectedUberOrder.channel === 'ubereats'
+                    ? `UBER-${String((selectedUberOrder as any).display_id || selectedUberOrder.invoiceNumber || selectedUberOrder.id).replace('UBER-', '').toUpperCase()}`
+                    : (selectedUberOrder.invoiceNumber || selectedUberOrder.id)}
                 </span>
               </div>
               <div className="flex justify-between">

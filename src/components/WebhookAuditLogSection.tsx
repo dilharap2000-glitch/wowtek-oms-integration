@@ -360,7 +360,11 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4">
                       {evt.invoiceNumber ? (
                         <div className="font-mono font-bold text-white flex items-center gap-1">
-                          <span>{evt.invoiceNumber}</span>
+                          <span>
+                            {evt.source === 'ubereats'
+                              ? `UBER-${String((evt as any).display_id || evt.invoiceNumber).replace('UBER-', '').toUpperCase()}`
+                              : evt.invoiceNumber}
+                          </span>
                         </div>
                       ) : (
                         <span className="text-neutral-500 font-mono text-[11px]">{evt.id}</span>

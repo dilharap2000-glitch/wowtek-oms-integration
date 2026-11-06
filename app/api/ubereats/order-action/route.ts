@@ -41,8 +41,13 @@ export async function POST(req: NextRequest) {
               { uber_order_id: cleanInputId },
               { uber_order_id: rawInputId },
               { uber_order_id: order_id },
+              { display_id: cleanInputId.toUpperCase() },
+              { display_id: cleanInputId },
+              { display_id: `UBER-${cleanInputId.toUpperCase()}` },
               { display_id: `UBER-${cleanInputId}` },
+              { display_id: order_id.toUpperCase() },
               { display_id: order_id },
+              { short_display_id: cleanInputId.toUpperCase() },
               { orderId: cleanInputId },
               { orderId: order_id },
             ]
