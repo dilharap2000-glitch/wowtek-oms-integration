@@ -86,6 +86,37 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [orderActionLoading, setOrderActionLoading] = React.useState<string | null>(null);
   const [orderActionToast, setOrderActionToast] = React.useState<{ message: string; isError: boolean } | null>(null);
 
+  // Auto-refresh orders polling (5-second interval)
+  const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch('/api/orders'); // ඔයාගේ orders ගන්න API එක
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (data.orders || []);
+      if (Array.isArray(list) && list.length > 0) {
+        setLiveOrders(list);
+      }
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchOrders(); // මුලින්ම ලෝඩ් වෙද්දී
+    
+    // සෑම තත්පර 5කට වරක්ම ඩේටා ඔටෝ රිෆ්රෙෂ් වෙයි (Stream එකක අවශ්යතාවය නැති කරයි)
+    const interval = setInterval(fetchOrders, 5000); 
+
+    return () => clearInterval(interval);
+  }, []);
+
+  React.useEffect(() => {
+    if (orders && orders.length > 0) {
+      setLiveOrders(orders);
+    }
+  }, [orders]);
+
   // Frontend button click handler
   const handleOrderAction = async (arg1: string, arg2: string, storeId?: string) => {
     // Supports both handleOrderAction(actionType, uberOriginalUuid) and handleOrderAction(orderId, actionType)
@@ -114,6 +145,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         setTimeout(() => setOrderActionToast(null), 4000);
         if (typeof window !== 'undefined') {
           fetch('/api/sync/live').catch(() => {});
+          fetchOrders();
         }
       }
     } catch (err: any) {
@@ -145,7 +177,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   };
 
   // Defensive array bindings
-  const safeOrders = orders || [];
+  const safeOrders = (liveOrders && liveOrders.length > 0 ? liveOrders : orders) || [];
   const safeWaybills = waybills || [];
   const safeWarranties = warranties || [];
   const safeExpenses = expenses || [];

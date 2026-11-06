@@ -19,14 +19,14 @@ export async function GET() {
         .sort({ createdAt: -1 })
         .toArray();
       const cleanOrders = orders.map(({ _id, ...rest }) => rest as Order);
-      return NextResponse.json({ success: true, orders: cleanOrders, source: 'mongodb' });
+      return NextResponse.json(cleanOrders);
     }
   } catch (err: any) {
     console.warn('[Orders API GET] MongoDB read error:', err.message);
   }
 
   const store = getServerStore();
-  return NextResponse.json({ success: true, orders: store.orders, source: 'serverStore' });
+  return NextResponse.json(store.orders);
 }
 
 export async function POST(req: NextRequest) {

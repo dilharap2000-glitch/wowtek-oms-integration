@@ -253,11 +253,12 @@ export async function getOrders(): Promise<Order[]> {
       const res = await fetch('/api/orders', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data.orders)) {
+        const orderList = Array.isArray(data) ? data : (Array.isArray(data.orders) ? data.orders : []);
+        if (orderList.length > 0) {
           const mock = initMockDb();
-          mock.orders = data.orders;
+          mock.orders = orderList;
           persistMockDb();
-          return data.orders;
+          return orderList;
         }
       }
     } catch {}
