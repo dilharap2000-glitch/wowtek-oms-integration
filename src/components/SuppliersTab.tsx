@@ -701,9 +701,9 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                           (p?.supplier || '').toLowerCase().trim() ===
                             selectedSupplierDetail.name.toLowerCase().trim()
                       )
-                      .map((p) => (
+                      .map((p, idx) => (
                         <div
-                          key={p.id}
+                          key={`${p.id || p.sku || 'sup-prod'}-${idx}`}
                           className="p-2.5 bg-neutral-950 flex items-center justify-between text-xs"
                         >
                           <div>
@@ -714,10 +714,10 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                           </div>
                           <div className="text-right">
                             <div className="font-mono text-purple-300">
-                              Rs. {p.costPrice.toLocaleString()}
+                              Rs. {Number(p.costPrice || 0).toLocaleString()}
                             </div>
                             <div className="text-[10px] text-neutral-400">
-                              Stock: {p.stockStore + p.stockWarehouse} units
+                              Stock: {Number(p.stockStore || 0) + Number(p.stockWarehouse || 0)} units
                             </div>
                           </div>
                         </div>

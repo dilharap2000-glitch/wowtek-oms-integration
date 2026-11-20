@@ -14,7 +14,10 @@ export async function GET() {
         .find({})
         .sort({ bookingDate: -1 })
         .toArray();
-      const clean = waybills.map(({ _id, ...rest }) => rest as TransExpressWaybill);
+      const clean = waybills.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<TransExpressWaybill>).id || _id.toString(),
+      })) as TransExpressWaybill[];
       return NextResponse.json({ success: true, waybills: clean });
     }
   } catch (err: any) {

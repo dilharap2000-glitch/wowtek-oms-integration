@@ -2051,8 +2051,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                       </td>
                     </tr>
               ) : (
-                (filteredOrders || []).map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-800/40 transition-colors">
+                (filteredOrders || []).map((order, idx) => (
+                  <tr key={`${order.id || order.invoiceNumber || 'pos-ord'}-${idx}`} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="font-mono font-bold text-white text-xs">{order.invoiceNumber}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
@@ -2103,10 +2103,10 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </td>
 
                         <td className="py-3.5 px-4 text-right font-mono tabular-nums text-white font-bold text-sm">
-                          Rs. {order.grossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          Rs. {Number(order.grossTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           {order.baseSubtotal && order.baseSubtotal !== order.grossTotal && (
                             <div className="text-[10px] text-slate-400 font-normal">
-                              Base: Rs. {order.baseSubtotal.toLocaleString()}
+                              Base: Rs. {Number(order.baseSubtotal || 0).toLocaleString()}
                             </div>
                           )}
                         </td>
@@ -2118,7 +2118,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             </span>
                           ) : (
                             <span className="text-emerald-400 font-bold">
-                              Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                           )}
                         </td>

@@ -19,7 +19,10 @@ export async function GET() {
         .sort({ receivedAt: -1 })
         .limit(100)
         .toArray();
-      const clean = events.map(({ _id, ...rest }) => rest as WebhookEvent);
+      const clean = events.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<WebhookEvent>).id || _id.toString(),
+      })) as WebhookEvent[];
       return NextResponse.json({ success: true, count: clean.length, events: clean });
     }
   } catch (err: any) {

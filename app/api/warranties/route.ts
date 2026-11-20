@@ -13,7 +13,10 @@ export async function GET() {
         .find({})
         .sort({ registrationDate: -1 })
         .toArray();
-      const clean = warranties.map(({ _id, ...rest }) => rest as WarrantyRecord);
+      const clean = warranties.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<WarrantyRecord>).id || _id.toString(),
+      })) as WarrantyRecord[];
       return NextResponse.json({ success: true, warranties: clean });
     }
   } catch (err: any) {

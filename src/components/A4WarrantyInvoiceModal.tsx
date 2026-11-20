@@ -436,11 +436,11 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                     </div>
                   ) : null}
 
-                  {order.courierFee > 0 && (
+                  {Number(order.courierFee || 0) > 0 && (
                     <div className="flex justify-between text-neutral-600">
                       <span>Delivery / Courier Fee:</span>
                       <span className="font-mono tabular-nums">
-                        Rs. {order.courierFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        Rs. {Number(order.courierFee || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                   )}

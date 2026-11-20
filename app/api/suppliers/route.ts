@@ -9,7 +9,10 @@ export async function GET() {
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
       const suppliers = await mongoConn.db.collection('suppliers').find({}).toArray();
-      const clean = suppliers.map(({ _id, ...rest }) => rest as Supplier);
+      const clean = suppliers.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<Supplier>).id || _id.toString(),
+      })) as Supplier[];
       return NextResponse.json({ success: true, suppliers: clean });
     }
   } catch (err: any) {

@@ -80,7 +80,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();
     const newExp: ExpenseItem = {
-      id: `exp-${Date.now().toString().slice(-4)}`,
+      id: `exp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       category,
       description,
       amount,
@@ -275,11 +275,14 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                   </td>
                 </tr>
               ) : (
-                (filteredExpenses || []).map((exp) => (
-                  <tr key={exp.id} className="hover:bg-neutral-850/40 transition-colors">
+                (filteredExpenses || []).map((exp, idx) => (
+                  <tr
+                    key={exp.id ? `${exp.id}-${idx}` : `exp-${idx}`}
+                    className="hover:bg-neutral-850/40 transition-colors"
+                  >
                     <td className="py-3 px-4">
-                      <div className="font-mono text-white font-medium">{exp.reference}</div>
-                      <div className="text-[11px] text-neutral-400">{exp.date}</div>
+                      <div className="font-mono text-white font-medium">{exp.reference || '—'}</div>
+                      <div className="text-[11px] text-neutral-400">{exp.date || '—'}</div>
                     </td>
 
                     <td className="py-3 px-4">
@@ -291,11 +294,11 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                     </td>
 
                     <td className="py-3 px-4 text-neutral-300">
-                      {exp.channel}
+                      {exp.channel || 'General'}
                     </td>
 
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-white">
-                      Rs. {exp.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      Rs. {Number(exp.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
                 ))

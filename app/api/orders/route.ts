@@ -18,7 +18,10 @@ export async function GET() {
         .find({})
         .sort({ createdAt: -1 })
         .toArray();
-      const cleanOrders = orders.map(({ _id, ...rest }) => rest as Order);
+      const cleanOrders = orders.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<Order>).id || _id.toString(),
+      })) as Order[];
       return NextResponse.json(cleanOrders);
     }
   } catch (err: any) {

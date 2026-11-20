@@ -11,7 +11,10 @@ export async function GET() {
     if (mongoConn) {
       const stores = await mongoConn.db.collection('store_mappings').find({}).toArray();
       if (stores && stores.length > 0) {
-        const clean = stores.map(({ _id, ...rest }) => rest as StoreMapping);
+        const clean = stores.map(({ _id, ...rest }) => ({
+          ...rest,
+          id: (rest as Partial<StoreMapping>).id || _id.toString(),
+        })) as StoreMapping[];
         return NextResponse.json({ success: true, stores: clean, source: 'mongodb' });
       } else {
         // Seed default store mappings into MongoDB Atlas

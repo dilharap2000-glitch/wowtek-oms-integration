@@ -1,24 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   MessageSquare,
   Users,
   Send,
-  Phone,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Sparkles,
   Search,
   UserPlus,
   Trash2,
-  CheckSquare,
-  Square,
   Upload,
   Download,
   FileSpreadsheet,
   X,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
 } from 'lucide-react';
 import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
 import {
@@ -26,6 +26,13 @@ import {
   CustomerCsvParseSummary,
   SAMPLE_CUSTOMER_CSV,
 } from '@/lib/customerCsv';
+import {
+  SMS_TEMPLATE_VARIABLES,
+  SMS_SUGGESTED_TEMPLATES,
+  resolveSmsVariables,
+  extractSmsTemplateTokens,
+  formatSriLankaSmsDate,
+} from '@/lib/smsTemplates';
 
 export function SMSMarketingTab() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -53,6 +60,12 @@ export function SMSMarketingTab() {
   const [bulkImportError, setBulkImportError] = useState<string | null>(null);
   const [isDraggingCsv, setIsDraggingCsv] = useState(false);
   const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const messageTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [previewRecipientIdx, setPreviewRecipientIdx] = useState(0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [varTriggerRange, setVarTriggerRange] = useState<{ start: number; end: number; query: string } | null>(null);
+  const [varMenuOpen, setVarMenuOpen] = useState(false);
+  const [varHighlightIdx, setVarHighlightIdx] = useState(0);
 
   // Fetch Customers
   const fetchCustomers = React.useCallback(async () => {
@@ -159,7 +172,6 @@ export function SMSMarketingTab() {
       setNotification({ type: 'error', message: 'කරුණාකර මකා දැමීමට පාරිභෝගිකයින් තෝරන්න (Select කරන්න).' });
       return;
     }
-    if (!confirm(`තෝරාගත් පාරිභෝගිකයින් ${selectedCustomers.length} දෙනා ඉවත් කිරීමට අවශ්‍යමද?`)) return;
 
     try {
       const res = await fetch('/api/customers/delete', {
@@ -171,6 +183,7 @@ export function SMSMarketingTab() {
       if (data.success) {
         setNotification({ type: 'success', message: 'තෝරාගත් පාරිභෝගිකයින් සාර්ථකව මකා දමන ලදී!' });
         setSelectedCustomers([]);
+        setConfirmingDelete(false);
         fetchCustomers();
       } else {
         setNotification({ type: 'error', message: 'Error: ' + data.error });
@@ -294,6 +307,166 @@ export function SMSMarketingTab() {
     }
   };
 
+  // Target recipients resolved for both live preview and personalized API dispatch
+  const targetRecipients = useMemo(() => {
+    if (campaignType === 'single') {
+      if (!selectedPhone) return [];
+      const match = customers.find((c) => c.phone === selectedPhone);
+      return [
+        {
+          name: match?.name || 'Valued Customer',
+          phone: selectedPhone,
+          source: match?.source || 'WOWTEK',
+        },
+      ];
+    }
+    if (campaignType === 'selected') {
+      return selectedCustomers.map((p) => {
+        const match = customers.find((c) => c.phone === p);
+        return {
+          name: match?.name || 'Valued Customer',
+          phone: p,
+          source: match?.source || 'WOWTEK',
+        };
+      });
+    }
+    return customers.map((c) => ({
+      name: c.name || 'Valued Customer',
+      phone: c.phone,
+      source: c.source || 'WOWTEK',
+    }));
+  }, [campaignType, selectedPhone, selectedCustomers, customers]);
+
+  const activePreviewRecipient = useMemo(() => {
+    if (targetRecipients.length === 0) {
+      return {
+        name: 'Kasun Perera',
+        phone: '+94771234567',
+        source: 'POS',
+      };
+    }
+    const safeIdx = previewRecipientIdx % targetRecipients.length;
+    return targetRecipients[safeIdx];
+  }, [targetRecipients, previewRecipientIdx]);
+
+  const resolvedPreviewMessage = useMemo(
+    () => resolveSmsVariables(message, activePreviewRecipient),
+    [message, activePreviewRecipient]
+  );
+
+  const usedTemplateTokens = useMemo(() => extractSmsTemplateTokens(message), [message]);
+
+  // Dynamic suggestion list filtered by {{query when typing inside the composer
+  const filteredVariableSuggestions = useMemo(() => {
+    const q = (varTriggerRange?.query || '').trim().toLowerCase();
+    if (!q) return SMS_TEMPLATE_VARIABLES;
+    return SMS_TEMPLATE_VARIABLES.filter(
+      (v) =>
+        v.key.toLowerCase().includes(q) ||
+        v.label.toLowerCase().includes(q) ||
+        v.token.toLowerCase().includes(q)
+    );
+  }, [varTriggerRange]);
+
+  const getVariableLiveValue = (key: string): string => {
+    const rawName = String(activePreviewRecipient.name || '').trim();
+    const resolvedName =
+      rawName && rawName.toLowerCase() !== 'walk-in customer' ? rawName : 'Valued Customer';
+    if (key === 'name') return resolvedName;
+    if (key === 'first_name') {
+      return rawName && rawName.toLowerCase() !== 'walk-in customer' ? rawName.split(/\s+/)[0] : 'Customer';
+    }
+    if (key === 'date') return formatSriLankaSmsDate();
+    if (key === 'phone') return activePreviewRecipient.phone || '+94771234567';
+    if (key === 'source') return activePreviewRecipient.source || 'WOWTEK';
+    return '';
+  };
+
+  // Detect `{{query` immediately before cursor to open inline variable autocomplete
+  const detectVariableTrigger = (text: string, cursorPos: number) => {
+    const uptoCursor = text.slice(0, cursorPos);
+    const match = uptoCursor.match(/\{\{([a-zA-Z0-9_]*)$/);
+    if (match && match.index !== undefined) {
+      setVarTriggerRange({
+        start: match.index,
+        end: cursorPos,
+        query: match[1] || '',
+      });
+      setVarMenuOpen(true);
+      setVarHighlightIdx(0);
+    } else {
+      setVarTriggerRange(null);
+      setVarMenuOpen(false);
+    }
+  };
+
+  // Insert template variable at cursor (or replace active `{{...` trigger)
+  const handleInsertVariable = (token: string, replaceTrigger = false) => {
+    const textarea = messageTextareaRef.current;
+    if (!textarea) {
+      setMessage((prev) => (prev ? `${prev}${prev.endsWith(' ') ? '' : ' '}${token}` : token));
+      setVarTriggerRange(null);
+      setVarMenuOpen(false);
+      return;
+    }
+
+    const start =
+      replaceTrigger && varTriggerRange
+        ? varTriggerRange.start
+        : (textarea.selectionStart ?? message.length);
+    const end =
+      replaceTrigger && varTriggerRange
+        ? varTriggerRange.end
+        : (textarea.selectionEnd ?? message.length);
+
+    const before = message.slice(0, start);
+    const after = message.slice(end);
+    const nextValue = `${before}${token}${after}`;
+    setMessage(nextValue);
+    setVarTriggerRange(null);
+    setVarMenuOpen(false);
+
+    requestAnimationFrame(() => {
+      if (messageTextareaRef.current) {
+        messageTextareaRef.current.focus();
+        const cursorPos = start + token.length;
+        messageTextareaRef.current.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextVal = e.target.value;
+    const cursor = e.target.selectionStart ?? nextVal.length;
+    setMessage(nextVal);
+    detectVariableTrigger(nextVal, cursor);
+  };
+
+  const handleMessageKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!varMenuOpen || filteredVariableSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setVarHighlightIdx((prev) => (prev + 1) % filteredVariableSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setVarHighlightIdx((prev) =>
+        prev === 0 ? filteredVariableSuggestions.length - 1 : prev - 1
+      );
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      const chosen =
+        filteredVariableSuggestions[varHighlightIdx] || filteredVariableSuggestions[0];
+      if (chosen) {
+        handleInsertVariable(chosen.token, Boolean(varTriggerRange));
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setVarMenuOpen(false);
+      setVarTriggerRange(null);
+    }
+  };
+
   const handleSendSMS = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -320,12 +493,12 @@ export function SMSMarketingTab() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: campaignType === 'selected' ? 'bulk' : campaignType,
+          type: campaignType,
           recipients:
             campaignType === 'single'
-              ? { phone: selectedPhone }
+              ? targetRecipients[0] || { phone: selectedPhone }
               : campaignType === 'selected'
-              ? selectedCustomers.map((p) => ({ phone: p }))
+              ? targetRecipients
               : null,
           message: message.trim(),
         }),
@@ -334,14 +507,18 @@ export function SMSMarketingTab() {
       const data = await res.json();
       if (data.success) {
         const count =
-          campaignType === 'single'
+          data.recipientsCount ??
+          (campaignType === 'single'
             ? 1
             : campaignType === 'selected'
             ? selectedCustomers.length
-            : customers.length;
+            : customers.length);
+        const samplePreview = data.dispatchedPreviews?.[0]?.renderedMessage;
         setNotification({
           type: 'success',
-          message: `SMS Sent Successfully! Dispatched to ${count} recipient(s).`,
+          message: `SMS Sent Successfully! Personalized & dispatched to ${count} recipient(s).${
+            samplePreview ? ` Sample: "${samplePreview}"` : ''
+          }`,
         });
         setMessage('');
       } else {
@@ -524,56 +701,214 @@ export function SMSMarketingTab() {
                 </div>
               )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-slate-300 font-semibold">Promotion Message Content</label>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {message.length} chars · {Math.max(1, Math.ceil(message.length / 160))} SMS segment(s)
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-slate-300 font-semibold">Message Content</label>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono tabular-nums">
+                    <span>{resolvedPreviewMessage.length} chars</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{Math.max(1, Math.ceil(resolvedPreviewMessage.length / 160))} SMS</span>
+                  </div>
+                </div>
+
+                {/* Textarea with anchored inline {{ variable suggestion popover */}
+                <div className="relative">
+                  <textarea
+                    ref={messageTextareaRef}
+                    rows={4}
+                    value={message}
+                    onChange={handleMessageChange}
+                    onKeyDown={handleMessageKeyDown}
+                    onClick={(e) =>
+                      detectVariableTrigger(
+                        e.currentTarget.value,
+                        e.currentTarget.selectionStart ?? e.currentTarget.value.length
+                      )
+                    }
+                    placeholder="Write your message here — type {{ to insert customer variables like {{first_name}} or {{date}}..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-xs resize-none shadow-inner leading-relaxed"
+                    required
+                  />
+
+                  {varMenuOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-slate-950 border border-slate-700/90 rounded-xl shadow-2xl overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 text-[11px] text-slate-400">
+                        <span className="font-medium text-slate-300 flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-purple-400" />
+                          <span>Personalization Variables</span>
+                        </span>
+                        <span className="font-mono text-[10px]">↑↓ Navigate · Enter to insert · Esc</span>
+                      </div>
+                      {filteredVariableSuggestions.length === 0 ? (
+                        <div className="px-3 py-2.5 text-xs text-slate-400">
+                          No matching variable for &ldquo;{varTriggerRange?.query}&rdquo;
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-800/70 max-h-52 overflow-y-auto">
+                          {filteredVariableSuggestions.map((v, idx) => {
+                            const isHighlighted = idx === varHighlightIdx;
+                            return (
+                              <button
+                                key={v.key}
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handleInsertVariable(v.token, Boolean(varTriggerRange));
+                                }}
+                                onMouseEnter={() => setVarHighlightIdx(idx)}
+                                className={`w-full px-3 py-2 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
+                                  isHighlighted
+                                    ? 'bg-purple-600/20 text-white'
+                                    : 'text-slate-300 hover:bg-slate-900'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className="font-mono text-[11px] text-purple-300 font-semibold shrink-0">
+                                    {v.token}
+                                  </span>
+                                  <span className="text-xs text-slate-300 truncate">{v.label}</span>
+                                </div>
+                                <span className="text-[11px] font-mono tabular-nums text-slate-400 truncate max-w-[140px]">
+                                  {getVariableLiveValue(v.key)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Clean single-line variable quick-insert toolbar (unboxed, zero pills) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px]">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-400">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVarTriggerRange(null);
+                        setVarMenuOpen((prev) => !prev);
+                        setVarHighlightIdx(0);
+                      }}
+                      className="text-purple-300 hover:text-purple-200 font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Tag className="w-3 h-3" />
+                      <span>Variables:</span>
+                    </button>
+                    {SMS_TEMPLATE_VARIABLES.map((v) => {
+                      const isActive = usedTemplateTokens.includes(v.token.toLowerCase());
+                      return (
+                        <button
+                          key={v.key}
+                          type="button"
+                          onClick={() => handleInsertVariable(v.token, false)}
+                          title={`${v.label}: ${v.description}`}
+                          className={`font-mono cursor-pointer transition-colors ${
+                            isActive
+                              ? 'text-purple-300 underline decoration-purple-400/70 underline-offset-4 font-semibold'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {v.token}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                    Type {'{{'} for menu
                   </span>
                 </div>
-                <textarea
-                  rows={3}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="e.g. WOWTEK: 15% OFF on all gaming accessories this weekend! Visit wowtek.lk or show this SMS at checkout."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-xs resize-none shadow-inner leading-relaxed"
-                  required
-                />
               </div>
 
-              {/* Sri Lankan SMS Template Presets */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                  Quick Sri Lankan Presets:
-                </span>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMessage('WOWTEK Promo: 10% OFF on all gaming accessories this week! Show this SMS at billing in Colombo store.')
-                    }
-                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
-                  >
-                    + 10% Promo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMessage('WOWTEK VIP: Exclusive 15% discount coupon: VIP15 at checkout on store.wowtek.lk.')
-                    }
-                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
-                  >
-                    + VIP Coupon
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setMessage('WOWTEK Alert: Your item order is packed and dispatched via Trans Express Courier. Tracking will follow.')
-                    }
-                    className="text-[10px] bg-slate-800/80 hover:bg-slate-750 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700/80 transition cursor-pointer"
-                  >
-                    + Dispatch Notice
-                  </button>
+              {/* Hairline-Separated Live Personalized Preview */}
+              {message.trim().length > 0 && (
+                <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>
+                        Preview{targetRecipients.length === 0 ? ' (Sample)' : ''}
+                      </span>
+                      <span aria-hidden="true" className="text-slate-600">·</span>
+                      <span className="text-slate-400 font-mono truncate max-w-[165px]">
+                        {activePreviewRecipient.name} · {activePreviewRecipient.phone}
+                      </span>
+                    </div>
+
+                    {targetRecipients.length > 1 && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] font-mono tabular-nums text-slate-400 mr-1">
+                          {(previewRecipientIdx % targetRecipients.length) + 1}/{targetRecipients.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewRecipientIdx((prev) =>
+                              prev === 0 ? targetRecipients.length - 1 : prev - 1
+                            )
+                          }
+                          className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                          aria-label="Previous recipient preview"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewRecipientIdx((prev) => (prev + 1) % targetRecipients.length)
+                          }
+                          className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                          aria-label="Next recipient preview"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">
+                    {resolvedPreviewMessage}
+                  </p>
+                </div>
+              )}
+
+              {/* Hairline-Separated Suggested Templates List */}
+              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-300 font-semibold">Suggested Templates</span>
+                  <span className="text-slate-500">Click to apply</span>
+                </div>
+                <div className="divide-y divide-slate-800/70 border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/50">
+                  {SMS_SUGGESTED_TEMPLATES.map((tpl) => {
+                    const isSelectedTemplate = message.trim() === tpl.body.trim();
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => {
+                          setMessage(tpl.body);
+                          setVarMenuOpen(false);
+                          setVarTriggerRange(null);
+                        }}
+                        className={`w-full px-3 py-2 text-left transition-colors cursor-pointer flex items-center justify-between gap-3 ${
+                          isSelectedTemplate
+                            ? 'bg-purple-600/15 text-white'
+                            : 'hover:bg-slate-900/90 text-slate-300'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-semibold text-slate-200">
+                            {tpl.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                            {resolveSmsVariables(tpl.body, activePreviewRecipient)}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-medium text-purple-300 shrink-0">
+                          {isSelectedTemplate ? 'Applied' : 'Use'}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -702,15 +1037,33 @@ export function SMSMarketingTab() {
                 <span>Bulk Import</span>
               </button>
 
-              {selectedCustomers.length > 0 && (
+              {selectedCustomers.length > 0 && !confirmingDelete && (
                 <button
                   type="button"
-                  onClick={handleDeleteSelected}
+                  onClick={() => setConfirmingDelete(true)}
                   className="flex items-center gap-1 px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete ({selectedCustomers.length})</span>
                 </button>
+              )}
+              {selectedCustomers.length > 0 && confirmingDelete && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Confirm ({selectedCustomers.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
 
               <div className="relative w-48 sm:w-52">

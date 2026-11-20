@@ -63,14 +63,29 @@ export async function GET() {
           .catch(() => []),
       ]);
 
-      atlasOrders = orderDocs.map(({ _id, ...rest }) => rest as Order);
-      atlasWaybills = waybillDocs.map(({ _id, ...rest }) => rest as TransExpressWaybill);
-      atlasEvents = eventDocs.map(({ _id, ...rest }) => rest as WebhookEvent);
+      atlasOrders = orderDocs.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<Order>).id || _id.toString(),
+      })) as Order[];
+      atlasWaybills = waybillDocs.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<TransExpressWaybill>).id || _id.toString(),
+      })) as TransExpressWaybill[];
+      atlasEvents = eventDocs.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<WebhookEvent>).id || _id.toString(),
+      })) as WebhookEvent[];
       if (storeDocs && storeDocs.length > 0) {
-        atlasStores = storeDocs.map(({ _id, ...rest }) => rest as StoreMapping);
+        atlasStores = storeDocs.map(({ _id, ...rest }) => ({
+          ...rest,
+          id: (rest as Partial<StoreMapping>).id || _id.toString(),
+        })) as StoreMapping[];
       }
       if (productDocs && productDocs.length > 0) {
-        atlasProducts = productDocs.map(({ _id, ...rest }) => rest as Product);
+        atlasProducts = productDocs.map(({ _id, ...rest }) => ({
+          ...rest,
+          id: (rest as Partial<Product>).id || _id.toString(),
+        })) as Product[];
       }
     }
   } catch {

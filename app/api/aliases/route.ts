@@ -11,7 +11,10 @@ export async function GET() {
     if (mongoConn) {
       const docs = await mongoConn.db.collection('product_aliases').find({}).toArray();
       if (docs && docs.length > 0) {
-        const clean = docs.map(({ _id, ...rest }) => rest as ProductAlias);
+        const clean = docs.map(({ _id, ...rest }) => ({
+          ...rest,
+          id: (rest as Partial<ProductAlias>).id || _id.toString(),
+        })) as ProductAlias[];
         return NextResponse.json({ success: true, aliases: clean, source: 'mongodb' });
       }
     }

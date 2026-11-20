@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
       }
 
       const products = await mongoConn.db.collection('products').find(query).toArray();
-      let clean = products.map(({ _id, ...rest }) => rest as Product);
+      let clean = products.map(({ _id, ...rest }) => ({
+        ...rest,
+        id: (rest as Partial<Product>).id || _id.toString(),
+      })) as Product[];
 
       // If batch or date is specified, filter activeSerials for precision
       if ((batch && batch !== 'all') || (date && date !== 'all')) {

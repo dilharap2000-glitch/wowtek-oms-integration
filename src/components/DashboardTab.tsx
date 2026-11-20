@@ -85,6 +85,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   const [orderActionLoading, setOrderActionLoading] = React.useState<string | null>(null);
   const [orderActionToast, setOrderActionToast] = React.useState<{ message: string; isError: boolean } | null>(null);
+  const [confirmingReturnOrderId, setConfirmingReturnOrderId] = React.useState<string | null>(null);
 
   // Auto-refresh orders polling (5-second interval)
   const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
@@ -112,9 +113,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   }, []);
 
   React.useEffect(() => {
-    if (orders && orders.length > 0) {
-      setLiveOrders(orders);
-    }
+    setLiveOrders(orders || []);
   }, [orders]);
 
   // Frontend button click handler
@@ -158,21 +157,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   };
 
   const handleReturnOrder = async (orderId: string) => {
+    setOrderActionLoading(`${orderId}-return`);
     try {
       const res = await fetch('/api/orders/return', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: orderId }), // Order ID එක හරියට pass වෙනවාද බලන්න
+        body: JSON.stringify({ orderId }),
       });
       const data = await res.json();
       if (data.success) {
-        alert("Return successful and stock updated!");
-        window.location.reload();
+        setConfirmingReturnOrderId(null);
+        setOrderActionToast({
+          message: 'Return successful and store stock updated!',
+          isError: false,
+        });
+        setTimeout(() => setOrderActionToast(null), 5000);
+        fetch('/api/sync/live').catch(() => {});
+        await fetchOrders();
       } else {
-        alert("Error: " + (data.message || data.error || 'Failed to process return'));
+        setOrderActionToast({
+          message: `Error: ${data.message || data.error || 'Failed to process return'}`,
+          isError: true,
+        });
+        setTimeout(() => setOrderActionToast(null), 5000);
       }
-    } catch (err: any) {
-      alert("Error: " + (err.message || 'Network error'));
+    } catch (err: unknown) {
+      setOrderActionToast({
+        message: `Error: ${err instanceof Error ? err.message : 'Network error'}`,
+        isError: true,
+      });
+      setTimeout(() => setOrderActionToast(null), 5000);
+    } finally {
+      setOrderActionLoading(null);
     }
   };
 
@@ -612,19 +628,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 {/* Live Pending Uber Eats Action Items */}
-                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE' || o?.status === 'Processing').slice(0, 4).map((order) => {
+                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE' || o?.status === 'Processing').slice(0, 4).map((order, idx) => {
                   const uberOriginalUuid = (order as any).uber_order_id || (order as any).orderId || order.id;
                   const rawDisplayId = (order as any).display_id || (order as any).short_display_id || order.invoiceNumber || '';
                   const cleanDisplayId = String(rawDisplayId).replace('UBER-', '');
 
                   return (
-                    <div key={order.id || uberOriginalUuid} className="mt-3 pt-3 border-t border-slate-800 order-card">
+                    <div key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`} className="mt-3 pt-3 border-t border-slate-800 order-card">
                       <div className="flex justify-between items-center text-[11px]">
                         {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම (උදා: UBER-95CF3) */}
                         <h3 className="font-mono text-purple-300 font-bold text-xs">
                           UBER-{(order as any).display_id ? String((order as any).display_id).replace('UBER-', '').toUpperCase() : cleanDisplayId.toUpperCase()}
                         </h3>
-                        <span className="text-emerald-400 font-mono font-semibold">Rs. {order.grossTotal.toLocaleString()}</span>
+                        <span className="text-emerald-400 font-mono font-semibold">Rs. {Number(order.grossTotal || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex items-center justify-between mt-1 text-[11px]">
                         <span className="text-slate-300 truncate">{order.customerName} ({order.branchName || 'Colombo'})</span>
@@ -722,7 +738,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-sans text-slate-300">
-                {orders.length === 0 ? (
+                {safeOrders.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
@@ -741,8 +757,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  (safeOrders || []).slice(0, 5).map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-800/40 transition-colors duration-150">
+                  (safeOrders || []).slice(0, 5).map((order, idx) => (
+                    <tr key={`${order.id || order.invoiceNumber || 'ord'}-${idx}`} className="hover:bg-slate-800/40 transition-colors duration-150">
                       <td className="py-3 px-3.5 font-mono font-medium text-white">
                         <div className="font-bold text-purple-400">
                           {order.channel === 'ubereats'
@@ -808,7 +824,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           </span>
                         ) : (
                           <span className="text-emerald-400">
-                            Rs. {order.netProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </span>
                         )}
                       </td>
@@ -875,25 +891,40 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             <span>4x6 Label</span>
                           </button>
 
-                          {order.status !== 'Returned' && (
-                            <button
-                              onClick={() => {
-                                const idToPass = (order as any)._id || order.id || order.invoiceNumber;
-                                if (
-                                  confirm(
-                                    `Process return for order #${order.invoiceNumber || order.id}? Items will be restored to store stock.`
-                                  )
-                                ) {
-                                  handleReturnOrder(String(idToPass));
-                                }
-                              }}
-                              className="px-2.5 py-1 text-amber-300 hover:text-white bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
-                              title="Process Customer Return & Restore Stock"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Return</span>
-                            </button>
-                          )}
+                          {order.status !== 'Returned' && (() => {
+                            const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
+                            const isConfirming = confirmingReturnOrderId === idToPass;
+                            const isReturning = orderActionLoading === `${idToPass}-return`;
+                            return isConfirming ? (
+                              <div className="inline-flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReturnOrder(idToPass)}
+                                  disabled={isReturning}
+                                  className="px-2 py-1 text-white bg-amber-600 hover:bg-amber-500 rounded-lg text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                                >
+                                  {isReturning ? '...' : 'Confirm'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingReturnOrderId(null)}
+                                  className="px-2 py-1 text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg text-[11px] cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmingReturnOrderId(idToPass)}
+                                className="px-2.5 py-1 text-amber-300 hover:text-white bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                                title="Process Customer Return & Restore Stock"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Return</span>
+                              </button>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>

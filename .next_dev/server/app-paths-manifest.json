@@ -1,6 +1,8 @@
 {
   "/api/sync/live/route": "app/api/sync/live/route.js",
-  "/page": "app/page.js",
+  "/api/orders/route": "app/api/orders/route.js",
   "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
-  "/sms-marketing/page": "app/sms-marketing/page.js"
+  "/page": "app/page.js",
+  "/sms/page": "app/sms/page.js",
+  "/api/sms/send/route": "app/api/sms/send/route.js"
 }

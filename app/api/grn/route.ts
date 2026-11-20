@@ -286,13 +286,18 @@ export async function POST(req: Request) {
 
     // 3. Expenses වලට Cost එක එකතු කිරීම
     const totalCost = Number(costPrice || 0) * qty;
+    const now = new Date();
     await db.collection('expenses').insertOne({
+      id: `exp-grn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       category: 'Inventory Restock',
       description: `GRN Restock for SKU: ${sku} (Qty: ${qty})`,
       amount: totalCost,
+      date: now.toISOString().split('T')[0],
+      channel: 'General',
+      reference: batchRef || 'BATCH-GEN',
       supplier: supplier || 'Direct Supplier',
       batchRef: batchRef || 'BATCH-GEN',
-      createdAt: new Date(),
+      createdAt: now,
     });
 
     // 4. 🚀 AUTO-SETTLE PENDING ORDERS (FIFO පදනමින් අලුත් බඩු වලින් Orders සෙට් කිරීම)

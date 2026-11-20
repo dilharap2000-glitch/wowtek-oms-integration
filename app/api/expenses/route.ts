@@ -11,9 +11,21 @@ export async function GET() {
       const expenses = await mongoConn.db
         .collection('expenses')
         .find({})
-        .sort({ date: -1 })
+        .sort({ date: -1, createdAt: -1 })
         .toArray();
-      const clean = expenses.map(({ _id, ...rest }) => rest as ExpenseItem);
+      const clean = expenses.map(({ _id, ...rest }) => {
+        const record = rest as Partial<ExpenseItem> & { batchRef?: string; createdAt?: Date | string };
+        return {
+          ...record,
+          id: record.id || _id.toString(),
+          date:
+            record.date ||
+            (record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : ''),
+          reference: record.reference || record.batchRef || '',
+          channel: record.channel || 'General',
+          amount: Number(record.amount || 0),
+        } as ExpenseItem;
+      });
       return NextResponse.json({ success: true, expenses: clean });
     }
   } catch (err: any) {

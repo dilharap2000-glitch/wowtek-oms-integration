@@ -632,11 +632,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     </td>
 
                     <td className="py-3 px-4 text-right font-mono tabular-nums text-neutral-400">
-                      Rs. {p.costPrice.toLocaleString()}
+                      Rs. {Number(p.costPrice || 0).toLocaleString()}
                     </td>
 
                     <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-white">
-                      Rs. {p.sellingPrice.toLocaleString()}
+                      Rs. {Number(p.sellingPrice || 0).toLocaleString()}
                     </td>
 
                     {/* PROFIT MARGIN PROGRESS BAR */}
