@@ -15,8 +15,17 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  X,
 } from 'lucide-react';
 import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
+import {
+  parseCustomerCsv,
+  CustomerCsvParseSummary,
+  SAMPLE_CUSTOMER_CSV,
+} from '@/lib/customerCsv';
 
 export function SMSMarketingTab() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -32,6 +41,18 @@ export function SMSMarketingTab() {
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualLoading, setManualLoading] = useState(false);
+
+  // Bulk CSV Import States
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkCsvFileName, setBulkCsvFileName] = useState<string>('');
+  const [bulkCsvRawText, setBulkCsvRawText] = useState<string>('');
+  const [bulkDefaultSource, setBulkDefaultSource] = useState<string>('CSV Import');
+  const [bulkPreviewFilter, setBulkPreviewFilter] = useState<'all' | 'valid' | 'invalid'>('all');
+  const [bulkParseSummary, setBulkParseSummary] = useState<CustomerCsvParseSummary | null>(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportError, setBulkImportError] = useState<string | null>(null);
+  const [isDraggingCsv, setIsDraggingCsv] = useState(false);
+  const csvFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Fetch Customers
   const fetchCustomers = React.useCallback(async () => {
@@ -160,6 +181,119 @@ export function SMSMarketingTab() {
     }
   };
 
+  // Bulk Import CSV Handlers
+  const processCsvFile = async (file: File) => {
+    setBulkImportError(null);
+    if (!file.name.toLowerCase().endsWith('.csv') && file.type && !file.type.includes('csv') && !file.type.includes('text')) {
+      setBulkImportError('Please upload a valid .csv file.');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      setBulkCsvFileName(file.name);
+      setBulkCsvRawText(text);
+      const summary = parseCustomerCsv(text, bulkDefaultSource.trim() || 'CSV Import');
+      setBulkParseSummary(summary);
+      setBulkPreviewFilter('all');
+      if (summary.totalRows === 0) {
+        setBulkImportError('The uploaded CSV file has no data rows.');
+      }
+    } catch (err: any) {
+      setBulkImportError(err?.message || 'Failed to read CSV file.');
+    }
+  };
+
+  const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processCsvFile(file);
+    }
+  };
+
+  const handleBulkDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingCsv(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processCsvFile(file);
+    }
+  };
+
+  const handleBulkSourceChange = (value: string) => {
+    setBulkDefaultSource(value);
+    if (bulkCsvRawText) {
+      setBulkParseSummary(parseCustomerCsv(bulkCsvRawText, value.trim() || 'CSV Import'));
+    }
+  };
+
+  const handleDownloadSampleCsv = () => {
+    const blob = new Blob([SAMPLE_CUSTOMER_CSV], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'wowtek-customers-template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleResetBulkImport = () => {
+    setBulkCsvFileName('');
+    setBulkCsvRawText('');
+    setBulkParseSummary(null);
+    setBulkImportError(null);
+    setBulkPreviewFilter('all');
+    if (csvFileInputRef.current) {
+      csvFileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmBulkImport = async () => {
+    if (!bulkParseSummary || bulkParseSummary.validRows.length === 0) {
+      setBulkImportError('No valid Sri Lankan phone numbers available to import.');
+      return;
+    }
+
+    setBulkImporting(true);
+    setBulkImportError(null);
+
+    try {
+      const res = await fetch('/api/customers/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customers: bulkParseSummary.validRows.map((row) => ({
+            name: row.name,
+            phone: row.formattedPhone,
+            source: row.source || bulkDefaultSource.trim() || 'CSV Import',
+          })),
+          defaultSource: bulkDefaultSource.trim() || 'CSV Import',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setBulkImportError(data.error || 'Failed to import customers.');
+        return;
+      }
+
+      const skippedTotal = bulkParseSummary.invalidRows.length + bulkParseSummary.duplicateRows.length;
+      setNotification({
+        type: 'success',
+        message: `${data.message}${skippedTotal > 0 ? ` (${skippedTotal} invalid/duplicate row(s) skipped)` : ''}`,
+      });
+      setShowBulkImportModal(false);
+      handleResetBulkImport();
+      fetchCustomers();
+    } catch (err: any) {
+      setBulkImportError(err?.message || 'Network error while importing CSV customers.');
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   const handleSendSMS = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -252,13 +386,25 @@ export function SMSMarketingTab() {
         </div>
 
         {/* Quick KPI Counters & Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-xs font-mono">
             <Users className="w-3.5 h-3.5 text-purple-400" />
             <span className="text-slate-400">Total Contacts:</span>
             <span className="text-white font-bold">{customers.length}</span>
           </div>
           <button
+            type="button"
+            onClick={() => {
+              setBulkImportError(null);
+              setShowBulkImportModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:brightness-110 border border-emerald-400/30 text-xs text-white font-semibold transition cursor-pointer shadow-sm"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Bulk Import CSV</span>
+          </button>
+          <button
+            type="button"
             onClick={fetchCustomers}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
           >
@@ -512,6 +658,18 @@ export function SMSMarketingTab() {
                   </>
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportError(null);
+                  setShowBulkImportModal(true);
+                }}
+                className="w-full py-2 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Bulk Import Customers via CSV</span>
+              </button>
             </form>
           </div>
         </div>
@@ -531,7 +689,19 @@ export function SMSMarketingTab() {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportError(null);
+                  setShowBulkImportModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Bulk Import</span>
+              </button>
+
               {selectedCustomers.length > 0 && (
                 <button
                   type="button"
@@ -543,7 +713,7 @@ export function SMSMarketingTab() {
                 </button>
               )}
 
-              <div className="relative w-52">
+              <div className="relative w-48 sm:w-52">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -652,6 +822,268 @@ export function SMSMarketingTab() {
           </div>
         </div>
       </div>
+
+      {/* BULK CSV IMPORT MODAL WITH SRI LANKAN PHONE VALIDATION */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-4xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Bulk Import Customers (CSV)</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Upload a CSV with <span className="font-mono text-slate-300">name, phone, source</span> columns. Validates &amp; normalizes Sri Lankan numbers (e.g. <span className="font-mono text-emerald-300">0771234567</span> → <span className="font-mono text-emerald-300">+94771234567</span>).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBulkImportModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                aria-label="Close bulk import modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Top Controls: Dropzone + Sample Download + Source Tag */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDraggingCsv(true);
+                  }}
+                  onDragLeave={() => setIsDraggingCsv(false)}
+                  onDrop={handleBulkDrop}
+                  onClick={() => csvFileInputRef.current?.click()}
+                  className={`md:col-span-8 p-5 rounded-xl border-2 border-dashed transition cursor-pointer flex flex-col items-center justify-center text-center gap-2 ${
+                    isDraggingCsv
+                      ? 'border-emerald-400 bg-emerald-950/30'
+                      : 'border-slate-700 bg-slate-950/60 hover:border-emerald-500/60 hover:bg-slate-950'
+                  }`}
+                >
+                  <input
+                    ref={csvFileInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handleBulkFileChange}
+                    className="hidden"
+                  />
+                  <Upload className="w-6 h-6 text-emerald-400" />
+                  {bulkCsvFileName ? (
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-white">{bulkCsvFileName}</p>
+                      <p className="text-[11px] text-emerald-400">Click or drop another CSV file to replace</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-white">
+                        Drop your customer CSV file here, or <span className="text-emerald-400 underline">browse</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Accepts 07XXXXXXXX, +947XXXXXXXX, 947XXXXXXXX, 00947XXXXXXXX, or Sri Lankan fixed-line numbers
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-4 flex flex-col justify-between gap-3 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1.5">Default Source Tag</label>
+                    <input
+                      type="text"
+                      value={bulkDefaultSource}
+                      onChange={(e) => handleBulkSourceChange(e.target.value)}
+                      placeholder="CSV Import"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadSampleCsv}
+                    className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Download Sample CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {bulkImportError && (
+                <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{bulkImportError}</span>
+                </div>
+              )}
+
+              {/* Validation Summary & Preview Table */}
+              {bulkParseSummary && bulkParseSummary.totalRows > 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-400 block text-[11px]">Total Parsed Rows</span>
+                      <span className="text-lg font-bold font-mono text-white">{bulkParseSummary.totalRows}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+                      <span className="text-emerald-300 block text-[11px]">Valid Sri Lankan</span>
+                      <span className="text-lg font-bold font-mono text-emerald-400">{bulkParseSummary.validRows.length}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30">
+                      <span className="text-rose-300 block text-[11px]">Invalid Phone Format</span>
+                      <span className="text-lg font-bold font-mono text-rose-400">{bulkParseSummary.invalidRows.length}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30">
+                      <span className="text-amber-300 block text-[11px]">Duplicates in CSV</span>
+                      <span className="text-lg font-bold font-mono text-amber-400">{bulkParseSummary.duplicateRows.length}</span>
+                    </div>
+                  </div>
+
+                  {/* Preview Filter Tabs */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setBulkPreviewFilter('all')}
+                        className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
+                          bulkPreviewFilter === 'all'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        All ({bulkParseSummary.totalRows})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkPreviewFilter('valid')}
+                        className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
+                          bulkPreviewFilter === 'valid'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        Valid ({bulkParseSummary.validRows.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBulkPreviewFilter('invalid')}
+                        className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
+                          bulkPreviewFilter === 'invalid'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        Rejected ({bulkParseSummary.invalidRows.length + bulkParseSummary.duplicateRows.length})
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleResetBulkImport}
+                      className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                    >
+                      Clear File
+                    </button>
+                  </div>
+
+                  {/* Preview Table */}
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border border-slate-800">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase font-mono sticky top-0 border-b border-slate-800">
+                        <tr>
+                          <th className="py-2.5 px-3">Row</th>
+                          <th className="py-2.5 px-3">Customer Name</th>
+                          <th className="py-2.5 px-3">Raw Phone</th>
+                          <th className="py-2.5 px-3">Normalized (+94)</th>
+                          <th className="py-2.5 px-3">Source</th>
+                          <th className="py-2.5 px-3">Validation Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {bulkParseSummary.rows
+                          .filter((row) => {
+                            if (bulkPreviewFilter === 'valid') return row.isValid;
+                            if (bulkPreviewFilter === 'invalid') return !row.isValid;
+                            return true;
+                          })
+                          .slice(0, 200)
+                          .map((row) => (
+                            <tr
+                              key={`${row.rowNumber}-${row.rawPhone}`}
+                              className={row.isValid ? 'hover:bg-slate-800/40' : 'bg-rose-950/15'}
+                            >
+                              <td className="py-2 px-3 font-mono text-slate-400">#{row.rowNumber}</td>
+                              <td className="py-2 px-3 font-medium text-white">{row.name}</td>
+                              <td className="py-2 px-3 font-mono text-slate-400">{row.rawPhone || '-'}</td>
+                              <td className="py-2 px-3 font-mono text-purple-300 font-semibold">
+                                {row.isValid ? row.formattedPhone : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-slate-300">{row.source}</td>
+                              <td className="py-2 px-3">
+                                {row.isValid ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/70 text-[10px] font-mono">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Valid SL
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700/70 text-[10px] font-mono">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {row.error}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-800 bg-slate-950/60">
+              <span className="text-[11px] text-slate-400">
+                Existing contacts matching the same <span className="font-mono text-slate-300">+94</span> number will be updated cleanly without duplicates.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkImportModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkImporting || !bulkParseSummary || bulkParseSummary.validRows.length === 0}
+                  onClick={handleConfirmBulkImport}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 disabled:opacity-40 text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-lg"
+                >
+                  {bulkImporting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Importing Customers...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>
+                        Import {bulkParseSummary ? bulkParseSummary.validRows.length : 0} Valid Customer(s)
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

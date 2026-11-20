@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToMongoDB } from '@/lib/mongodb';
 import { formatSriLankanPhone, isValidSriLankanPhone } from '@/lib/phoneUtils';
+import { upsertServerCustomers } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const { name, phone, source } = await req.json();
-    const { db } = await connectToDatabase();
 
     if (!phone || !String(phone).trim()) {
       return NextResponse.json({ success: false, error: "දුරකථන අංකය ඇතුළත් කිරීම අත්‍යවශ්‍ය වේ." }, { status: 400 });
@@ -24,19 +24,26 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Upsert customer with uniformly formatted +94 phone number
-    await db.collection('customers').updateOne(
-      { phone: formattedPhone },
-      { 
-        $set: { 
-          name: name ? String(name).trim() : 'Manual Customer', 
-          source: source || 'Manual Add',
-          updatedAt: new Date() 
+    const customerName = name ? String(name).trim() : 'Manual Customer';
+    const customerSource = source || 'Manual Add';
+
+    const mongoConn = await connectToMongoDB();
+    if (mongoConn) {
+      await mongoConn.db.collection('customers').updateOne(
+        { phone: formattedPhone },
+        { 
+          $set: { 
+            name: customerName, 
+            source: customerSource,
+            updatedAt: new Date() 
+          },
+          $setOnInsert: { createdAt: new Date(), lastOrderDate: new Date(), totalOrders: 0 }
         },
-        $setOnInsert: { createdAt: new Date(), totalOrders: 0 }
-      },
-      { upsert: true }
-    );
+        { upsert: true }
+      );
+    }
+
+    upsertServerCustomers([{ name: customerName, phone: formattedPhone, source: customerSource }]);
 
     return NextResponse.json({ 
       success: true, 

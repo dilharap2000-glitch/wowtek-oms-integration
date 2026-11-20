@@ -137,6 +137,57 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const [simStoreResponse, setSimStoreResponse] = useState<any | null>(null);
   const [orderActionMsg, setOrderActionMsg] = useState<{ message: string; isError: boolean } | null>(null);
 
+  // Uber Eats Sandbox Validation Suite State
+  const [uberSandboxStoreId, setUberSandboxStoreId] = useState(apiConfig.uberEatsStoreId || '');
+  const [uberSandboxOrderId, setUberSandboxOrderId] = useState('');
+  const [uberSandboxIntegrationId, setUberSandboxIntegrationId] = useState('');
+  const [uberSandboxRunCancel, setUberSandboxRunCancel] = useState(false);
+  const [uberSandboxLoading, setUberSandboxLoading] = useState(false);
+  const [uberSandboxError, setUberSandboxError] = useState<string | null>(null);
+  const [uberSandboxReport, setUberSandboxReport] = useState<{
+    environment: string;
+    tested_at: string;
+    results: Array<{
+      feature: string;
+      method: string;
+      path: string;
+      status: number | string;
+      ok: boolean;
+      response?: unknown;
+      error?: string;
+    }>;
+  } | null>(null);
+
+  const handleRunUberSandboxValidation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUberSandboxLoading(true);
+    setUberSandboxError(null);
+    setUberSandboxReport(null);
+
+    try {
+      const res = await fetch('/api/uber/test-validation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: uberSandboxStoreId.trim() || undefined,
+          order_id: uberSandboxOrderId.trim() || undefined,
+          integration_id: uberSandboxIntegrationId.trim() || undefined,
+          run_cancel: uberSandboxRunCancel,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUberSandboxError(data.error || 'Sandbox validation failed');
+      } else {
+        setUberSandboxReport(data);
+      }
+    } catch (err: any) {
+      setUberSandboxError(err?.message || 'Network error running Uber sandbox validation');
+    } finally {
+      setUberSandboxLoading(false);
+    }
+  };
+
   const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId: string) => {
     try {
       const response = await fetch('/api/orders/action', {
@@ -1537,6 +1588,156 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
             </div>
           )}
         </div>
+      </div>
+
+      {/* UBER EATS SANDBOX API VALIDATION SUITE */}
+      <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Shield className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-semibold text-white">
+                  Uber Eats Sandbox Validation Suite
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  POST /api/uber/test-validation
+                </span>
+              </div>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Validate Store Status, Prep Time, POS Integration Activation, Order Details (v2), Accept POS Order, DMC Status, Ready for Pickup, and Cancel endpoints against Uber Eats Sandbox.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleRunUberSandboxValidation} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="block text-neutral-300 font-medium mb-1">Sandbox Store UUID (store_id)</label>
+              <input
+                type="text"
+                value={uberSandboxStoreId}
+                onChange={(e) => setUberSandboxStoreId(e.target.value)}
+                placeholder="e.g. 68dba37f-7468-49c0-..."
+                className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-neutral-300 font-medium mb-1">Sandbox Order UUID (order_id)</label>
+              <input
+                type="text"
+                value={uberSandboxOrderId}
+                onChange={(e) => setUberSandboxOrderId(e.target.value)}
+                placeholder="e.g. c7e05234-04ca-4460-..."
+                className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-neutral-300 font-medium mb-1">Integration ID (Optional)</label>
+              <input
+                type="text"
+                value={uberSandboxIntegrationId}
+                onChange={(e) => setUberSandboxIntegrationId(e.target.value)}
+                placeholder="Defaults to Store UUID"
+                className="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <label className="inline-flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={uberSandboxRunCancel}
+                onChange={(e) => setUberSandboxRunCancel(e.target.checked)}
+                className="rounded bg-neutral-950 border-neutral-700 text-rose-500 focus:ring-rose-500"
+              />
+              <span>Include Cancel Order endpoint test (Use on test orders only)</span>
+            </label>
+
+            <button
+              type="submit"
+              disabled={uberSandboxLoading}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-xs inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {uberSandboxLoading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Validating Uber Sandbox Endpoints...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Run Uber Sandbox Validation</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {uberSandboxError && (
+          <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>{uberSandboxError}</span>
+          </div>
+        )}
+
+        {uberSandboxReport && (
+          <div className="space-y-3 pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400 bg-neutral-950 px-3 py-2 rounded-lg border border-neutral-800">
+              <span>Environment: <strong className="text-emerald-400">{uberSandboxReport.environment}</strong></span>
+              <span>Tested At: {new Date(uberSandboxReport.tested_at).toLocaleString()}</span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-neutral-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-neutral-950 text-neutral-400 uppercase font-mono text-[10px] border-b border-neutral-800">
+                  <tr>
+                    <th className="py-2.5 px-3">Feature</th>
+                    <th className="py-2.5 px-3">Method &amp; Path</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3">Response / Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-800/80">
+                  {uberSandboxReport.results.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-neutral-800/40">
+                      <td className="py-2.5 px-3 font-medium text-white whitespace-nowrap">{item.feature}</td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-neutral-300">
+                        <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-purple-300 mr-1.5">{item.method}</span>
+                        <span>{item.path}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                            item.ok
+                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                              : 'bg-rose-950 text-rose-300 border border-rose-700'
+                          }`}
+                        >
+                          {item.ok ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                          {String(item.status)}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-neutral-400 max-w-md truncate">
+                        {item.error
+                          ? item.error
+                          : item.response !== undefined && item.response !== null
+                          ? JSON.stringify(item.response)
+                          : 'OK (No Content)'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MULTI-CHANNEL PRODUCT NAME & SKU MATCHING HUB */}

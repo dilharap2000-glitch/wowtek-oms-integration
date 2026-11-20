@@ -18,8 +18,12 @@ export function formatSriLankanPhone(input: string): string {
   // 1. Remove all whitespace, hyphens, brackets, and periods
   let cleaned = String(input).trim().replace(/[\s\-\(\)\.]+/g, '');
 
-  // 2. If user enters "+0...", remove the 0
-  if (cleaned.startsWith('+0')) {
+  // 2. Handle "0094..." or "+0..." international/trunk prefixes
+  if (cleaned.startsWith('0094')) {
+    cleaned = '+94' + cleaned.slice(4);
+  } else if (cleaned.startsWith('+940')) {
+    cleaned = '+94' + cleaned.slice(4);
+  } else if (cleaned.startsWith('+0')) {
     cleaned = '+' + cleaned.slice(2);
   }
 
@@ -43,15 +47,15 @@ export function formatSriLankanPhone(input: string): string {
 
 /**
  * Validates if the phone number is a valid Sri Lankan phone number in "+94XXXXXXXXX" format.
- * Sri Lankan phone numbers have 9 digits after +94 (total 12 characters).
+ * Sri Lankan phone numbers have 9 digits after +94 (total 12 characters), starting with 1-9.
  * Mobile: +94 7X XXXXXXX (e.g., 70, 71, 72, 74, 75, 76, 77, 78)
  * Fixed: +94 11/21/23/24/25/26/27/31/32/33/34/35/36/37/38/41/45/47/51/52/54/55/57/63/65/66/67/81/91 XXXXXXX
  */
 export function isValidSriLankanPhone(phone: string): boolean {
   if (!phone) return false;
   const formatted = formatSriLankanPhone(phone);
-  // Must be "+94" followed by exactly 9 digits
-  return /^\+94\d{9}$/.test(formatted);
+  // Must be "+94" followed by [1-9] and 8 more digits (total 9 digits)
+  return /^\+94[1-9]\d{8}$/.test(formatted);
 }
 
 /**

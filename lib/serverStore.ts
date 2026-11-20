@@ -2,10 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import { Order, TransExpressWaybill, WebhookEvent } from '@/types';
 
+export interface ServerCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  source: string;
+  totalOrders: number;
+  lastOrderDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ServerStoreData {
   orders: Order[];
   waybills: TransExpressWaybill[];
   webhookEvents: WebhookEvent[];
+  customers: ServerCustomer[];
   lastUpdated: string;
 }
 
@@ -62,6 +74,7 @@ function readFromDisk(): ServerStoreData {
             orders: Array.isArray(data.orders) ? data.orders : [],
             waybills: Array.isArray(data.waybills) ? data.waybills : [],
             webhookEvents: Array.isArray(data.webhookEvents) ? data.webhookEvents : [],
+            customers: Array.isArray(data.customers) ? data.customers : [],
             lastUpdated: data.lastUpdated || new Date().toISOString(),
           };
         }
@@ -75,6 +88,7 @@ function readFromDisk(): ServerStoreData {
     orders: [],
     waybills: [],
     webhookEvents: [],
+    customers: [],
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -225,3 +239,70 @@ export function clearServerWebhookEvents(): boolean {
 
   return true;
 }
+
+export function getServerCustomers(): ServerCustomer[] {
+  const store = getServerStore();
+  if (!Array.isArray(store.customers)) {
+    store.customers = [];
+  }
+  return store.customers;
+}
+
+export function upsertServerCustomers(
+  records: Array<{ name: string; phone: string; source?: string }>
+): { inserted: number; updated: number; total: number } {
+  const store = getServerStore();
+  if (!Array.isArray(store.customers)) {
+    store.customers = [];
+  }
+
+  const now = new Date().toISOString();
+  let inserted = 0;
+  let updated = 0;
+
+  for (const rec of records) {
+    const existingIdx = store.customers.findIndex((c) => c.phone === rec.phone);
+    if (existingIdx !== -1) {
+      store.customers[existingIdx] = {
+        ...store.customers[existingIdx],
+        name: rec.name || store.customers[existingIdx].name,
+        source: rec.source || store.customers[existingIdx].source,
+        updatedAt: now,
+      };
+      updated++;
+    } else {
+      store.customers.unshift({
+        id: `cust-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: rec.name || 'Manual Customer',
+        phone: rec.phone,
+        source: rec.source || 'CSV Import',
+        totalOrders: 0,
+        lastOrderDate: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      inserted++;
+    }
+  }
+
+  store.lastUpdated = now;
+  writeToDisk(store);
+
+  return { inserted, updated, total: store.customers.length };
+}
+
+export function deleteServerCustomers(phones: string[]): number {
+  const store = getServerStore();
+  if (!Array.isArray(store.customers)) {
+    store.customers = [];
+    return 0;
+  }
+
+  const prevLen = store.customers.length;
+  store.customers = store.customers.filter((c) => !phones.includes(c.phone));
+  store.lastUpdated = new Date().toISOString();
+  writeToDisk(store);
+
+  return prevLen - store.customers.length;
+}
+
