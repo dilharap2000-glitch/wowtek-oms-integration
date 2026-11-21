@@ -47,14 +47,30 @@ export function clearUberAccessTokenCache(isSandbox?: boolean): void {
   }
 }
 
-export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
-  const clientId = isSandbox
-    ? process.env.UBER_SANDBOX_CLIENT_ID || process.env.UBER_CLIENT_ID
-    : process.env.UBER_PROD_CLIENT_ID || process.env.UBER_CLIENT_ID;
-  const clientSecret = isSandbox
-    ? process.env.UBER_SANDBOX_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET
-    : process.env.UBER_PROD_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET;
+function getUberClientCredentials(isSandbox: boolean): {
+  clientId?: string;
+  clientSecret?: string;
+} {
+  const clientId = (
+    isSandbox
+      ? process.env.UBER_SANDBOX_CLIENT_ID || process.env.UBER_CLIENT_ID || process.env.ClientID
+      : process.env.UBER_PROD_CLIENT_ID || process.env.UBER_CLIENT_ID || process.env.ClientID
+  )?.trim();
 
+  const clientSecret = (
+    isSandbox
+      ? process.env.UBER_SANDBOX_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET || process.env.ClientSecret
+      : process.env.UBER_PROD_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET || process.env.ClientSecret
+  )?.trim();
+
+  return {
+    clientId: isUsableToken(clientId) ? clientId : undefined,
+    clientSecret: isUsableToken(clientSecret) ? clientSecret : undefined,
+  };
+}
+
+export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
+  const { clientId, clientSecret } = getUberClientCredentials(isSandbox);
   if (clientId && clientSecret) return true;
 
   const staticToken = isSandbox
@@ -77,16 +93,9 @@ export async function getUberAccessToken(isSandbox: boolean): Promise<string | n
     return existing.token;
   }
 
-  // 2. Client ID + Client Secret වලින් OAuth token එක auto fetch කරන්න
-  const clientId = isSandbox
-    ? process.env.UBER_SANDBOX_CLIENT_ID || process.env.UBER_CLIENT_ID
-    : process.env.UBER_PROD_CLIENT_ID || process.env.UBER_CLIENT_ID;
-
-  const clientSecret = isSandbox
-    ? process.env.UBER_SANDBOX_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET
-    : process.env.UBER_PROD_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET;
-
-  const scope = process.env.UBER_OAUTH_SCOPE || 'eats.order eats.store.orders.read';
+  // 2. Vercel env variables වලින් Client ID & Secret ගන්න (ClientID / ClientSecret fallback එක්ක)
+  const { clientId, clientSecret } = getUberClientCredentials(isSandbox);
+  const scope = (process.env.UBER_OAUTH_SCOPE || 'eats.order eats.store.orders.read').trim();
 
   if (clientId && clientSecret) {
     const controller = new AbortController();

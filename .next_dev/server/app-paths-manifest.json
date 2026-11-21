@@ -1,6 +1,7 @@
 {
-  "/api/orders/route": "app/api/orders/route.js",
   "/api/sync/live/route": "app/api/sync/live/route.js",
   "/page": "app/page.js",
+  "/api/orders/route": "app/api/orders/route.js",
+  "/api/uber/test-validation/route": "app/api/uber/test-validation/route.js",
   "/api/orders/action/route": "app/api/orders/action/route.js"
 }
