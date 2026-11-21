@@ -534,27 +534,27 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
         }
       `}</style>
 
-      <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]">
+      <div className="w-full max-w-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[96vh]">
         {/* Top Modal Controls Header */}
-        <div className="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-neutral-800 bg-neutral-950 gap-3">
+        <div className="flex flex-wrap items-center justify-between p-3.5 sm:p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-              <Printer className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] flex items-center justify-center border border-[var(--border-subtle)] shadow-sm">
+              <Printer className="w-4 h-4 text-[var(--accent-primary)]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white tracking-wide">
+                <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-wide">
                   4x6 Thermal Shipping Waybill
                 </h3>
-                <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono font-semibold">
+                <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30 text-[10px] font-mono font-semibold">
                   100mm × 150mm
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 text-[10px] font-mono">
+                <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[10px] font-mono">
                   Trans Express
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-400 mt-0.5 font-mono">
-                Tracking: <span className="text-white font-bold">{trackingNumber}</span> · Trans Express
+              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-mono">
+                Tracking: <span className="text-[var(--text-primary)] font-bold">{trackingNumber}</span> · Trans Express
               </p>
             </div>
           </div>
@@ -563,7 +563,7 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
             {/* Zoom / Scale Toggle */}
             <button
               onClick={() => setZoomLevel((prev) => (prev === 'fit' ? '100%' : 'fit'))}
-              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700 text-xs font-medium transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)] text-xs font-medium transition-colors flex items-center gap-1"
               title="Toggle Scale"
             >
               {zoomLevel === 'fit' ? (
@@ -582,10 +582,10 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
             {/* Copy Tracking */}
             <button
               onClick={handleCopyTracking}
-              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700 text-xs font-medium transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)] text-xs font-medium transition-colors flex items-center gap-1"
               title="Copy Tracking Number"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy TE#'}</span>
             </button>
 
@@ -593,7 +593,7 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
             <button
               onClick={handleDownloadHtml}
               disabled={downloading}
-              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700 text-xs font-medium transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)] text-xs font-medium transition-colors flex items-center gap-1"
               title="Download 4x6 Label HTML"
             >
               <Download className="w-3.5 h-3.5" />
@@ -612,7 +612,7 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
             {/* Close Modal */}
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface)] transition-colors"
               title="Close (Esc)"
             >
               <X className="w-5 h-5" />
@@ -621,7 +621,7 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-4 sm:p-6 bg-neutral-950 overflow-y-auto flex justify-center items-start flex-1 min-h-[460px]">
+        <div className="p-4 sm:p-6 bg-[var(--bg-app)] overflow-y-auto flex justify-center items-start flex-1 min-h-[460px]">
           {/* Label Card Container with Realistic Thermal Paper Styling */}
           <div
             className={`transition-all duration-200 ${
@@ -1118,16 +1118,16 @@ export const ThermalWaybillModal: React.FC<ThermalWaybillModalProps> = ({
         </div>
 
         {/* Modal Bottom Actions Bar */}
-        <div className="p-3 border-t border-neutral-800 bg-neutral-950 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-neutral-400 text-[11px]">
-            <Truck className="w-3.5 h-3.5 text-purple-400" />
+        <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[11px]">
+            <Truck className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             <span>Formatted for standard 100mm × 150mm direct thermal printers (Xprinter, Gprinter, Zebra).</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 text-xs font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-app)] text-xs font-medium transition-colors"
             >
               Close
             </button>

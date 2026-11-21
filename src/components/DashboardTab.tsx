@@ -87,12 +87,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [orderActionToast, setOrderActionToast] = React.useState<{ message: string; isError: boolean } | null>(null);
   const [confirmingReturnOrderId, setConfirmingReturnOrderId] = React.useState<string | null>(null);
 
-  // Auto-refresh orders polling (5-second interval)
+  // Auto-refresh orders polling (15-second interval with rate-limit backoff)
   const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
+  const isFetchingOrdersRef = React.useRef(false);
+  const rateLimitUntilRef = React.useRef(0);
 
-  const fetchOrders = async () => {
+  const fetchOrders = React.useCallback(async (force = false) => {
+    if (typeof document !== 'undefined' && document.hidden && !force) return;
+    if (!force && Date.now() < rateLimitUntilRef.current) return;
+    if (isFetchingOrdersRef.current) return;
+
+    isFetchingOrdersRef.current = true;
     try {
       const res = await fetch('/api/orders', { cache: 'no-store' }); // ඔයාගේ orders ගන්න API එක
+      if (res.status === 429) {
+        rateLimitUntilRef.current = Date.now() + 30_000;
+        return;
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        const rawText = await res.text().catch(() => '');
+        if (rawText.toLowerCase().includes('rate exceeded')) {
+          rateLimitUntilRef.current = Date.now() + 30_000;
+          return;
+        }
+        console.warn(`Orders fetch returned non-JSON (${res.status}):`, rawText.slice(0, 120));
+        return;
+      }
+
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.orders || []);
       if (Array.isArray(list) && list.length > 0) {
@@ -100,17 +123,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
+    } finally {
+      isFetchingOrdersRef.current = false;
     }
-  };
+  }, []);
 
   React.useEffect(() => {
-    fetchOrders(); // මුලින්ම ලෝඩ් වෙද්දී
-    
-    // සෑම තත්පර 5කට වරක්ම ඩේටා ඔටෝ රිෆ්රෙෂ් වෙයි (Stream එකක අවශ්යතාවය නැති කරයි)
-    const interval = setInterval(fetchOrders, 5000); 
+    const interval = setInterval(() => {
+      void fetchOrders(false);
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchOrders]);
 
   React.useEffect(() => {
     setLiveOrders(orders || []);
@@ -182,8 +206,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         });
         setTimeout(() => setOrderActionToast(null), 4000);
         if (typeof window !== 'undefined') {
-          fetch('/api/sync/live').catch(() => {});
-          await fetchOrders(); // අලුත් status ("Processing" / "Ready" / "Cancelled") එක වහාම ගන්න
+          await fetchOrders(true); // අලුත් status ("Processing" / "Ready" / "Cancelled") එක වහාම ගන්න
         }
         return;
       }
@@ -214,16 +237,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         setConfirmingReturnOrderId(null);
         setOrderActionToast({
           message: 'Return successful and store stock updated!',
           isError: false,
         });
         setTimeout(() => setOrderActionToast(null), 5000);
-        fetch('/api/sync/live').catch(() => {});
-        await fetchOrders();
+        await fetchOrders(true);
       } else {
         setOrderActionToast({
           message: `Error: ${data.message || data.error || 'Failed to process return'}`,
@@ -326,33 +348,31 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   return (
     <div className="space-y-6">
       {/* DB Connectivity & System Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
-
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm relative overflow-hidden">
         <div className="flex items-center gap-3 relative">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 flex items-center justify-center text-purple-400 glow-purple shadow-inner">
+          <div className="w-10 h-10 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--accent-primary)]">
             <Database className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-white">Database Engine:</span>
+              <span className="text-sm font-semibold text-[var(--text-primary)]">Database Engine:</span>
               <span
-                className={`text-[11px] px-2.5 py-0.5 rounded-full font-mono font-semibold flex items-center gap-1.5 ${
+                className={`text-[11px] px-2.5 py-0.5 rounded-full font-mono font-semibold flex items-center gap-1.5 border border-[var(--border-subtle)] ${
                   dbStatus.status === 'connected'
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 glow-emerald'
-                    : 'bg-amber-500/15 text-amber-300 border border-amber-500/40'
+                    ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                    : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.status === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${dbStatus.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
                 {dbStatus.status === 'connected'
                   ? 'MongoDB Atlas Connected (Live)'
                   : 'Mock DB Fallback (Offline)'}
               </span>
-              <span className="text-xs text-slate-400 font-mono">
+              <span className="text-xs text-[var(--text-secondary)] font-mono">
                 {dbStatus.latencyMs}ms latency
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {dbStatus.status === 'connected'
                 ? 'MongoDB Atlas live connection established with connection pooling. Real orders and webhooks persisted directly.'
                 : 'Offline resilient fallback active. Real WooCommerce orders prioritized.'}
@@ -363,7 +383,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="flex items-center gap-3 relative">
           <button
             onClick={() => onNavigateTab('pos')}
-            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-purple-950/40 border border-purple-400/20 cursor-pointer active:scale-95"
+            className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer active:scale-95 whitespace-nowrap"
           >
             <ShoppingCart className="w-3.5 h-3.5" />
             <span>Open POS Terminal</span>
@@ -374,47 +394,47 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Gross Revenue */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl transition-all duration-200 hover:border-purple-500/40 glow-purple">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium uppercase tracking-wider mb-2">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider mb-2">
             <span>Gross Revenue</span>
-            <div className="p-1.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-1.5 rounded-xl bg-[var(--bg-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             Rs. {totalGrossRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2.5 border-t border-slate-800/80">
+          <div className="flex items-center justify-between mt-3 text-xs text-[var(--text-secondary)] pt-2.5 border-t border-[var(--border-subtle)]">
             <span>{orders.length} total orders / invoices</span>
-            <span className="text-emerald-400 flex items-center font-semibold">
+            <span className="text-[var(--accent-primary)] flex items-center font-semibold">
               +19.2% <ArrowUpRight className="w-3 h-3 ml-0.5" />
             </span>
           </div>
         </div>
 
         {/* Net Profit */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-emerald-500/25 backdrop-blur-md shadow-xl transition-all duration-200 hover:border-emerald-500/50 glow-emerald">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium uppercase tracking-wider mb-2">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider mb-2">
             <span>Net Operating Profit</span>
-            <div className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-1.5 rounded-xl bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-[var(--border-subtle)]">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
+          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 dark:text-emerald-400">
             Rs. {totalNetProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
           {pendingProfitOrdersCount > 0 ? (
-            <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-amber-400 flex items-center gap-1 font-mono">
-                <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+            <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px]">
+              <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1 font-mono">
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                 <span>{pendingProfitOrdersCount} pending valuation</span>
               </span>
-              <span className="text-slate-500 font-mono text-[10px]">Real records only</span>
+              <span className="text-[var(--text-secondary)] font-mono text-[10px]">Real records only</span>
             </div>
           ) : (
-            <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2.5 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mt-3 text-xs text-[var(--text-secondary)] pt-2.5 border-t border-[var(--border-subtle)]">
               <span>After Verified COGS</span>
-              <span className="text-slate-300 font-mono font-semibold">
+              <span className="text-[var(--text-primary)] font-mono font-semibold">
                 {((totalNetProfit / (totalGrossRevenue || 1)) * 100).toFixed(1)}% margin
               </span>
             </div>
@@ -422,22 +442,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Courier Queue */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl transition-all duration-200 hover:border-cyan-500/40">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium uppercase tracking-wider mb-2">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider mb-2">
             <span>Trans Express Queue</span>
-            <div className="p-1.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <div className="p-1.5 rounded-xl bg-cyan-50 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-500/20">
               <Truck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             {pendingWaybills.length}{' '}
-            <span className="text-xs font-sans font-normal text-slate-400">pending</span>
+            <span className="text-xs font-sans font-normal text-[var(--text-secondary)]">pending</span>
           </div>
-          <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2.5 border-t border-slate-800/80">
+          <div className="flex items-center justify-between mt-3 text-xs text-[var(--text-secondary)] pt-2.5 border-t border-[var(--border-subtle)]">
             <span>{waybills.length} total shipments</span>
             <button
               onClick={() => onNavigateTab('waybills')}
-              className="text-purple-400 hover:text-purple-300 transition-colors font-medium cursor-pointer"
+              className="text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors font-medium cursor-pointer"
             >
               View Queue →
             </button>
@@ -445,26 +465,26 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Warranty & Returns */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl transition-all duration-200 hover:border-purple-500/40">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium uppercase tracking-wider mb-2">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm transition-colors duration-200 hover:border-[var(--accent-primary)]">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] text-xs font-medium uppercase tracking-wider mb-2">
             <span>Warranties & Returns</span>
-            <div className="p-1.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-1.5 rounded-xl bg-[var(--bg-subtle)] text-[var(--accent-primary)] border border-[var(--border-subtle)]">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             {activeWarranties.length}
             {returnedOrders.length > 0 && (
-              <span className="ml-2 text-xs font-sans font-normal text-amber-400">
+              <span className="ml-2 text-xs font-sans font-normal text-amber-700 dark:text-amber-400">
                 ({returnedOrders.length} returns)
               </span>
             )}
           </div>
-          <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2.5 border-t border-slate-800/80">
+          <div className="flex items-center justify-between mt-3 text-xs text-[var(--text-secondary)] pt-2.5 border-t border-[var(--border-subtle)]">
             <span>SMSlenz automated</span>
             <button
               onClick={() => onNavigateTab('warranty')}
-              className="text-purple-400 hover:text-purple-300 transition-colors font-medium cursor-pointer"
+              className="text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] transition-colors font-medium cursor-pointer"
             >
               Manage →
             </button>
@@ -474,14 +494,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
       {/* RESTOCK SUCCESS TOAST BANNER */}
       {restockSuccessMsg && (
-        <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/60 text-emerald-200 rounded-2xl flex items-center justify-between text-xs shadow-2xl backdrop-blur-md animate-fadeIn glow-emerald">
+        <div className="p-3.5 bg-[var(--badge-ready-bg)] border border-[var(--border-subtle)] text-[var(--badge-ready-text)] rounded-2xl flex items-center justify-between text-xs shadow-sm">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             <span className="font-medium">{restockSuccessMsg}</span>
           </div>
           <button
             onClick={() => setRestockSuccessMsg(null)}
-            className="text-slate-400 hover:text-white cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -490,22 +510,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
       {/* PENDING INVENTORY BACKLOG QUEUE (AUTO-DEDUCTION ENGINE) */}
       {pendingBacklogOrders.length > 0 && (
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-amber-500/30 backdrop-blur-md shadow-xl space-y-3.5 glow-amber">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-amber-300 dark:border-amber-500/30 shadow-sm space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+              <div className="w-9 h-9 rounded-xl bg-[var(--badge-pending-bg)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--badge-pending-text)]">
                 <AlertTriangle className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                     Pending / Inventory Not Found Backlog Queue
                   </h3>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
                     {pendingBacklogOrders.length} Backlog Orders
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Orders holding unregistered items or out-of-stock SKUs. When a new GRN / restock occurs, stock will be automatically deducted, warnings cleared, and verified Net Profit updated instantly.
                 </p>
               </div>
@@ -513,7 +533,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
             <button
               onClick={() => onNavigateTab('products')}
-              className="self-start sm:self-auto text-xs text-purple-400 hover:text-purple-300 font-medium cursor-pointer"
+              className="self-start sm:self-auto text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium cursor-pointer"
             >
               Open Inventory & GRN →
             </button>
@@ -521,7 +541,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase font-mono text-[10px] tracking-wider border-b border-slate-800/80">
+              <thead className="bg-[var(--bg-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider border-b border-[var(--border-subtle)]">
                 <tr>
                   <th className="py-3 px-3.5">Invoice No</th>
                   <th className="py-3 px-3.5">Channel</th>
@@ -531,7 +551,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   <th className="py-3 px-3.5 text-center">Quick Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans">
+              <tbody className="divide-y divide-[var(--border-subtle)] font-sans">
                 {pendingBacklogOrders.map((order) => {
                   const unregItems = (order.items || []).filter(
                     (it) => !it.isRegistered || it.costPrice <= 0
@@ -539,35 +559,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   const displayItems = unregItems.length > 0 ? unregItems : order.items || [];
 
                   return (
-                    <tr key={order.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-3.5 font-mono text-purple-300 font-semibold">
+                    <tr key={order.id} className="hover:bg-[var(--bg-subtle)]/60 transition-colors">
+                      <td className="py-3 px-3.5 font-mono text-[var(--accent-primary)] font-semibold">
                         {order.invoiceNumber}
                       </td>
                       <td className="py-3 px-3.5">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] uppercase font-mono bg-slate-950 border border-slate-800 text-slate-300">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] uppercase font-mono bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-primary)]">
                           {order.channel}
                         </span>
                       </td>
-                      <td className="py-3 px-3.5 text-slate-200">
+                      <td className="py-3 px-3.5 text-[var(--text-primary)]">
                         <div className="font-medium">{order.customerName}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{order.customerPhone}</div>
+                        <div className="text-[10px] text-[var(--text-secondary)] font-mono">{order.customerPhone}</div>
                       </td>
                       <td className="py-3 px-3.5 space-y-1">
                         {displayItems.map((it, idx) => (
                           <div key={idx} className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono text-amber-300 font-semibold text-[11px]">
+                            <span className="font-mono text-[var(--badge-pending-text)] font-semibold text-[11px]">
                               {it.sku || 'UNREGISTERED'}
                             </span>
-                            <span className="text-slate-400 text-[11px]">
+                            <span className="text-[var(--text-secondary)] text-[11px]">
                               &ldquo;{it.name}&rdquo; ({it.quantity} qty)
                             </span>
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-950 text-amber-400 border border-amber-800">
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
                               Awaiting GRN
                             </span>
                           </div>
                         ))}
                       </td>
-                      <td className="py-3 px-3.5 text-right font-mono tabular-nums text-white font-medium">
+                      <td className="py-3 px-3.5 text-right font-mono tabular-nums text-[var(--text-primary)] font-medium">
                         Rs. {(order.grossTotal || 0).toLocaleString()}
                       </td>
                       <td className="py-3 px-3.5 text-center">
@@ -580,7 +600,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                 suggestedCost: displayItems[0].costPrice || 0,
                               })
                             }
-                            className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 hover:text-white rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+                            className="px-3 py-1 bg-[var(--badge-pending-bg)] hover:opacity-90 border border-amber-400/40 text-[var(--badge-pending-text)] rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition-all cursor-pointer active:scale-95"
                             title="Add stock via Inward GRN to automatically resolve this backlog order"
                           >
                             <PlusCircle className="w-3.5 h-3.5" />
@@ -600,13 +620,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       {/* Channel Performance & Recent Invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Multi-Channel Distribution */}
-        <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl flex flex-col justify-between">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white">Dynamic Channel Fees</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Dynamic Channel Fees</h3>
               <button
                 onClick={() => onNavigateTab('settings')}
-                className="text-xs text-purple-400 hover:text-purple-300 cursor-pointer"
+                className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] cursor-pointer"
               >
                 Edit Fees →
               </button>
@@ -614,65 +634,65 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
             <div className="space-y-3">
               {/* POS In-Store */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
-                    <span className="font-medium text-white">In-Store POS Retail</span>
+                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                    <span className="font-medium text-[var(--text-primary)]">In-Store POS Retail</span>
                   </div>
-                  <span className="text-slate-400 font-mono">{posOrders.length} sales</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{posOrders.length} sales</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">0% Platform Fee</span>
-                  <span className="text-white font-mono tabular-nums font-medium">
+                  <span className="text-[var(--text-secondary)]">0% Platform Fee</span>
+                  <span className="text-[var(--text-primary)] font-mono tabular-nums font-medium">
                     Rs. {(posOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
 
               {/* PickMe (20%) */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
-                    <span className="font-medium text-white">PickMe Market (20%)</span>
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span className="font-medium text-[var(--text-primary)]">PickMe Market (20%)</span>
                     {stores.filter((s) => s.platform === 'pickme').length > 0 && (
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800">
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
                         {stores.filter((s) => s.platform === 'pickme' && s.isActive !== false).length} Branches
                       </span>
                     )}
                   </div>
-                  <span className="text-slate-400 font-mono">{(pkmOrders || []).length} orders</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{(pkmOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">
+                  <span className="text-[var(--text-secondary)]">
                     Comm: -Rs. {(pkmOrders || []).reduce((s, o) => s + (o?.platformFeeAmount || 0), 0).toLocaleString()}
                   </span>
-                  <span className="text-white font-mono tabular-nums font-medium">
+                  <span className="text-[var(--text-primary)] font-mono tabular-nums font-medium">
                     Rs. {(pkmOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
               </div>
 
               {/* Uber Eats (15.4%) */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span>
-                    <span className="font-medium text-white">Uber Eats Retail (15.4%)</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span className="font-medium text-[var(--text-primary)]">Uber Eats Retail (15.4%)</span>
                     {stores.filter((s) => s.platform === 'ubereats').length > 0 && (
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]">
                         {stores.filter((s) => s.platform === 'ubereats' && s.isActive !== false).length} Branches
                       </span>
                     )}
                   </div>
-                  <span className="text-slate-400 font-mono">{(ubrOrders || []).length} orders</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{(ubrOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">
+                  <span className="text-[var(--text-secondary)]">
                     Comm: -Rs. {(ubrOrders || []).reduce((s, o) => s + (o?.platformFeeAmount || 0), 0).toLocaleString()}
                   </span>
-                  <span className="text-white font-mono tabular-nums font-medium">
+                  <span className="text-[var(--text-primary)] font-mono tabular-nums font-medium">
                     Rs. {(ubrOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
@@ -688,57 +708,89 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                         .toUpperCase();
 
                   return (
-                    <div key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`} className="mt-3 pt-3 border-t border-slate-800 order-card">
-                      <div className="flex justify-between items-center text-[11px]">
-                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම ("UBER-" නැතුව, උදා: 95CF3) */}
-                        <h3 className="font-mono text-purple-300 font-bold text-xs">
-                          {displayOrderCode}
-                        </h3>
-                        <span className="text-emerald-400 font-mono font-semibold">Rs. {Number(order.grossTotal || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-1 text-[11px]">
-                        <span className="text-slate-300 truncate">{order.customerName} ({order.branchName || 'Colombo'})</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${order.status === 'Processing' || order.status === 'ACCEPTED' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
-                          {order.status}
-                        </span>
+                    <div
+                      key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`}
+                      className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 shadow-sm order-card"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-xs font-semibold text-[var(--text-primary)]">
+                            {order.branchName ? `Uber Eats (${order.branchName})` : 'Uber Eats Retail (Central Hub)'}
+                          </h3>
+                          <span className="font-mono text-[11px] font-bold text-[var(--accent-primary)]">
+                            #{displayOrderCode}
+                          </span>
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                              order.status === 'Processing' || order.status === 'ACCEPTED'
+                                ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                                : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                            }`}
+                          >
+                            {order.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-[var(--text-secondary)] truncate">
+                          {order.customerName} • {order.city || order.branchName || 'Colombo'} •{' '}
+                          <span className="font-mono font-semibold text-[var(--text-primary)]">
+                            Rs. {Number(order.grossTotal || 0).toLocaleString()}
+                          </span>
+                        </p>
                       </div>
 
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         {order.status === 'PENDING_ACCEPTANCE' || order.status === 'Pending' || order.status === 'PENDING' ? (
                           <>
-                            <button 
+                            <button
+                              type="button"
                               onClick={() => handleOrderAction('accept', uberOrder)}
                               disabled={orderActionLoading === `${uberOriginalUuid}-accept`}
-                              className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-green-700 cursor-pointer text-xs flex-1 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50"
                             >
-                              {orderActionLoading === `${uberOriginalUuid}-accept` ? '...' : 'Accept'}
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{orderActionLoading === `${uberOriginalUuid}-accept` ? '...' : 'Accept'}</span>
                             </button>
-                            <button 
+                            <button
+                              type="button"
                               onClick={() => handleOrderAction('cancel', uberOrder)}
                               disabled={orderActionLoading === `${uberOriginalUuid}-cancel`}
-                              className="bg-red-600/80 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-red-700 cursor-pointer text-xs transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer disabled:opacity-50"
                             >
-                              {orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}
+                              <X className="w-3.5 h-3.5" />
+                              <span>{orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}</span>
                             </button>
                           </>
                         ) : order.status === 'Processing' || order.status === 'ACCEPTED' ? (
                           <>
-                            <button 
+                            <button
+                              type="button"
                               onClick={() => handleOrderAction('ready', uberOrder)}
                               disabled={orderActionLoading === `${uberOriginalUuid}-ready`}
-                              className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-blue-700 cursor-pointer text-xs flex-1 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50"
                             >
-                              {orderActionLoading === `${uberOriginalUuid}-ready` ? '...' : 'Ready'}
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{orderActionLoading === `${uberOriginalUuid}-ready` ? '...' : 'Ready'}</span>
                             </button>
-                            <button 
+                            <button
+                              type="button"
                               onClick={() => handleOrderAction('cancel', uberOrder)}
                               disabled={orderActionLoading === `${uberOriginalUuid}-cancel`}
-                              className="bg-red-600/80 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-red-700 cursor-pointer text-xs transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer disabled:opacity-50"
                             >
-                              {orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}
+                              <X className="w-3.5 h-3.5" />
+                              <span>{orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}</span>
                             </button>
                           </>
                         ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOrderForThermalPrint(order)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-primary)] transition hover:opacity-90 cursor-pointer"
+                          title="Print 4x6 Thermal Label"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>4x6 Label</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -746,17 +798,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               </div>
 
               {/* WooCommerce */}
-              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+              <div className="p-3.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"></span>
-                    <span className="font-medium text-white">WooCommerce Website</span>
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span className="font-medium text-[var(--text-primary)]">WooCommerce Website</span>
                   </div>
-                  <span className="text-slate-400 font-mono">{(wcOrders || []).length} orders</span>
+                  <span className="text-[var(--text-secondary)] font-mono">{(wcOrders || []).length} orders</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">Trans Express Auto-Linked</span>
-                  <span className="text-white font-mono tabular-nums font-medium">
+                  <span className="text-[var(--text-secondary)]">Trans Express Auto-Linked</span>
+                  <span className="text-[var(--text-primary)] font-mono tabular-nums font-medium">
                     Rs. {(wcOrders || []).reduce((s, o) => s + (o?.grossTotal || 0), 0).toLocaleString()}
                   </span>
                 </div>
@@ -764,26 +816,26 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex justify-between">
+          <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] flex justify-between">
             <span>Total Fees & Gateway Costs:</span>
-            <span className="text-amber-400 font-mono tabular-nums font-medium">
+            <span className="text-amber-700 dark:text-amber-400 font-mono tabular-nums font-medium">
               -Rs. {totalCommissionsDeducted.toLocaleString()}
             </span>
           </div>
         </div>
 
         {/* Live Invoices Table */}
-        <div className="lg:col-span-2 p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-xl">
+        <div className="lg:col-span-2 p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-white">Recent Transactions & Invoices</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent Transactions & Invoices</h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 Multi-channel aggregation with automated platform & payment gateway fees
               </p>
             </div>
             <button
               onClick={() => onNavigateTab('pos')}
-              className="text-xs text-purple-400 hover:text-purple-300 font-medium cursor-pointer"
+              className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium cursor-pointer"
             >
               Open Invoices & Returns →
             </button>
@@ -791,7 +843,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 border-b border-slate-800/80 text-slate-400 uppercase font-mono text-[10px] tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3.5">Invoice No</th>
                   <th className="py-3 px-3.5">Channel & Gateway</th>
@@ -801,19 +853,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   <th className="py-3 px-3.5 text-center">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans text-slate-300">
+              <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
                 {safeOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={6} className="py-12 text-center text-[var(--text-secondary)]">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                        <ShoppingCart className="w-8 h-8 text-slate-600" />
-                        <p className="font-semibold text-white text-xs">No Recent Invoices or Orders</p>
-                        <p className="text-[11px] text-slate-400">
+                        <ShoppingCart className="w-8 h-8 text-[var(--text-secondary)] opacity-60" />
+                        <p className="font-semibold text-[var(--text-primary)] text-xs">No Recent Invoices or Orders</p>
+                        <p className="text-[11px] text-[var(--text-secondary)]">
                           Create sales orders in the POS terminal or connect external store webhooks to populate real-time analytics.
                         </p>
                         <button
                           onClick={() => onNavigateTab('pos')}
-                          className="mt-1 px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md transition-all cursor-pointer"
+                          className="mt-1 px-3.5 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                         >
                           Open POS Terminal
                         </button>
@@ -822,9 +874,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   </tr>
                 ) : (
                   (safeOrders || []).slice(0, 5).map((order, idx) => (
-                    <tr key={`${order.id || order.invoiceNumber || 'ord'}-${idx}`} className="hover:bg-slate-800/40 transition-colors duration-150">
-                      <td className="py-3 px-3.5 font-mono font-medium text-white">
-                        <div className="font-bold text-purple-400">
+                    <tr key={`${order.id || order.invoiceNumber || 'ord'}-${idx}`} className="hover:bg-[var(--bg-subtle)]/50 transition-colors duration-150">
+                      <td className="py-3 px-3.5 font-mono font-medium text-[var(--text-primary)]">
+                        <div className="font-bold text-[var(--accent-primary)]">
                           {order.channel === 'ubereats'
                             ? String(
                                 (order as any).display_id ||
@@ -838,13 +890,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             : order.invoiceNumber}
                         </div>
                         {order.waybillNumber ? (
-                          <div className="text-[10px] text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
+                          <div className="text-[10px] text-cyan-700 dark:text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
                             <Truck className="w-2.5 h-2.5" />
                             <span>TX: {order.waybillNumber}</span>
                           </div>
                         ) : order.waybillError ? (
                           <div
-                            className="text-[10px] text-rose-400 font-mono flex items-center gap-1 mt-0.5 truncate max-w-[120px]"
+                            className="text-[10px] text-rose-700 dark:text-rose-400 font-mono flex items-center gap-1 mt-0.5 truncate max-w-[120px]"
                             title={order.waybillError}
                           >
                             <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
@@ -854,36 +906,36 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       </td>
                       <td className="py-3 px-3.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-white font-medium">{order.channelName}</span>
+                          <span className="text-[var(--text-primary)] font-medium">{order.channelName}</span>
                           {order.branchName && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-950/70 border border-purple-800 text-purple-300">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
                               📍 {order.branchName}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
-                          <span className="text-purple-300">
+                        <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
+                          <span className="text-[var(--accent-primary)]">
                             {order.paymentGatewayName} ({order.gatewayFeePercent}%)
                           </span>
                           {order.externalStoreId && (
-                            <span className="text-slate-500">
+                            <span className="text-[var(--text-secondary)]">
                               · {order.externalStoreId}
                             </span>
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-3.5">
-                        <div className="text-white font-medium">{order.customerName}</div>
-                        <div className="text-slate-400 text-[11px]">{order.city}</div>
+                        <div className="text-[var(--text-primary)] font-medium">{order.customerName}</div>
+                        <div className="text-[var(--text-secondary)] text-[11px]">{order.city}</div>
                       </td>
                       <td className="py-3 px-3.5 text-center">
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
                             order.status === 'Completed' || order.status === 'Delivered' || order.status === 'READY_FOR_PICKUP' || order.status === 'Ready for Pickup'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
                               : order.status === 'Returned' || order.status === 'Cancelled'
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
+                              : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
                           }`}
                         >
                           {order.status}
@@ -891,11 +943,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       </td>
                       <td className="py-3 px-3.5 text-right font-mono tabular-nums font-semibold">
                         {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] whitespace-nowrap">
                             Pending Valuation
                           </span>
                         ) : (
-                          <span className="text-emerald-400">
+                          <span className="text-emerald-700 dark:text-emerald-400">
                             Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </span>
                         )}
@@ -908,41 +960,46 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                               {order.status === 'PENDING_ACCEPTANCE' || order.status === 'Pending' || order.status === 'PENDING' ? (
                                 <>
                                   <button
+                                    type="button"
                                     onClick={() => handleOrderAction('accept', order as any)}
                                     disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-accept`}
-                                    className="px-2 py-1 text-emerald-300 hover:text-white bg-emerald-600/25 hover:bg-emerald-600 border border-emerald-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                    className="px-2.5 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
                                     title="Accept Uber Eats Order"
                                   >
-                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                    <CheckCircle2 className="w-3 h-3" />
                                     <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-accept` ? '...' : 'Accept'}</span>
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => handleOrderAction('cancel', order as any)}
                                     disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel`}
-                                    className="px-2 py-1 text-rose-300 hover:text-white bg-rose-600/25 hover:bg-rose-600 border border-rose-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                    className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
                                     title="Cancel Uber Eats Order"
                                   >
-                                    <X className="w-3 h-3 text-rose-400" />
+                                    <X className="w-3 h-3" />
                                     <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel` ? '...' : 'Cancel'}</span>
                                   </button>
                                 </>
                               ) : order.status === 'Processing' || order.status === 'ACCEPTED' ? (
                                 <>
                                   <button
+                                    type="button"
                                     onClick={() => handleOrderAction('ready', order as any)}
                                     disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-ready`}
-                                    className="px-2 py-1 text-blue-300 hover:text-white bg-blue-600/25 hover:bg-blue-600 border border-blue-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                    className="px-2.5 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
                                     title="Mark Ready on Uber Eats"
                                   >
+                                    <CheckCircle2 className="w-3 h-3" />
                                     <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-ready` ? '...' : 'Ready'}</span>
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => handleOrderAction('cancel', order as any)}
                                     disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel`}
-                                    className="px-2 py-1 text-rose-300 hover:text-white bg-rose-600/25 hover:bg-rose-600 border border-rose-500/40 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
+                                    className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
                                     title="Cancel Uber Eats Order"
                                   >
-                                    <X className="w-3 h-3 text-rose-400" />
+                                    <X className="w-3 h-3" />
                                     <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel` ? '...' : 'Cancel'}</span>
                                   </button>
                                 </>
@@ -951,8 +1008,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           )}
 
                           <button
+                            type="button"
                             onClick={() => setSelectedOrderForInvoice(order)}
-                            className="px-2.5 py-1 text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                            className="px-2.5 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
                             title="View & Print A4 Warranty Invoice"
                           >
                             <FileText className="w-3 h-3" />
@@ -960,8 +1018,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => setSelectedOrderForThermalPrint(order)}
-                            className="px-2.5 py-1 text-emerald-300 hover:text-white bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                            className="px-2.5 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
                             title="Print 100mm x 150mm Daraz-Style 4x6 Thermal Shipping Waybill"
                           >
                             <Printer className="w-3 h-3" />
@@ -985,7 +1044,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => setConfirmingReturnOrderId(null)}
-                                  className="px-2 py-1 text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg text-[11px] cursor-pointer"
+                                  className="px-2 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-80 rounded-lg text-[11px] cursor-pointer"
                                 >
                                   Cancel
                                 </button>
@@ -994,7 +1053,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setConfirmingReturnOrderId(idToPass)}
-                                className="px-2.5 py-1 text-amber-300 hover:text-white bg-amber-600/20 hover:bg-amber-600 border border-amber-500/30 rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                                className="px-2.5 py-1 text-[var(--badge-pending-text)] hover:text-white bg-[var(--badge-pending-bg)] hover:bg-amber-600 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
                                 title="Process Customer Return & Restore Stock"
                               >
                                 <RotateCcw className="w-3 h-3" />
@@ -1044,27 +1103,27 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         />
       )}
 
-      {/* Uber Eats Order Action Modal with User's Action Button Group */}
+      {/* Uber Eats Order Action Modal */}
       {selectedUberOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <h3 className="text-sm font-bold text-white">Uber Eats Order Dispatcher</h3>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Uber Eats Order Dispatcher</h3>
               </div>
               <button
                 onClick={() => setSelectedUberOrder(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-2.5 text-xs text-slate-300">
+            <div className="mt-4 space-y-2.5 text-xs text-[var(--text-primary)]">
               <div className="flex justify-between">
-                <span className="text-slate-400">Order ID:</span>
-                <span className="font-mono font-bold text-purple-400">
+                <span className="text-[var(--text-secondary)]">Order ID:</span>
+                <span className="font-mono font-bold text-[var(--accent-primary)]">
                   {selectedUberOrder.channel === 'ubereats'
                     ? String(
                         (selectedUberOrder as any).display_id ||
@@ -1080,69 +1139,77 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Customer:</span>
-                <span className="font-medium text-white">{selectedUberOrder.customerName}</span>
+                <span className="text-[var(--text-secondary)]">Customer:</span>
+                <span className="font-medium text-[var(--text-primary)]">{selectedUberOrder.customerName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Branch Location:</span>
-                <span className="font-medium text-slate-200">📍 {selectedUberOrder.branchName || 'Colombo Main'}</span>
+                <span className="text-[var(--text-secondary)]">Branch Location:</span>
+                <span className="font-medium text-[var(--text-primary)]">📍 {selectedUberOrder.branchName || 'Colombo Main'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Current Status:</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                <span className="text-[var(--text-secondary)]">Current Status:</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
                   {selectedUberOrder.status}
                 </span>
               </div>
-              <div className="flex justify-between pt-2 border-t border-slate-800/80">
-                <span className="text-slate-400">Gross Total:</span>
-                <span className="font-mono font-bold text-white text-sm">
+              <div className="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
+                <span className="text-[var(--text-secondary)]">Gross Total:</span>
+                <span className="font-mono font-bold text-[var(--text-primary)] text-sm">
                   Rs. {selectedUberOrder.grossTotal?.toLocaleString()}
                 </span>
               </div>
             </div>
 
-            {/* User's Exact Action Button Group */}
+            {/* Action Button Group */}
             <div className="flex gap-2 mt-4">
               {selectedUberOrder.status === 'PENDING_ACCEPTANCE' || selectedUberOrder.status === 'Pending' || selectedUberOrder.status === 'PENDING' ? (
                 <>
-                  <button 
+                  <button
+                    type="button"
                     onClick={async () => {
                       await handleOrderAction('accept', selectedUberOrder as any);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-green-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-green-700 flex-1 cursor-pointer transition-colors text-xs"
+                    className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
                   >
-                    Accept
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Accept</span>
                   </button>
-                  <button 
+                  <button
+                    type="button"
                     onClick={async () => {
                       await handleOrderAction('cancel', selectedUberOrder as any);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-red-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-red-700 flex-1 cursor-pointer transition-colors text-xs"
+                    className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
                   >
-                    Cancel
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cancel</span>
                   </button>
                 </>
               ) : selectedUberOrder.status === 'Processing' || selectedUberOrder.status === 'ACCEPTED' ? (
                 <>
-                  <button 
+                  <button
+                    type="button"
                     onClick={async () => {
                       await handleOrderAction('ready', selectedUberOrder as any);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-blue-700 flex-1 cursor-pointer transition-colors text-xs"
+                    className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
                   >
-                    Ready
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Ready</span>
                   </button>
-                  <button 
+                  <button
+                    type="button"
                     onClick={async () => {
                       await handleOrderAction('cancel', selectedUberOrder as any);
                       setSelectedUberOrder(null);
                     }}
-                    className="bg-red-600 text-white px-3 py-2 rounded-lg font-semibold hover:bg-red-700 flex-1 cursor-pointer transition-colors text-xs"
+                    className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
                   >
-                    Cancel
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cancel</span>
                   </button>
                 </>
               ) : null}
@@ -1152,7 +1219,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       )}
       {/* QUICK INWARD RESTOCK MODAL (BACKLOG AUTO-DEDUCTION) */}
       {quickRestockItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-xl">
             {(() => {
               const targetWaiting = safeOrders.filter(
@@ -1229,96 +1296,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
       )}
 
-      {/* Uber Eats Order Action Modal */}
-      {selectedUberOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-            <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <h4 className="text-sm font-semibold text-white">
-                  Uber Eats Order:{' '}
-                  <span className="font-mono text-emerald-300">
-                    {String(
-                      (selectedUberOrder as any).display_id ||
-                        (selectedUberOrder as any).order_number ||
-                        selectedUberOrder.invoiceNumber ||
-                        selectedUberOrder.id ||
-                        ''
-                    )
-                      .replace(/^UBER-/i, '')
-                      .toUpperCase()}
-                  </span>
-                </h4>
-              </div>
-              <button
-                onClick={() => setSelectedUberOrder(null)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3 text-xs">
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Customer Name:</span>
-                <span className="text-white font-medium">{selectedUberOrder.customerName}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Branch Location:</span>
-                <span className="text-purple-300 font-mono">{selectedUberOrder.branchName || selectedUberOrder.storeName || 'Main Branch'}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Gross Total:</span>
-                <span className="text-emerald-400 font-mono font-bold">Rs. {selectedUberOrder.grossTotal?.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Status:</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  {selectedUberOrder.status}
-                </span>
-              </div>
-
-              {/* Exact User Requested Button Block */}
-              <div className="flex gap-2 mt-4">
-                <button 
-                  onClick={async () => {
-                    await handleOrderAction('accept', selectedUberOrder as any);
-                    setSelectedUberOrder(null);
-                  }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 cursor-pointer"
-                >
-                  Accept on Uber
-                </button>
-                
-                <button 
-                  onClick={async () => {
-                    await handleOrderAction('cancel', selectedUberOrder as any);
-                    setSelectedUberOrder(null);
-                  }}
-                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 cursor-pointer"
-                >
-                  Cancel Order
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Order Action Feedback Toast */}
       {orderActionToast && (
         <div
           className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 border ${
             orderActionToast.isError
-              ? 'bg-rose-950 text-rose-200 border-rose-700/60'
-              : 'bg-emerald-950 text-emerald-200 border-emerald-700/60'
+              ? 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200 dark:border-rose-700/60'
+              : 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border-[var(--border-subtle)]'
           }`}
         >
           {orderActionToast.isError ? (
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4" />
           )}
           <span>{orderActionToast.message}</span>
         </div>

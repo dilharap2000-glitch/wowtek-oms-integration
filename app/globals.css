@@ -2,8 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+[data-theme="warm-daylight"] {
+  --bg-app: #F5F5F4;          /* Warm Stone 100 - zero eye-strain background */
+  --bg-surface: #FFFFFF;      /* Crisp White cards & panels */
+  --bg-subtle: #EAE8E3;       /* Soft warm divider / muted panel */
+  --border-subtle: #E7E5E4;   /* Clean subtle border */
+  --text-primary: #1C1917;    /* Charcoal - crisp & easy to read */
+  --text-secondary: #57534E;  /* Warm Stone gray */
+  --accent-primary: #0F766E;  /* Deep Teal */
+  --accent-primary-hover: #115E59;
+  --badge-pending-bg: #FEF3C7;
+  --badge-pending-text: #B45309;
+  --badge-ready-bg: #CCFBF1;
+  --badge-ready-text: #0F766E;
+}
+
+[data-theme="midnight-emerald"] {
+  --bg-app: #0B1120;
+  --bg-surface: #111827;
+  --bg-subtle: #1E293B;
+  --border-subtle: #1F2937;
+  --text-primary: #F9FAFB;
+  --text-secondary: #9CA3AF;
+  --accent-primary: #10B981;
+  --accent-primary-hover: #059669;
+  --badge-pending-bg: rgba(245, 158, 11, 0.16);
+  --badge-pending-text: #FBBF24;
+  --badge-ready-bg: rgba(16, 185, 129, 0.16);
+  --badge-ready-text: #34D399;
+}
+
 @layer base {
   body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
 
@@ -12,45 +46,51 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Custom dark scrollbar */
+  /* Theme-aware scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #090d16;
+    background: var(--bg-app);
   }
   ::-webkit-scrollbar-thumb {
-    background: #1e293b;
+    background: var(--border-subtle);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: var(--text-secondary);
   }
 }
 
 @layer utilities {
+  .theme-surface {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+  }
+  .theme-subtle {
+    background-color: var(--bg-subtle);
+    border: 1px solid var(--border-subtle);
+  }
+  .theme-badge-pending {
+    background-color: var(--badge-pending-bg);
+    color: var(--badge-pending-text);
+  }
+  .theme-badge-ready {
+    background-color: var(--badge-ready-bg);
+    color: var(--badge-ready-text);
+  }
   .glass-card {
-    background-color: rgba(15, 23, 42, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(51, 65, 85, 0.45);
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
   }
   .glass-card-hover {
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-card-hover:hover {
-    border-color: rgba(147, 51, 234, 0.4);
-    box-shadow: 0 10px 25px -5px rgba(126, 34, 206, 0.12);
-  }
-  .glow-purple {
-    box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.25);
-  }
-  .glow-amber {
-    box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25);
-  }
-  .glow-emerald {
-    box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+    border-color: var(--accent-primary);
+    box-shadow: 0 10px 25px -5px rgba(15, 118, 110, 0.12);
   }
 }
 
@@ -151,4 +191,3 @@
 #wowtek-barcode-scanner-viewport img {
   display: none !important;
 }
-

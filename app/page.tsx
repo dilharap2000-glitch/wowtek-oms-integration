@@ -18,6 +18,8 @@ import {
   Building2,
   MessageSquare,
   Users,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 import {
@@ -98,10 +100,39 @@ import { IntegrationsTab } from '@/src/components/IntegrationsTab';
 import { SuppliersTab } from '@/src/components/SuppliersTab';
 import { SMSMarketingTab } from '@/src/components/SMSMarketingTab';
 import { CreditCustomersTab } from '@/src/components/CreditCustomersTab';
+import {
+  ThemeSwitcher,
+  applyThemeMode,
+  readStoredTheme,
+  type ThemeMode,
+} from '@/src/components/ThemeSwitcher';
 
 export default function WowtekProApp() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>('warm-daylight');
+
+  useEffect(() => {
+    const initial = readStoredTheme();
+    setTheme(initial);
+    document.documentElement.setAttribute('data-theme', initial);
+    document.documentElement.classList.toggle('dark', initial === 'midnight-emerald');
+
+    const handleThemeEvent = (event: Event) => {
+      const next = (event as CustomEvent<ThemeMode>).detail;
+      if (next === 'warm-daylight' || next === 'midnight-emerald') {
+        setTheme(next);
+      }
+    };
+
+    window.addEventListener('wowtek-theme-change', handleThemeEvent);
+    return () => window.removeEventListener('wowtek-theme-change', handleThemeEvent);
+  }, []);
+
+  const handleSetTheme = (nextTheme: ThemeMode) => {
+    setTheme(nextTheme);
+    applyThemeMode(nextTheme);
+  };
 
   // Core Data States
   const [orders, setOrders] = useState<Order[]>([]);
@@ -300,14 +331,26 @@ export default function WowtekProApp() {
     };
   }, []);
 
-  // Periodic Fast Live Polling from Server API (/api/sync/live every 2s)
-  // Ensures incoming WooCommerce Webhook events update dashboard seamlessly
+  // Periodic Live Polling from Server API (/api/sync/live every 15s with 429 backoff)
+  // Ensures incoming Webhook events stay synced while avoiding proxy rate limits
   useEffect(() => {
+    let isSyncing = false;
+    let rateLimitUntil = 0;
+
     const syncServerData = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (Date.now() < rateLimitUntil || isSyncing) return;
+      isSyncing = true;
+
       try {
         const start = Date.now();
         const res = await fetch('/api/sync/live', { cache: 'no-store' });
-        if (res.ok) {
+        if (res.status === 429) {
+          rateLimitUntil = Date.now() + 30_000;
+          return;
+        }
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
           const latency = Date.now() - start;
 
@@ -345,10 +388,12 @@ export default function WowtekProApp() {
         }
       } catch {
         // Keep current state
+      } finally {
+        isSyncing = false;
       }
     };
 
-    const intervalId = setInterval(syncServerData, 6000);
+    const intervalId = setInterval(syncServerData, 15000);
 
     // Also listen for BroadcastChannel updates if available
     let channel: BroadcastChannel | null = null;
@@ -356,7 +401,7 @@ export default function WowtekProApp() {
       try {
         channel = new BroadcastChannel('wowtek_live_sync');
         channel.onmessage = () => {
-          syncServerData();
+          void syncServerData();
         };
       } catch {
         // Ignore
@@ -751,60 +796,62 @@ export default function WowtekProApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-purple-500/30 selection:text-purple-200">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col antialiased transition-colors duration-200 selection:bg-[var(--accent-primary)]/20">
       {/* Top Bar Contract: 3 zones */}
-      <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between shadow-sm">
+      <header className="h-16 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-xl sticky top-0 z-40 px-4 lg:px-8 flex items-center justify-between shadow-sm">
         {/* Zone 1: Brand Wordmark */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 lg:hidden transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] lg:hidden transition-colors"
             aria-label="Toggle navigation"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          {/* Brand / Logo Section with subtle gradient accent & ring */}
+          {/* Brand / Logo Section */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-bold flex items-center justify-center shadow-lg shadow-purple-950/50 ring-1 ring-white/20">
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent-primary)] text-white font-bold flex items-center justify-center shadow-sm">
               W
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-wide text-white leading-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+              <h1 className="text-lg font-bold tracking-wide text-[var(--text-primary)] leading-tight whitespace-nowrap shrink-0">
                 WOWTEK
               </h1>
-              <p className="text-[11px] text-slate-400 font-medium">Order Management System</p>
+              <p className="text-[11px] text-[var(--text-secondary)] font-medium">Order Management System</p>
             </div>
           </div>
         </div>
 
         {/* Zone 2: Navigation Breadcrumb */}
-        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
-          <span className="text-slate-400">Enterprise</span>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
-          <span className="text-purple-300 font-semibold capitalize bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+        <div className="hidden md:flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <span>Enterprise</span>
+          <ChevronRight className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+          <span className="font-semibold capitalize bg-[var(--bg-subtle)] text-[var(--accent-primary)] px-2.5 py-0.5 rounded-md border border-[var(--border-subtle)] whitespace-nowrap">
             {navItems.find((n) => n.id === activeTab)?.label}
           </span>
         </div>
 
-        {/* Zone 3: Database & Actions */}
+        {/* Zone 3: Theme Switcher, Database & Hub Info */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800/80 backdrop-blur-md text-xs shadow-inner">
+          <ThemeSwitcher />
+
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-xs">
             <span
               className={`w-2 h-2 rounded-full ${
-                dbHealth.status === 'connected' ? 'bg-emerald-400 ring-2 ring-emerald-500/30 animate-pulse' : 'bg-amber-400 ring-2 ring-amber-500/30'
+                dbHealth.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
               }`}
             />
-            <span className="font-mono text-slate-300 text-[11px]">
+            <span className="font-mono text-[var(--text-primary)] text-[11px] whitespace-nowrap">
               {dbHealth.status === 'connected'
                 ? 'MongoDB Atlas Connected (Live)'
                 : 'Mock DB Fallback (Offline)'}
             </span>
           </div>
 
-          <div className="text-right hidden sm:block">
-            <div className="text-xs font-semibold text-white">Colombo Hub</div>
-            <div className="text-[10px] text-slate-400 font-mono">LKR Sri Lanka</div>
+          <div className="text-right hidden sm:block shrink-0">
+            <div className="text-xs font-semibold text-[var(--text-primary)] whitespace-nowrap">Colombo Hub</div>
+            <div className="text-[10px] text-[var(--text-secondary)] font-mono">LKR Sri Lanka</div>
           </div>
         </div>
       </header>
@@ -813,24 +860,24 @@ export default function WowtekProApp() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Nav */}
         <aside
-          className={`fixed inset-y-0 left-0 z-30 w-64 bg-slate-950/95 backdrop-blur-xl border-r border-slate-800/80 transition-transform duration-200 lg:static lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 w-64 bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] transition-transform duration-200 lg:static lg:translate-x-0 ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } flex flex-col justify-between`}
         >
           <div>
             {/* Brand / Logo Section in Sidebar (Mobile View) */}
-            <div className="flex items-center space-x-3 px-6 py-5 border-b border-slate-800/80 lg:hidden">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white font-bold flex items-center justify-center shadow-lg shadow-purple-950/50 ring-1 ring-white/20">
+            <div className="flex items-center space-x-3 px-6 py-5 border-b border-[var(--border-subtle)] lg:hidden">
+              <div className="w-9 h-9 rounded-xl bg-[var(--accent-primary)] text-white font-bold flex items-center justify-center shadow-sm">
                 W
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-wide text-white">WOWTEK</h1>
-                <p className="text-xs text-slate-400">Order Management System</p>
+                <h1 className="text-lg font-bold tracking-wide text-[var(--text-primary)]">WOWTEK</h1>
+                <p className="text-xs text-[var(--text-secondary)]">Order Management System</p>
               </div>
             </div>
 
             <div className="p-4 space-y-1">
-              <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              <div className="px-3 py-2 text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                 Management Modules
               </div>
 
@@ -846,20 +893,20 @@ export default function WowtekProApp() {
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
                     isActive
-                      ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-purple-950/50 border border-purple-400/30'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+                      ? 'bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                    <span>{item.label}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[var(--text-secondary)]'}`} />
+                    <span className="truncate">{item.label}</span>
                   </div>
                   {item.badge !== undefined && (
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold ${
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold shrink-0 ${
                         isActive
                           ? 'bg-white/20 text-white border border-white/30'
-                          : 'bg-slate-800/80 text-slate-300 border border-slate-700/60'
+                          : 'bg-[var(--bg-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)]'
                       }`}
                     >
                       {item.badge}
@@ -871,25 +918,52 @@ export default function WowtekProApp() {
             </div>
           </div>
 
-          {/* Quick Rates Banner */}
-          <div className="p-4 pt-0">
-            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md text-xs space-y-1 shadow-sm">
-              <div className="flex items-center justify-between text-slate-400 text-[10px]">
-                <span className="font-semibold text-slate-300">ACTIVE FEE RATES</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          {/* Theme Switcher & Quick Rates Banner */}
+          <div className="p-4 pt-0 space-y-3">
+            <div className="p-1 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => handleSetTheme('warm-daylight')}
+                className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  theme === 'warm-daylight'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Daylight</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSetTheme('midnight-emerald')}
+                className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  theme === 'midnight-emerald'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Midnight</span>
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-xs space-y-1">
+              <div className="flex items-center justify-between text-[var(--text-secondary)] text-[10px]">
+                <span className="font-semibold text-[var(--text-primary)]">ACTIVE FEE RATES</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               </div>
-              <div className="text-[11px] text-slate-300 font-mono">
+              <div className="text-[11px] text-[var(--text-primary)] font-mono">
                 PickMe: {platforms.find((p) => p.code === 'pickme')?.feePercent ?? 20}% · Uber: {platforms.find((p) => p.code === 'ubereats')?.feePercent ?? 15.4}%
               </div>
-              <div className="text-[10px] text-slate-400 font-mono">
+              <div className="text-[10px] text-[var(--text-secondary)] font-mono">
                 Payzy/Koko/Mintpay: 12% · Cash: 0%
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Content Viewport with subtle gradient ambiance */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.1),rgba(2,6,23,0))]">
+        {/* Content Viewport */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[var(--bg-app)] transition-colors duration-200">
           <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && (
               <DashboardTab

@@ -150,19 +150,19 @@ export function AddProductGRNForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-slate-900 text-white p-6 rounded-2xl max-w-xl mx-auto space-y-4 border border-slate-800 shadow-2xl relative"
+      className="bg-[var(--bg-surface)] text-[var(--text-primary)] p-6 rounded-2xl max-w-xl mx-auto space-y-4 border border-[var(--border-subtle)] shadow-2xl relative"
     >
-      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300">
+            <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 dark:from-purple-400 dark:via-pink-400 dark:to-indigo-300">
               Add New Product &amp; GRN Inward
             </h2>
-            <span className="text-[10px] font-mono font-bold bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
+            <span className="text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 px-2 py-0.5 rounded-full border dark:border-purple-500/30">
               Store Shelf
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
             Strict Serial &amp; IMEI Tracking · Anti-duplicate verification · Direct store stock
           </p>
         </div>
@@ -170,7 +170,7 @@ export function AddProductGRNForm({
           <button
             type="button"
             onClick={onCancel}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-subtle)] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -179,17 +179,17 @@ export function AddProductGRNForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-semibold text-slate-300">SKU Code</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">SKU Code</label>
           <input
             type="text"
             value={formData.skuCode}
             onChange={(e) => setFormData({ ...formData, skuCode: e.target.value.toUpperCase() })}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white font-mono uppercase focus:border-purple-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono uppercase focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
         </div>
         <div>
-          <label className="text-xs font-semibold text-slate-300">Category</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">Category</label>
           <select
             value={formData.category}
             onChange={(e) => {
@@ -200,34 +200,34 @@ export function AddProductGRNForm({
                 setIsSerialized(true);
               }
             }}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white focus:border-purple-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none text-xs"
           >
             <option value="Electronics">Electronics</option>
-            <option value="Audio & Gadgets">Audio & Gadgets</option>
+            <option value="Audio & Gadgets">Audio &amp; Gadgets</option>
             <option value="Computer Parts">Computer Parts</option>
             <option value="Computer Components">Computer Components</option>
             <option value="Peripherals">Peripherals</option>
             <option value="Mobile Accessories">Mobile Accessories</option>
-            <option value="Networking & Storage">Networking & Storage</option>
+            <option value="Networking & Storage">Networking &amp; Storage</option>
           </select>
         </div>
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-300">Product Title</label>
+        <label className="text-xs font-semibold text-[var(--text-primary)]">Product Title</label>
         <input
           type="text"
           placeholder="e.g. Baseus Metal Gleam 8-in-1 USB-C Hub"
           value={formData.productTitle}
           onChange={(e) => setFormData({ ...formData, productTitle: e.target.value })}
-          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white focus:border-purple-500 focus:outline-none text-xs"
+          className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:border-[var(--accent-primary)] focus:outline-none text-xs"
           required
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-semibold text-slate-300">Cost Price (LKR COGS)</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">Cost Price (LKR COGS)</label>
           <input
             type="number"
             min="0"
@@ -236,12 +236,12 @@ export function AddProductGRNForm({
               setFormData({ ...formData, costPrice: Math.max(0, Number(e.target.value) || 0) })
             }
             placeholder="0"
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-purple-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
         </div>
         <div>
-          <label className="text-xs font-semibold text-slate-300">Selling Price (LKR Retail)</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">Selling Price (LKR Retail)</label>
           <input
             type="number"
             min="0"
@@ -250,7 +250,7 @@ export function AddProductGRNForm({
               setFormData({ ...formData, sellingPrice: Math.max(0, Number(e.target.value) || 0) })
             }
             placeholder="0"
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-purple-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
         </div>
@@ -258,7 +258,7 @@ export function AddProductGRNForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-semibold text-purple-300">Store Stock Quantity</label>
+          <label className="text-xs font-semibold text-purple-700 dark:text-purple-300">Store Stock Quantity</label>
           <input
             type="number"
             min="1"
@@ -268,13 +268,13 @@ export function AddProductGRNForm({
               setFormData({ ...formData, stockQuantity: val });
             }}
             placeholder="1"
-            className="w-full bg-slate-950 border border-purple-500/50 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-purple-400 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-purple-300 dark:border-purple-500/50 rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
-          <p className="text-[10px] text-slate-400 mt-1">Units added directly to store shelf</p>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-1">Units added directly to store shelf</p>
         </div>
         <div>
-          <label className="text-xs font-semibold text-slate-300">Warranty (Months)</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">Warranty (Months)</label>
           <input
             type="number"
             min="0"
@@ -283,18 +283,18 @@ export function AddProductGRNForm({
               setFormData({ ...formData, warrantyMonths: Math.max(0, Number(e.target.value) || 0) })
             }
             placeholder="12"
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-purple-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
           />
-          <p className="text-[10px] text-slate-400 mt-1">Official WOWTEK warranty period</p>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-1">Official WOWTEK warranty period</p>
         </div>
       </div>
 
       {/* STRICT SERIAL & IMEI TRACKING SECTION */}
-      <div className="p-4 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-3">
+      <div className="p-4 rounded-xl bg-[var(--bg-app)] border border-purple-200 dark:border-purple-500/30 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-purple-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
               Strict Serial Number &amp; IMEI Enforcement
             </span>
           </div>
@@ -303,22 +303,22 @@ export function AddProductGRNForm({
               type="checkbox"
               checked={isSerialized}
               onChange={(e) => setIsSerialized(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-purple-600 focus:ring-0 cursor-pointer"
+              className="rounded border-[var(--border-subtle)] text-purple-600 focus:ring-0 cursor-pointer"
             />
-            <span className="text-slate-300 text-[11px]">Require Unique S/N per unit</span>
+            <span className="text-[var(--text-primary)] text-[11px]">Require Unique S/N per unit</span>
           </label>
         </div>
 
         {isSerialized ? (
           <div className="space-y-2.5">
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-[var(--text-secondary)]">
               Each unit requires a unique Serial Number / IMEI. Scan with USB/Bluetooth scanner or enter below (Press Enter or comma to add).
             </p>
 
             {/* Quick Barcode / Serial Scan Input */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Barcode className="w-4 h-4 text-purple-400 absolute left-3 top-3" />
+                <Barcode className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   value={currentSerialInput}
@@ -333,7 +333,7 @@ export function AddProductGRNForm({
                     }
                   }}
                   placeholder="Scan S/N barcode or type IMEI & press Enter..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-purple-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--bg-surface)] border border-purple-300 dark:border-purple-500/40 rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
               <button
@@ -348,15 +348,15 @@ export function AddProductGRNForm({
 
             {/* Status counter pill */}
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">
-                Scanned: <strong className="text-white">{scannedSerials.length}</strong> / {formData.stockQuantity} required
+              <span className="text-[var(--text-secondary)]">
+                Scanned: <strong className="text-[var(--text-primary)]">{scannedSerials.length}</strong> / {formData.stockQuantity} required
               </span>
               {remainingNeeded === 0 ? (
-                <span className="text-emerald-300 flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="text-[var(--badge-ready-text)] flex items-center gap-1 text-[11px] font-semibold bg-[var(--badge-ready-bg)] px-2 py-0.5 rounded-full border border-teal-200 dark:border-emerald-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5" /> All Units Tracked
                 </span>
               ) : (
-                <span className="text-amber-300 flex items-center gap-1 text-[11px] font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                <span className="text-[var(--badge-pending-text)] flex items-center gap-1 text-[11px] font-semibold bg-[var(--badge-pending-bg)] px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-500/20">
                   <AlertCircle className="w-3.5 h-3.5" /> {remainingNeeded} more S/N needed
                 </span>
               )}
@@ -364,18 +364,18 @@ export function AddProductGRNForm({
 
             {/* Scanned Serials Chips List */}
             {scannedSerials.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-slate-900 rounded-xl border border-slate-800">
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-2 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                 {scannedSerials.map((sn, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-purple-500/15 text-purple-200 border border-purple-500/30"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:text-purple-200 dark:border-purple-500/30"
                   >
-                    <Hash className="w-3 h-3 text-purple-400" />
+                    <Hash className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                     <span>{sn}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveSerial(idx)}
-                      className="text-slate-400 hover:text-rose-400 ml-0.5 cursor-pointer"
+                      className="text-[var(--text-secondary)] hover:text-rose-500 ml-0.5 cursor-pointer"
                       title="Remove serial"
                     >
                       <X className="w-3 h-3" />
@@ -386,25 +386,25 @@ export function AddProductGRNForm({
             )}
           </div>
         ) : (
-          <p className="text-[11px] text-slate-500 italic">
+          <p className="text-[11px] text-[var(--text-secondary)] italic">
             Serialized tracking disabled. Items will be counted as bulk units. (Recommended only for generic cables or stickers).
           </p>
         )}
 
         {serialError && (
-          <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2 animate-fadeIn">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-500/50 text-rose-700 dark:text-rose-200 text-xs flex items-start gap-2 animate-fadeIn">
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
             <span>{serialError}</span>
           </div>
         )}
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-300">Primary Supplier</label>
+        <label className="text-xs font-semibold text-[var(--text-primary)]">Primary Supplier</label>
         <select
           value={formData.supplier}
           onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white focus:border-purple-500 focus:outline-none text-xs"
+          className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none text-xs"
         >
           {defaultSuppliers.map((sup, idx) => (
             <option key={idx} value={sup.name}>
@@ -419,14 +419,14 @@ export function AddProductGRNForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl transition-colors text-xs cursor-pointer"
+            className="flex-1 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] font-semibold py-2.5 rounded-xl transition-colors text-xs cursor-pointer"
           >
             Cancel
           </button>
         )}
         <button
           type="submit"
-          className="flex-1 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white font-bold py-2.5 rounded-xl hover:opacity-95 transition-opacity text-xs shadow-md shadow-purple-950/50 cursor-pointer"
+          className="flex-1 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white font-bold py-2.5 rounded-xl hover:opacity-95 transition-opacity text-xs shadow-sm cursor-pointer"
         >
           Confirm GRN Receipt &amp; Register Serials
         </button>
@@ -585,14 +585,14 @@ export function RestockGRNForm({
   return (
     <form
       onSubmit={handleRestockSubmit}
-      className="bg-slate-900 text-white p-6 rounded-2xl max-w-xl mx-auto space-y-4 border border-slate-800 shadow-2xl relative"
+      className="bg-[var(--bg-surface)] text-[var(--text-primary)] p-6 rounded-2xl max-w-xl mx-auto space-y-4 border border-[var(--border-subtle)] shadow-2xl relative"
     >
-      <div className="flex justify-between items-center border-b border-slate-800/80 pb-3">
+      <div className="flex justify-between items-center border-b border-[var(--border-subtle)] pb-3">
         <div>
-          <h2 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
             <span>Inward GRN Restock &amp; Serial Verification</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
             Store shelf inventory increment · Auto-deducts pending backlog orders
           </p>
         </div>
@@ -600,34 +600,34 @@ export function RestockGRNForm({
           <button
             type="button"
             onClick={onCancel}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-subtle)] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-1">
+      <div className="bg-[var(--bg-app)] p-3 rounded-xl border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] space-y-1">
         <p>
-          <strong className="text-white">Product:</strong>{' '}
+          <strong className="text-[var(--text-primary)]">Product:</strong>{' '}
           {product?.title || product?.productTitle || product?.name || 'Item'}
         </p>
         <p>
-          <strong className="text-white">SKU:</strong> {product?.sku || product?.skuCode}{' '}
-          <span className="text-slate-600">|</span>{' '}
-          <span className="text-emerald-400 font-semibold">Current Store Stock: {currentStoreHeld}</span>
+          <strong className="text-[var(--text-primary)]">SKU:</strong> {product?.sku || product?.skuCode}{' '}
+          <span className="text-[var(--border-subtle)]">|</span>{' '}
+          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Current Store Stock: {currentStoreHeld}</span>
         </p>
       </div>
 
       {pendingWaitingCount > 0 && (
-        <div className="p-3 bg-amber-950/70 border border-amber-600/70 rounded-xl text-xs text-amber-200 space-y-1">
-          <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        <div className="p-3 bg-[var(--badge-pending-bg)] border border-amber-300 dark:border-amber-600/70 rounded-xl text-xs text-[var(--badge-pending-text)] space-y-1">
+          <div className="flex items-center gap-1.5 font-semibold">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
               {pendingWaitingCount} Pending Backlog Order(s) Waiting ({pendingNeededUnits} pcs needed)
             </span>
           </div>
-          <p className="text-[11px] text-amber-300/80">
+          <p className="text-[11px] opacity-90">
             Upon confirming GRN, required stock will be auto-deducted, warnings cleared, and verified Net Operating Profit calculated in real time.
           </p>
         </div>
@@ -635,7 +635,7 @@ export function RestockGRNForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs font-semibold text-emerald-400">Store Restock Quantity</label>
+          <label className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Store Restock Quantity</label>
           <input
             type="number"
             min="1"
@@ -644,31 +644,31 @@ export function RestockGRNForm({
               const val = Math.max(1, Number(e.target.value) || 1);
               setRestockQty(val);
             }}
-            className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-emerald-400 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-emerald-300 dark:border-emerald-500/50 rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
-          <p className="text-[10px] text-slate-400 mt-1">Increments storeStock directly</p>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-1">Increments storeStock directly</p>
         </div>
         <div>
-          <label className="text-xs font-semibold text-slate-300">Landed Cost Price (COGS)</label>
+          <label className="text-xs font-semibold text-[var(--text-primary)]">Landed Cost Price (COGS)</label>
           <input
             type="number"
             min="0"
             value={costPrice}
             onChange={(e) => setCostPrice(Number(e.target.value))}
-            className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white font-mono focus:border-emerald-500 focus:outline-none text-xs"
+            className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none text-xs"
             required
           />
-          <p className="text-[10px] text-slate-400 mt-1">Used for verified profit calculation</p>
+          <p className="text-[10px] text-[var(--text-secondary)] mt-1">Used for verified profit calculation</p>
         </div>
       </div>
 
       {/* STRICT SERIAL SCANNING FOR RESTOCK */}
-      <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-500/30 space-y-3">
+      <div className="p-4 rounded-xl bg-[var(--bg-app)] border border-emerald-200 dark:border-emerald-500/30 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
               Scan Restock Serial Numbers &amp; IMEIs
             </span>
           </div>
@@ -677,9 +677,9 @@ export function RestockGRNForm({
               type="checkbox"
               checked={isSerialized}
               onChange={(e) => setIsSerialized(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-emerald-600 focus:ring-0 cursor-pointer"
+              className="rounded border-[var(--border-subtle)] text-emerald-600 focus:ring-0 cursor-pointer"
             />
-            <span className="text-slate-300 text-[11px]">Serialized Unit</span>
+            <span className="text-[var(--text-primary)] text-[11px]">Serialized Unit</span>
           </label>
         </div>
 
@@ -687,7 +687,7 @@ export function RestockGRNForm({
           <div className="space-y-2.5">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Barcode className="w-4 h-4 text-emerald-400 absolute left-3 top-3" />
+                <Barcode className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   value={currentSerialInput}
@@ -699,7 +699,7 @@ export function RestockGRNForm({
                     }
                   }}
                   placeholder="Scan serial barcode or type S/N & press Enter..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-emerald-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--bg-surface)] border border-emerald-300 dark:border-emerald-500/40 rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
               <button
@@ -713,33 +713,33 @@ export function RestockGRNForm({
             </div>
 
             <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">
-                Scanned: <strong className="text-white">{scannedSerials.length}</strong> / {restockQty} units
+              <span className="text-[var(--text-secondary)]">
+                Scanned: <strong className="text-[var(--text-primary)]">{scannedSerials.length}</strong> / {restockQty} units
               </span>
               {remainingNeeded === 0 ? (
-                <span className="text-emerald-300 flex items-center gap-1 text-[11px] font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="text-[var(--badge-ready-text)] flex items-center gap-1 text-[11px] font-semibold bg-[var(--badge-ready-bg)] px-2 py-0.5 rounded-full border border-teal-200 dark:border-emerald-500/20">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Ready to restock
                 </span>
               ) : (
-                <span className="text-amber-300 flex items-center gap-1 text-[11px] font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                <span className="text-[var(--badge-pending-text)] flex items-center gap-1 text-[11px] font-semibold bg-[var(--badge-pending-bg)] px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-500/20">
                   <AlertCircle className="w-3.5 h-3.5" /> {remainingNeeded} serial(s) remaining
                 </span>
               )}
             </div>
 
             {scannedSerials.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-slate-900 rounded-xl border border-slate-800">
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)]">
                 {scannedSerials.map((sn, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-200 border border-emerald-500/30"
+                    className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/30"
                   >
-                    <Hash className="w-3 h-3 text-emerald-400" />
+                    <Hash className="w-3 h-3" />
                     <span>{sn}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveSerial(idx)}
-                      className="text-slate-400 hover:text-rose-400 ml-0.5 cursor-pointer"
+                      className="text-[var(--text-secondary)] hover:text-rose-500 ml-0.5 cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -749,25 +749,25 @@ export function RestockGRNForm({
             )}
           </div>
         ) : (
-          <p className="text-[11px] text-slate-500 italic">
+          <p className="text-[11px] text-[var(--text-secondary)] italic">
             Non-serialized item. Stock count will be added in bulk without individual tracking.
           </p>
         )}
 
         {serialError && (
-          <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-500/50 text-rose-700 dark:text-rose-200 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
             <span>{serialError}</span>
           </div>
         )}
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-300">Supplier / Source</label>
+        <label className="text-xs font-semibold text-[var(--text-primary)]">Supplier / Source</label>
         <select
           value={selectedSupplier}
           onChange={(e) => setSelectedSupplier(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 mt-1 text-white focus:border-emerald-500 focus:outline-none text-xs"
+          className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 mt-1 text-[var(--text-primary)] focus:border-[var(--accent-primary)] focus:outline-none text-xs"
         >
           {defaultSuppliers.map((sup, idx) => (
             <option key={idx} value={sup.name}>
@@ -777,7 +777,7 @@ export function RestockGRNForm({
         </select>
       </div>
 
-      <div className="bg-purple-950/40 border border-purple-800/80 p-3 rounded-xl text-xs text-purple-300">
+      <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 p-3 rounded-xl text-xs text-purple-800 dark:text-purple-300">
         ⚡ <strong>Auto-Deduction Engine:</strong> Any pending orders waiting for {product?.sku || 'this SKU'} will automatically have stock deducted, accurate COGS and Net Operating Profit computed, and be moved to active status!
       </div>
 
@@ -786,14 +786,14 @@ export function RestockGRNForm({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl transition-colors text-xs cursor-pointer"
+            className="flex-1 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] font-semibold py-2.5 rounded-xl transition-colors text-xs cursor-pointer"
           >
             Cancel
           </button>
         )}
         <button
           type="submit"
-          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold py-2.5 rounded-xl transition-all text-xs shadow-md shadow-emerald-950/50 cursor-pointer"
+          className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 text-white font-bold py-2.5 rounded-xl transition-all text-xs shadow-sm cursor-pointer"
         >
           Confirm Inward GRN Restock
         </button>

@@ -350,28 +350,28 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-2xl backdrop-blur-md animate-fadeIn ${
+          className={`p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-lg animate-fadeIn ${
             toastMessage.type === 'success'
-              ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200 glow-emerald'
-              : 'bg-rose-950/80 border-rose-500/60 text-rose-200'
+              ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-500/60 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-500/60 text-rose-800 dark:text-rose-200'
           }`}
         >
           <div className="flex items-center gap-2">
             {toastMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
             )}
             <span>{toastMessage.text}</span>
           </div>
           <button
             type="button"
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white ml-3 underline text-[11px] cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] ml-3 underline text-[11px] cursor-pointer"
           >
             Dismiss
           </button>
@@ -379,24 +379,22 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
       )}
 
       {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/70 border border-slate-800/80 backdrop-blur-md rounded-2xl p-5 shadow-xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-gradient-to-br from-amber-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
-        
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm relative overflow-hidden">
         <div className="relative">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/25 glow-amber shadow-inner">
+            <div className="p-3 rounded-2xl bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-amber-200 dark:border-amber-500/25 shadow-sm">
               <Users className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-bold text-white tracking-tight">
+                <h2 className="text-base font-bold text-[var(--text-primary)] tracking-tight">
                   Credit Customers &amp; Accounts Receivable
                 </h2>
-                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-mono border border-amber-500/30">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] font-mono border border-amber-200 dark:border-amber-500/30">
                   ණය පාරිභෝගික කළමනාකරණය
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 Monitor unsettled credit sales, partial advance splits, installment tracking, and automated SMS collections.
               </p>
             </div>
@@ -408,9 +406,9 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
             <button
               type="button"
               onClick={() => onNavigateTab('pos')}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-purple-950/40 border border-purple-400/20 transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold shadow-sm border border-purple-400/20 transition-all duration-200 flex items-center gap-1.5 cursor-pointer active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5 text-purple-200" />
+              <Plus className="w-3.5 h-3.5 text-purple-100" />
               <span>New POS Credit Sale</span>
             </button>
           )}
@@ -420,90 +418,90 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
       {/* Financial KPI Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* Total Outstanding Due */}
-        <div className="p-4 bg-slate-900/70 border border-amber-500/30 glow-amber backdrop-blur-md rounded-2xl shadow-xl transition-all hover:border-amber-500/50">
+        <div className="p-4 bg-[var(--bg-surface)] border border-amber-300 dark:border-amber-500/30 rounded-2xl shadow-sm transition-all hover:border-amber-400 dark:hover:border-amber-500/50">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Outstanding</span>
-            <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">Total Outstanding</span>
+            <div className="p-1.5 rounded-xl bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-amber-200 dark:border-amber-500/20">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5">
-            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-amber-400">
+            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">
               Rs. {kpis.totalBalanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
               Unsettled accounts receivable
             </div>
           </div>
         </div>
 
         {/* Overdue Balances */}
-        <div className="p-4 bg-slate-900/70 border border-rose-500/30 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:border-rose-500/50">
+        <div className="p-4 bg-[var(--bg-surface)] border border-rose-300 dark:border-rose-500/30 rounded-2xl shadow-sm transition-all hover:border-rose-400 dark:hover:border-rose-500/50">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-medium text-rose-300 uppercase tracking-wider">Overdue Balances</span>
-            <div className="p-1.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+            <span className="text-[11px] font-medium text-rose-700 dark:text-rose-300 uppercase tracking-wider">Overdue Balances</span>
+            <div className="p-1.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5">
-            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-rose-400">
+            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-rose-600 dark:text-rose-400">
               Rs. {kpis.overdueAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-rose-300/80 mt-0.5 font-medium">
+            <div className="text-[10px] text-rose-600 dark:text-rose-300/80 mt-0.5 font-medium">
               {kpis.overdueCount} invoice{kpis.overdueCount !== 1 ? 's' : ''} past due date
             </div>
           </div>
         </div>
 
         {/* Total Settled / Collected */}
-        <div className="p-4 bg-slate-900/70 border border-emerald-500/25 glow-emerald backdrop-blur-md rounded-2xl shadow-xl transition-all hover:border-emerald-500/40">
+        <div className="p-4 bg-[var(--bg-surface)] border border-teal-200 dark:border-emerald-500/25 rounded-2xl shadow-sm transition-all hover:border-teal-400 dark:hover:border-emerald-500/40">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Settled</span>
-            <div className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">Total Settled</span>
+            <div className="p-1.5 rounded-xl bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/20">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5">
-            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-emerald-400">
+            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
               Rs. {kpis.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
               Advances &amp; installment receipts
             </div>
           </div>
         </div>
 
         {/* Total Credit Invoiced */}
-        <div className="p-4 bg-slate-900/70 border border-slate-800/80 backdrop-blur-md rounded-2xl shadow-xl transition-all hover:border-slate-700">
+        <div className="p-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-sm transition-all">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Total Invoiced</span>
-            <div className="p-1.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">Total Invoiced</span>
+            <div className="p-1.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20">
               <FileText className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5">
-            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-white">
+            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
               Rs. {kpis.totalCreditInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
               {allCreditOrders.length} total credit invoice{allCreditOrders.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
 
         {/* Active Debtors */}
-        <div className="p-4 bg-slate-900/70 border border-slate-800/80 backdrop-blur-md rounded-2xl shadow-xl col-span-2 lg:col-span-1 transition-all hover:border-slate-700">
+        <div className="p-4 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-sm col-span-2 lg:col-span-1 transition-all">
           <div className="flex justify-between items-start">
-            <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Active Debtors</span>
-            <div className="p-1.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] uppercase tracking-wider">Active Debtors</span>
+            <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2.5">
-            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-indigo-400">
+            <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-indigo-600 dark:text-indigo-400">
               {kpis.activeCustomerCount}
             </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
               Clients with unpaid balance
             </div>
           </div>
@@ -511,17 +509,17 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
       </div>
 
       {/* View Mode & Filter Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-slate-900/70 border border-slate-800/80 backdrop-blur-md p-3.5 rounded-2xl shadow-xl">
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-3.5 rounded-2xl shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Mode Toggle */}
-          <div className="flex rounded-xl bg-slate-950/80 p-1 border border-slate-800 text-xs">
+          <div className="flex rounded-xl bg-[var(--bg-subtle)] p-1 border border-[var(--border-subtle)] text-xs">
             <button
               type="button"
               onClick={() => setViewMode('customers')}
               className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'customers'
-                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
@@ -532,8 +530,8 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
               onClick={() => setViewMode('invoices')}
               className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 viewMode === 'invoices'
-                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-sm'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Receipt className="w-3.5 h-3.5" />
@@ -542,7 +540,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
           </div>
 
           {/* Status Filter */}
-          <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
+          <div className="flex items-center gap-1 bg-[var(--bg-subtle)] p-1 rounded-xl border border-[var(--border-subtle)] text-xs">
             {(['open', 'overdue', 'all', 'settled'] as const).map((filter) => (
               <button
                 key={filter}
@@ -550,8 +548,8 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                 onClick={() => setStatusFilter(filter)}
                 className={`px-2.5 py-1 rounded-lg capitalize transition-all text-[11px] font-medium cursor-pointer ${
                   statusFilter === filter
-                    ? 'bg-slate-800 text-white font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold shadow-sm'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {filter === 'open'
@@ -568,13 +566,13 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
         {/* Search Bar */}
         <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by customer name, phone, invoice #..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950/80 border border-slate-800 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/30 transition-all font-sans"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/30 transition-all font-sans"
           />
         </div>
       </div>
@@ -583,12 +581,12 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
       {viewMode === 'customers' && (
         <div className="space-y-3">
           {filteredCustomers.length === 0 ? (
-            <div className="py-16 text-center bg-slate-900/70 border border-slate-800/80 backdrop-blur-md rounded-2xl flex flex-col items-center justify-center p-6 shadow-xl">
-              <div className="p-3.5 rounded-2xl bg-slate-800/60 text-slate-500 mb-3 border border-slate-700/50">
+            <div className="py-16 text-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl flex flex-col items-center justify-center p-6 shadow-sm">
+              <div className="p-3.5 rounded-2xl bg-[var(--bg-subtle)] text-[var(--text-secondary)] mb-3 border border-[var(--border-subtle)]">
                 <Users className="w-8 h-8" />
               </div>
-              <h4 className="text-sm font-semibold text-white">No Credit Customers Found</h4>
-              <p className="text-xs text-slate-400 max-w-md mt-1">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">No Credit Customers Found</h4>
+              <p className="text-xs text-[var(--text-secondary)] max-w-md mt-1">
                 {statusFilter === 'overdue'
                   ? 'Great news! No customers currently have overdue credit balances.'
                   : 'No customer matches your search criteria or no credit sales have been recorded yet.'}
@@ -602,24 +600,24 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
               return (
                 <div
                   key={customerKey}
-                  className={`bg-slate-900/70 border rounded-2xl transition-all duration-200 backdrop-blur-md shadow-xl ${
+                  className={`bg-[var(--bg-surface)] border rounded-2xl transition-all duration-200 shadow-sm ${
                     cust.isOverdue
-                      ? 'border-rose-500/40 hover:border-rose-500/60'
+                      ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-400 dark:hover:border-rose-500/60'
                       : cust.totalBalanceDue > 0
-                      ? 'border-amber-500/30 hover:border-amber-500/50'
-                      : 'border-slate-800/80 hover:border-slate-700/80'
+                      ? 'border-amber-300 dark:border-amber-500/30 hover:border-amber-400 dark:hover:border-amber-500/50'
+                      : 'border-[var(--border-subtle)]'
                   }`}
                 >
                   {/* Customer Summary Bar */}
                   <div className="p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
                     <div className="flex items-start gap-3">
                       <div
-                        className={`p-2.5 rounded-xl font-bold font-mono text-sm shrink-0 ${
+                        className={`p-2.5 rounded-xl font-bold font-mono text-sm shrink-0 border ${
                           cust.isOverdue
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            ? 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
                             : cust.totalBalanceDue > 0
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            ? 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border-amber-200 dark:border-amber-500/30'
+                            : 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border-teal-200 dark:border-emerald-500/30'
                         }`}
                       >
                         {cust.customerName.slice(0, 2).toUpperCase()}
@@ -627,32 +625,32 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-bold text-white tracking-tight">{cust.customerName}</h3>
+                          <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">{cust.customerName}</h3>
                           {cust.isOverdue && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/40 animate-pulse">
                               OVERDUE
                             </span>
                           )}
                           {cust.totalBalanceDue <= 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/40">
                               SETTLED
                             </span>
                           )}
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-950/80 text-slate-400 font-mono border border-slate-800">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-subtle)] text-[var(--text-secondary)] font-mono border border-[var(--border-subtle)]">
                             {cust.totalOrders} Credit Invoice{cust.totalOrders !== 1 ? 's' : ''}
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400 font-mono">
+                        <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-[var(--text-secondary)] font-mono">
                           {cust.customerPhone && (
-                            <span className="flex items-center gap-1 text-purple-400">
+                            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
                               <Phone className="w-3 h-3" />
                               {cust.customerPhone}
                             </span>
                           )}
                           {cust.earliestDueDate && (
-                            <span className="flex items-center gap-1 text-slate-300">
-                              <Calendar className="w-3 h-3 text-slate-400" />
+                            <span className="flex items-center gap-1 text-[var(--text-secondary)]">
+                              <Calendar className="w-3 h-3" />
                               Due:{' '}
                               {new Date(cust.earliestDueDate).toLocaleDateString('en-GB', {
                                 day: '2-digit',
@@ -666,31 +664,31 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                     </div>
 
                     {/* Financial Figures & Action Buttons */}
-                    <div className="flex flex-wrap items-center justify-between lg:justify-end gap-4 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-800/80">
+                    <div className="flex flex-wrap items-center justify-between lg:justify-end gap-4 w-full lg:w-auto pt-3 lg:pt-0 border-t lg:border-t-0 border-[var(--border-subtle)]">
                       <div className="flex items-center gap-4 text-xs font-mono tabular-nums">
                         <div className="text-left lg:text-right">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Total Invoiced</div>
-                          <div className="text-slate-200 font-semibold">
+                          <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Total Invoiced</div>
+                          <div className="text-[var(--text-primary)] font-semibold">
                             Rs. {cust.totalCreditAmount.toLocaleString()}
                           </div>
                         </div>
 
                         <div className="text-left lg:text-right">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Paid / Advances</div>
-                          <div className="text-emerald-400 font-semibold">
+                          <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Paid / Advances</div>
+                          <div className="text-emerald-600 dark:text-emerald-400 font-semibold">
                             Rs. {cust.totalPaidAmount.toLocaleString()}
                           </div>
                         </div>
 
-                        <div className="text-left lg:text-right bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800/90 shadow-inner">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">Balance Due</div>
+                        <div className="text-left lg:text-right bg-[var(--bg-subtle)] px-3 py-1.5 rounded-xl border border-[var(--border-subtle)]">
+                          <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">Balance Due</div>
                           <div
                             className={`text-sm font-bold ${
                               cust.isOverdue
-                                ? 'text-rose-400'
+                                ? 'text-rose-600 dark:text-rose-400'
                                 : cust.totalBalanceDue > 0
-                                ? 'text-amber-400'
-                                : 'text-emerald-400'
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
                             }`}
                           >
                             Rs. {cust.totalBalanceDue.toLocaleString()}
@@ -703,7 +701,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenPaymentModal(cust.orders[0])}
-                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-950/40 border border-emerald-400/20 cursor-pointer active:scale-95 flex items-center gap-1.5"
+                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-xl text-xs font-bold transition-all shadow-sm border border-emerald-400/20 cursor-pointer active:scale-95 flex items-center gap-1.5"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
                             <span>Record Payment</span>
@@ -715,10 +713,10 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                             type="button"
                             onClick={() => handleSendSmsReminder(cust.orders[0])}
                             disabled={sendingSmsOrderIds[cust.orders[0].id]}
-                            className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-750 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-medium transition-all flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-50"
+                            className="px-2.5 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-xl text-xs font-medium transition-all flex items-center gap-1 cursor-pointer active:scale-95 disabled:opacity-50"
                             title="Send SMS Payment Reminder"
                           >
-                            <Send className="w-3.5 h-3.5 text-purple-400" />
+                            <Send className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                             <span className="hidden sm:inline">SMS</span>
                           </button>
                         )}
@@ -728,7 +726,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                           onClick={() =>
                             setExpandedCustomerKey(isExpanded ? null : customerKey)
                           }
-                          className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700/50 cursor-pointer"
+                          className="p-1.5 rounded-xl bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all border border-[var(--border-subtle)] cursor-pointer"
                           title={isExpanded ? 'Collapse invoices' : 'View customer invoices'}
                         >
                           {isExpanded ? (
@@ -743,8 +741,8 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
                   {/* Expanded Breakdown: Invoices for this customer */}
                   {isExpanded && (
-                    <div className="border-t border-slate-800/80 p-4 bg-slate-950/60 rounded-b-2xl space-y-2.5">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <div className="border-t border-[var(--border-subtle)] p-4 bg-[var(--bg-subtle)]/70 rounded-b-2xl space-y-2.5">
+                      <div className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                         Credit Invoices &amp; Payment History ({cust.orders.length})
                       </div>
 
@@ -762,50 +760,50 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                           return (
                             <div
                               key={ord.id}
-                              className="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs transition-colors hover:border-slate-700/80"
+                              className="p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs transition-colors hover:border-[var(--accent-primary)]/40"
                             >
                               <div className="space-y-0.5">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono font-bold text-purple-400">
+                                  <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
                                     {ord.invoiceNumber}
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-mono">
+                                  <span className="text-[10px] text-[var(--text-secondary)] font-mono">
                                     {new Date(ord.createdAt).toLocaleDateString('en-GB')}
                                   </span>
                                   {oOverdue && (
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/40">
                                       Overdue
                                     </span>
                                   )}
                                   {oBalance <= 0 && (
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/40">
                                       Fully Settled
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] text-slate-400">
+                                <div className="text-[11px] text-[var(--text-secondary)]">
                                   Due Date:{' '}
-                                  <strong className="text-slate-200 font-mono">
+                                  <strong className="text-[var(--text-primary)] font-mono">
                                     {ord.creditDueDate
                                       ? new Date(ord.creditDueDate).toLocaleDateString('en-GB')
                                       : 'Not set'}
                                   </strong>
-                                  {ord.notes && <span className="ml-2 italic text-slate-400">({ord.notes})</span>}
+                                  {ord.notes && <span className="ml-2 italic text-[var(--text-secondary)]">({ord.notes})</span>}
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                                 <div className="font-mono tabular-nums text-right">
-                                  <div className="text-[10px] text-slate-400">
+                                  <div className="text-[10px] text-[var(--text-secondary)]">
                                     Inv: Rs. {oGross.toLocaleString()} | Paid: Rs. {oPaid.toLocaleString()}
                                   </div>
                                   <div
                                     className={`font-bold ${
                                       oOverdue
-                                        ? 'text-rose-400'
+                                        ? 'text-rose-600 dark:text-rose-400'
                                         : oBalance > 0
-                                        ? 'text-amber-400'
-                                        : 'text-emerald-400'
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-emerald-600 dark:text-emerald-400'
                                     }`}
                                   >
                                     Due: Rs. {oBalance.toLocaleString()}
@@ -825,7 +823,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => setSelectedInvoiceForHistory(ord)}
-                                    className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] transition-all cursor-pointer"
                                     title="View Payment Installment History"
                                   >
                                     <History className="w-3.5 h-3.5" />
@@ -833,7 +831,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => setSelectedInvoiceForPrint(ord)}
-                                    className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] transition-all cursor-pointer"
                                     title="View / Print Invoice"
                                   >
                                     <Printer className="w-3.5 h-3.5" />
@@ -855,10 +853,10 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
       {/* VIEW: BY INVOICE TABLE */}
       {viewMode === 'invoices' && (
-        <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl backdrop-blur-md">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 border-b border-slate-800/80 text-slate-400 uppercase font-mono text-[10px] tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3.5 px-4">Invoice #</th>
                   <th className="py-3.5 px-4">Date</th>
@@ -871,10 +869,10 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-sans text-slate-300">
+              <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
                 {filteredInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-14 text-center text-slate-400">
+                    <td colSpan={9} className="py-14 text-center text-[var(--text-secondary)]">
                       No credit invoices found matching your criteria.
                     </td>
                   </tr>
@@ -892,34 +890,34 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                     return (
                       <tr
                         key={inv.id}
-                        className={`hover:bg-slate-800/40 transition-colors duration-150 ${
-                          isOverdue ? 'bg-rose-950/20' : ''
+                        className={`hover:bg-[var(--bg-subtle)]/60 transition-colors duration-150 ${
+                          isOverdue ? 'bg-rose-50 dark:bg-rose-950/20' : ''
                         }`}
                       >
-                        <td className="py-3.5 px-4 font-mono font-bold text-purple-400">
+                        <td className="py-3.5 px-4 font-mono font-bold text-purple-600 dark:text-purple-400">
                           {inv.invoiceNumber}
                         </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">
+                        <td className="py-3.5 px-4 font-mono text-[var(--text-secondary)] text-[11px]">
                           {new Date(inv.createdAt).toLocaleDateString('en-GB')}
                         </td>
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-white">{inv.customerName || 'Customer'}</div>
-                          <div className="text-[10px] font-mono text-slate-400">{inv.customerPhone}</div>
+                          <div className="font-semibold text-[var(--text-primary)]">{inv.customerName || 'Customer'}</div>
+                          <div className="text-[10px] font-mono text-[var(--text-secondary)]">{inv.customerPhone}</div>
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono tabular-nums font-medium text-white">
+                        <td className="py-3.5 px-4 text-right font-mono tabular-nums font-medium text-[var(--text-primary)]">
                           Rs. {gross.toLocaleString()}
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono tabular-nums text-emerald-400">
+                        <td className="py-3.5 px-4 text-right font-mono tabular-nums text-emerald-700 dark:text-emerald-400">
                           Rs. {paid.toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4 text-right font-mono tabular-nums font-bold">
                           <span
                             className={
                               isOverdue
-                                ? 'text-rose-400'
+                                ? 'text-rose-600 dark:text-rose-400'
                                 : balance > 0
-                                ? 'text-amber-400'
-                                : 'text-emerald-400'
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : 'text-emerald-700 dark:text-emerald-400'
                             }
                           >
                             Rs. {balance.toLocaleString()}
@@ -929,27 +927,27 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                           {inv.creditDueDate ? (
                             <span
                               className={
-                                isOverdue ? 'text-rose-300 font-semibold flex items-center gap-1' : 'text-slate-300'
+                                isOverdue ? 'text-rose-600 dark:text-rose-300 font-semibold flex items-center gap-1' : 'text-[var(--text-primary)]'
                               }
                             >
-                              {isOverdue && <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />}
+                              {isOverdue && <AlertTriangle className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0" />}
                               {new Date(inv.creditDueDate).toLocaleDateString('en-GB')}
                             </span>
                           ) : (
-                            <span className="text-slate-400">Not specified</span>
+                            <span className="text-[var(--text-secondary)]">Not specified</span>
                           )}
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           {balance <= 0 || inv.creditSettled ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/40">
                               Settled
                             </span>
                           ) : isOverdue ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/40 animate-pulse">
                               Overdue
                             </span>
                           ) : (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-amber-200 dark:border-amber-500/40">
                               Active Due
                             </span>
                           )}
@@ -973,17 +971,17 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                                 type="button"
                                 onClick={() => handleSendSmsReminder(inv)}
                                 disabled={sendingSmsOrderIds[inv.id]}
-                                className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                                className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-lg transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                                 title="Send SMS Payment Reminder"
                               >
-                                <Send className="w-3.5 h-3.5 text-purple-400" />
+                                <Send className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                               </button>
                             )}
 
                             <button
                               type="button"
                               onClick={() => setSelectedInvoiceForHistory(inv)}
-                              className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 rounded-lg transition-all cursor-pointer active:scale-95"
+                              className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-lg transition-all cursor-pointer active:scale-95"
                               title="Payment History"
                             >
                               <History className="w-3.5 h-3.5" />
@@ -992,7 +990,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                             <button
                               type="button"
                               onClick={() => setSelectedInvoiceForPrint(inv)}
-                              className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/60 rounded-lg transition-all cursor-pointer active:scale-95"
+                              className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-lg transition-all cursor-pointer active:scale-95"
                               title="Print Invoice"
                             >
                               <Printer className="w-3.5 h-3.5" />
@@ -1011,52 +1009,52 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
       {/* RECORD PAYMENT / SETTLEMENT MODAL */}
       {selectedInvoiceForPayment && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900/95 border border-slate-800/90 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 glow-purple">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 glow-emerald">
+                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/25">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">Record Credit Settlement / Payment</h3>
-                  <p className="text-[11px] text-slate-400">
-                    Invoice: <span className="font-mono text-purple-400 font-bold">{selectedInvoiceForPayment.invoiceNumber}</span>
+                  <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">Record Credit Settlement / Payment</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Invoice: <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{selectedInvoiceForPayment.invoiceNumber}</span>
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedInvoiceForPayment(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Invoice & Debtor Summary Box */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="flex justify-between text-slate-400">
+            <div className="bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Customer:</span>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-[var(--text-primary)]">
                   {selectedInvoiceForPayment.customerName} ({selectedInvoiceForPayment.customerPhone})
                 </span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Total Invoice Amount:</span>
-                <span className="font-mono tabular-nums text-white">
+                <span className="font-mono tabular-nums text-[var(--text-primary)]">
                   Rs. {Number(selectedInvoiceForPayment.grossTotal || 0).toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-[var(--text-secondary)]">
                 <span>Already Paid to Date:</span>
-                <span className="font-mono tabular-nums text-emerald-400">
+                <span className="font-mono tabular-nums text-emerald-700 dark:text-emerald-400">
                   Rs. {Number(selectedInvoiceForPayment.advancePaid || 0).toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between text-slate-300 font-bold pt-2 border-t border-slate-800/80">
+              <div className="flex justify-between text-[var(--text-primary)] font-bold pt-2 border-t border-[var(--border-subtle)]">
                 <span>Current Outstanding Due:</span>
-                <span className="font-mono tabular-nums text-amber-400 text-sm">
+                <span className="font-mono tabular-nums text-amber-700 dark:text-amber-400 text-sm">
                   Rs.{' '}
                   {(
                     selectedInvoiceForPayment.balanceDue !== undefined
@@ -1071,7 +1069,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
               {/* Payment Amount */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-slate-300 font-semibold">Payment Amount (Rs.) *</label>
+                  <label className="text-[var(--text-primary)] font-semibold">Payment Amount (Rs.) *</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1081,20 +1079,20 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                           : Math.max(0, Number(selectedInvoiceForPayment.grossTotal || 0) - Number(selectedInvoiceForPayment.advancePaid || 0));
                       setPaymentAmount(bal);
                     }}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline cursor-pointer font-medium"
+                    className="text-[11px] text-amber-700 dark:text-amber-400 hover:underline cursor-pointer font-medium"
                   >
                     Set Full Balance Due
                   </button>
                 </div>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-slate-400 font-mono text-xs">Rs.</span>
+                  <span className="absolute left-3.5 top-2.5 text-[var(--text-secondary)] font-mono text-xs">Rs.</span>
                   <input
                     type="number"
                     min="1"
                     step="any"
                     value={paymentAmount || ''}
                     onChange={(e) => setPaymentAmount(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full pl-10 pr-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                    className="w-full pl-10 pr-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-sm focus:outline-none focus:border-[var(--accent-primary)] transition-all"
                     placeholder="Enter payment amount"
                     required
                   />
@@ -1103,7 +1101,7 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
               {/* Payment Method Selector */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1.5">Payment Method *</label>
+                <label className="block text-[var(--text-primary)] font-semibold mb-1.5">Payment Method *</label>
                 <div className="grid grid-cols-4 gap-2">
                   {['Cash', 'Bank Transfer', 'Card', 'Cheque'].map((method) => (
                     <button
@@ -1112,8 +1110,8 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                       onClick={() => setPaymentMethod(method)}
                       className={`py-2 px-2 rounded-xl border text-center transition-all font-semibold text-xs cursor-pointer ${
                         paymentMethod === method
-                          ? 'border-emerald-500/80 bg-emerald-500/15 text-emerald-300 shadow-sm'
-                          : 'border-slate-800 bg-slate-950/80 text-slate-400 hover:text-white hover:border-slate-700'
+                          ? 'border-emerald-500 bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] shadow-sm'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                       }`}
                     >
                       {method}
@@ -1125,54 +1123,54 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
               {/* Receipt Reference */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-slate-400 text-[11px] mb-1">Receipt / Voucher #</label>
+                  <label className="block text-[var(--text-secondary)] text-[11px] mb-1">Receipt / Voucher #</label>
                   <input
                     type="text"
                     value={paymentReceiptNumber}
                     onChange={(e) => setPaymentReceiptNumber(e.target.value)}
                     placeholder="RCP-123456"
-                    className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-slate-700"
+                    className="w-full px-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 text-[11px] mb-1">Payment Notes / Reference</label>
+                  <label className="block text-[var(--text-secondary)] text-[11px] mb-1">Payment Notes / Reference</label>
                   <input
                     type="text"
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
                     placeholder="e.g. Paid in cash at store counter"
-                    className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-slate-700"
+                    className="w-full px-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
 
               {/* SMS Receipt Checkbox */}
-              <div className="flex items-center gap-2.5 p-3 bg-slate-950/80 border border-slate-800 rounded-xl">
+              <div className="flex items-center gap-2.5 p-3 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl">
                 <input
                   type="checkbox"
                   id="sendSmsCheck"
                   checked={sendSmsReceipt}
                   onChange={(e) => setSendSmsReceipt(e.target.checked)}
-                  className="rounded border-slate-700 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                  className="rounded border-[var(--border-subtle)] text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
                 />
-                <label htmlFor="sendSmsCheck" className="text-xs text-slate-300 cursor-pointer">
+                <label htmlFor="sendSmsCheck" className="text-xs text-[var(--text-primary)] cursor-pointer">
                   Send automated SMS payment receipt to customer ({selectedInvoiceForPayment.customerPhone || 'phone'})
                 </label>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => setSelectedInvoiceForPayment(null)}
-                  className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl transition-all text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl transition-all text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingPayment}
-                  className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-white rounded-xl transition-all text-xs font-bold shadow-lg shadow-emerald-950/40 border border-emerald-400/20 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-white rounded-xl transition-all text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   {isSubmittingPayment ? (
                     <>
@@ -1194,24 +1192,24 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
 
       {/* PAYMENT HISTORY MODAL */}
       {selectedInvoiceForHistory && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900/95 border border-slate-800/90 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4 glow-purple">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-[var(--border-subtle)]">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/25 glow-purple">
+                <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/25">
                   <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">Payment Installments History</h3>
-                  <p className="text-[11px] text-slate-400">
-                    Invoice: <span className="font-mono text-purple-400 font-bold">{selectedInvoiceForHistory.invoiceNumber}</span> · Customer: {selectedInvoiceForHistory.customerName}
+                  <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-tight">Payment Installments History</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    Invoice: <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{selectedInvoiceForHistory.invoiceNumber}</span> · Customer: {selectedInvoiceForHistory.customerName}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedInvoiceForHistory(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1220,11 +1218,11 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
             {/* Installments Table */}
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {!selectedInvoiceForHistory.creditPaymentHistory || selectedInvoiceForHistory.creditPaymentHistory.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
+                <div className="py-8 text-center text-[var(--text-secondary)] text-xs">
                   {Number(selectedInvoiceForHistory.advancePaid || 0) > 0 ? (
                     <div>
-                      Initial Advance Paid at Checkout: <strong className="text-emerald-400 font-mono">Rs. {Number(selectedInvoiceForHistory.advancePaid).toLocaleString()}</strong>
-                      <p className="text-[10px] text-slate-400 mt-1">No subsequent installment records found.</p>
+                      Initial Advance Paid at Checkout: <strong className="text-emerald-700 dark:text-emerald-400 font-mono">Rs. {Number(selectedInvoiceForHistory.advancePaid).toLocaleString()}</strong>
+                      <p className="text-[10px] text-[var(--text-secondary)] mt-1">No subsequent installment records found.</p>
                     </div>
                   ) : (
                     'No payment installments have been logged for this credit sale yet.'
@@ -1234,36 +1232,36 @@ export const CreditCustomersTab: React.FC<CreditCustomersTabProps> = ({
                 selectedInvoiceForHistory.creditPaymentHistory.map((rec, i) => (
                   <div
                     key={rec.id || i}
-                    className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex justify-between items-center text-xs"
+                    className="p-3 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] flex justify-between items-center text-xs"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white font-mono tabular-nums">Rs. {rec.amount.toLocaleString()}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-slate-900 text-slate-300 font-mono text-[10px] border border-slate-800">
+                        <span className="font-bold text-[var(--text-primary)] font-mono tabular-nums">Rs. {rec.amount.toLocaleString()}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-primary)] font-mono text-[10px] border border-[var(--border-subtle)]">
                           {rec.paymentMethod}
                         </span>
                         {rec.receiptNumber && (
-                          <span className="text-[10px] text-slate-400 font-mono">
+                          <span className="text-[10px] text-[var(--text-secondary)] font-mono">
                             Ref: {rec.receiptNumber}
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-mono">
                         {new Date(rec.date).toLocaleString('en-GB')}
-                        {rec.notes && <span className="text-slate-400 italic ml-1.5 font-sans">({rec.notes})</span>}
+                        {rec.notes && <span className="text-[var(--text-secondary)] italic ml-1.5 font-sans">({rec.notes})</span>}
                       </div>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">{rec.recordedBy || 'POS'}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">{rec.recordedBy || 'POS'}</span>
                   </div>
                 ))
               )}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-800">
+            <div className="flex justify-end pt-3 border-t border-[var(--border-subtle)]">
               <button
                 type="button"
                 onClick={() => setSelectedInvoiceForHistory(null)}
-                className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+                className="px-4 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl text-xs font-semibold cursor-pointer transition-colors"
               >
                 Close
               </button>

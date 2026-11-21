@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
 import { parseCsvMatrix, SAMPLE_CUSTOMER_CSV } from '@/lib/customerCsv';
+import { ThemeSwitcher } from '@/src/components/ThemeSwitcher';
 
 interface CustomerRecord {
   _id?: string;
@@ -414,19 +415,22 @@ export default function SmsMarketingPage() {
   };
 
   return (
-    <div className="p-6 text-white bg-gray-950 min-h-screen">
+    <div className="p-6 text-[var(--text-primary)] bg-[var(--bg-app)] min-h-screen">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-purple-400">SMS Marketing &amp; Customer Database</h1>
-            <p className="text-xs text-gray-400 mt-1">
+            <h1 className="text-2xl font-bold text-purple-600 dark:text-purple-400">SMS Marketing &amp; Customer Database</h1>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">
               Manage customers manually or bulk import CSV lists with Sri Lankan (+94) validation.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-300 bg-gray-900 border border-gray-800 px-3 py-2 rounded-lg">
-            <Users className="w-4 h-4 text-purple-400" />
-            <span>Total Contacts:</span>
-            <span className="font-bold text-white">{customers.length}</span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <ThemeSwitcher />
+            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3 py-2 rounded-lg shadow-sm">
+              <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Total Contacts:</span>
+              <span className="font-bold text-[var(--text-primary)]">{customers.length}</span>
+            </div>
           </div>
         </div>
 
@@ -434,22 +438,22 @@ export default function SmsMarketingPage() {
           <div
             className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${
               statusBanner.type === 'success'
-                ? 'bg-emerald-950/50 border-emerald-700/60 text-emerald-200'
-                : 'bg-red-950/50 border-red-700/60 text-red-200'
+                ? 'bg-[var(--badge-ready-bg)] border-teal-200 dark:border-emerald-700/60 text-[var(--badge-ready-text)]'
+                : 'bg-rose-50 dark:bg-red-950/50 border-rose-200 dark:border-red-700/60 text-rose-700 dark:text-red-200'
             }`}
           >
             <div className="flex items-center gap-2.5">
               {statusBanner.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--accent-primary)] shrink-0" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-red-400 shrink-0" />
               )}
               <span>{statusBanner.message}</span>
             </div>
             <button
               type="button"
               onClick={() => setStatusBanner(null)}
-              className="text-gray-400 hover:text-white cursor-pointer"
+              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
               aria-label="Dismiss message"
             >
               <X className="w-4 h-4" />
@@ -459,26 +463,26 @@ export default function SmsMarketingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left: Manual Customer Add Form */}
-          <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl shadow-xl">
-            <h2 className="text-lg font-semibold mb-3 text-pink-400 flex items-center gap-2">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-5 rounded-xl shadow-sm">
+            <h2 className="text-lg font-semibold mb-3 text-pink-600 dark:text-pink-400 flex items-center gap-2">
               <UserPlus className="w-5 h-5" />
               <span>Add Manual Customer / Phone</span>
             </h2>
             <form onSubmit={handleAddManualCustomer} className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Customer Name</label>
+                <label className="block text-xs text-[var(--text-secondary)] mb-1">Customer Name</label>
                 <input
                   type="text"
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                   placeholder="e.g. Nimal Perera"
-                  className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-pink-500"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs text-gray-400">Phone Number *</label>
-                  <span className="text-[10px] text-pink-400 font-mono">Format: +947XXXXXXXX</span>
+                  <label className="block text-xs text-[var(--text-secondary)]">Phone Number *</label>
+                  <span className="text-[10px] text-pink-600 dark:text-pink-400 font-mono">Format: +947XXXXXXXX</span>
                 </div>
                 <input
                   type="text"
@@ -487,20 +491,20 @@ export default function SmsMarketingPage() {
                   onBlur={handlePhoneBlur}
                   placeholder="0715330724 (auto-converts to +94715330724)"
                   required
-                  className={`w-full bg-gray-800 border ${
-                    phoneError ? 'border-red-500' : 'border-gray-700'
-                  } rounded p-2 text-sm text-white font-mono focus:outline-none focus:border-pink-500`}
+                  className={`w-full bg-[var(--bg-app)] border ${
+                    phoneError ? 'border-red-500' : 'border-[var(--border-subtle)]'
+                  } rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono focus:outline-none focus:border-[var(--accent-primary)]`}
                 />
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Numbers starting with <span className="text-pink-300 font-mono">0</span> automatically convert to{' '}
-                  <span className="text-green-400 font-mono">+94</span>.
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                  Numbers starting with <span className="text-pink-600 dark:text-pink-300 font-mono">0</span> automatically convert to{' '}
+                  <span className="text-emerald-600 dark:text-green-400 font-mono">+94</span>.
                 </p>
-                {phoneError && <p className="text-xs text-red-400 mt-1 font-medium">{phoneError}</p>}
+                {phoneError && <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">{phoneError}</p>}
               </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded font-bold text-sm hover:opacity-90 disabled:opacity-50 cursor-pointer transition shadow-md"
+                className="w-full py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded font-bold text-sm hover:opacity-90 disabled:opacity-50 cursor-pointer transition shadow-sm"
               >
                 {loading ? 'Adding...' : 'Save Customer'}
               </button>
@@ -508,15 +512,15 @@ export default function SmsMarketingPage() {
           </div>
 
           {/* Right: Saved Customers List with Selection & Delete */}
-          <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl flex flex-col justify-between shadow-xl">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-5 rounded-xl flex flex-col justify-between shadow-sm">
             <div>
               <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-                <h2 className="text-lg font-semibold text-purple-400">Saved Customers ({customers.length})</h2>
+                <h2 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Saved Customers ({customers.length})</h2>
                 {selectedCustomers.length > 0 && !confirmingDelete && (
                   <button
                     type="button"
                     onClick={() => setConfirmingDelete(true)}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5"
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete Selected ({selectedCustomers.length})</span>
@@ -528,14 +532,14 @@ export default function SmsMarketingPage() {
                       type="button"
                       onClick={handleDeleteSelected}
                       disabled={deleting}
-                      className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold transition cursor-pointer disabled:opacity-50"
                     >
                       {deleting ? 'Deleting...' : `Confirm Delete (${selectedCustomers.length})`}
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmingDelete(false)}
-                      className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs text-gray-300 cursor-pointer"
+                      className="px-2.5 py-1 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded text-xs text-[var(--text-primary)] cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -544,12 +548,12 @@ export default function SmsMarketingPage() {
               </div>
 
               {/* Select All Checkbox */}
-              <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-gray-800 text-xs text-gray-400">
+              <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
                 <input
                   type="checkbox"
                   onChange={handleSelectAll}
                   checked={customers.length > 0 && selectedCustomers.length === customers.length}
-                  className="rounded bg-gray-800 border-gray-700 accent-purple-600 cursor-pointer"
+                  className="rounded border-[var(--border-subtle)] accent-purple-600 cursor-pointer"
                 />
                 <span>Select All</span>
               </div>
@@ -557,28 +561,28 @@ export default function SmsMarketingPage() {
               {/* Customer List */}
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {customers.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 text-sm">
+                  <div className="p-6 text-center text-[var(--text-secondary)] text-sm">
                     No customers found. Add your first customer using the form or bulk CSV import below.
                   </div>
                 ) : (
                   customers.map((c, idx) => (
                     <div
                       key={c._id || c.phone || idx}
-                      className="flex items-center justify-between bg-gray-800/60 p-2.5 rounded border border-gray-700/50 text-sm hover:bg-gray-800 transition"
+                      className="flex items-center justify-between bg-[var(--bg-app)] p-2.5 rounded border border-[var(--border-subtle)] text-sm hover:bg-[var(--bg-subtle)] transition"
                     >
                       <div className="flex items-center space-x-3">
                         <input
                           type="checkbox"
                           checked={selectedCustomers.includes(c.phone)}
                           onChange={() => handleToggleSelect(c.phone)}
-                          className="rounded bg-gray-800 border-gray-700 accent-purple-600 cursor-pointer"
+                          className="rounded border-[var(--border-subtle)] accent-purple-600 cursor-pointer"
                         />
                         <div>
-                          <p className="font-semibold text-white">{c.name || 'Walk-in Customer'}</p>
-                          <p className="text-xs text-gray-400 font-mono">{c.phone}</p>
+                          <p className="font-semibold text-[var(--text-primary)]">{c.name || 'Walk-in Customer'}</p>
+                          <p className="text-xs text-[var(--text-secondary)] font-mono">{c.phone}</p>
                         </div>
                       </div>
-                      <span className="text-[10px] bg-gray-700 px-2 py-0.5 rounded text-gray-300">
+                      <span className="text-[10px] bg-[var(--bg-subtle)] px-2 py-0.5 rounded text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                         {c.source || 'POS'}
                       </span>
                     </div>
@@ -590,23 +594,23 @@ export default function SmsMarketingPage() {
         </div>
 
         {/* Bulk CSV Import Section */}
-        <div className="bg-gray-900 border border-gray-800 p-5 rounded-xl shadow-xl space-y-4">
+        <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-5 rounded-xl shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-purple-400 flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-pink-400" />
+              <h2 className="text-lg font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-pink-600 dark:text-pink-400" />
                 <span>Bulk Import Customers (CSV)</span>
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Upload a CSV file, map columns to <span className="text-gray-200 font-mono">name</span> and{' '}
-                <span className="text-gray-200 font-mono">phone</span>, and automatically filter out invalid Sri Lankan numbers.
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Upload a CSV file, map columns to <span className="text-[var(--text-primary)] font-mono">name</span> and{' '}
+                <span className="text-[var(--text-primary)] font-mono">phone</span>, and automatically filter out invalid Sri Lankan numbers.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleDownloadSampleCsv}
-                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs font-medium text-gray-200 inline-flex items-center gap-1.5 cursor-pointer transition"
+                className="px-3 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg text-xs font-medium text-[var(--text-primary)] inline-flex items-center gap-1.5 cursor-pointer transition"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Sample CSV</span>
@@ -615,7 +619,7 @@ export default function SmsMarketingPage() {
                 <button
                   type="button"
                   onClick={resetCsvImport}
-                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-xs font-medium text-gray-300 inline-flex items-center gap-1 cursor-pointer transition"
+                  className="px-3 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg text-xs font-medium text-[var(--text-primary)] inline-flex items-center gap-1 cursor-pointer transition"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Clear</span>
@@ -625,12 +629,12 @@ export default function SmsMarketingPage() {
           </div>
 
           {/* File Input */}
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 hover:border-pink-500/70 bg-gray-950/60 rounded-xl p-6 cursor-pointer transition">
-            <Upload className="w-7 h-7 text-pink-400 mb-2" />
-            <span className="text-sm font-medium text-gray-200">
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--border-subtle)] hover:border-pink-500/70 bg-[var(--bg-app)] rounded-xl p-6 cursor-pointer transition">
+            <Upload className="w-7 h-7 text-pink-600 dark:text-pink-400 mb-2" />
+            <span className="text-sm font-medium text-[var(--text-primary)]">
               {csvFileName ? `Selected file: ${csvFileName}` : 'Choose a CSV file to upload'}
             </span>
-            <span className="text-xs text-gray-400 mt-1">
+            <span className="text-xs text-[var(--text-secondary)] mt-1">
               Supports formats like 0715330724, +94715330724, 94771234567, or 011 234 5678
             </span>
             <input
@@ -643,8 +647,8 @@ export default function SmsMarketingPage() {
           </label>
 
           {csvError && (
-            <div className="flex items-center gap-2 bg-red-950/50 border border-red-700/60 text-red-200 text-xs px-3 py-2.5 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <div className="flex items-center gap-2 bg-rose-50 dark:bg-red-950/50 border border-rose-200 dark:border-red-700/60 text-rose-700 dark:text-red-200 text-xs px-3 py-2.5 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-red-400 shrink-0" />
               <span>{csvError}</span>
             </div>
           )}
@@ -652,13 +656,13 @@ export default function SmsMarketingPage() {
           {csvMatrix.length > 0 && (
             <div className="space-y-4">
               {/* Column Mapping Controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-950/70 border border-gray-800 p-4 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[var(--bg-app)] border border-[var(--border-subtle)] p-4 rounded-xl">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Map Name Column</label>
+                  <label className="block text-xs text-[var(--text-secondary)] mb-1">Map Name Column</label>
                   <select
                     value={nameColumnIdx}
                     onChange={(e) => setNameColumnIdx(Number(e.target.value))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:outline-none focus:border-pink-500"
+                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     <option value={-1}>None (Default: CSV Customer)</option>
                     {columnOptions.map((col) => (
@@ -670,11 +674,11 @@ export default function SmsMarketingPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Map Phone Column *</label>
+                  <label className="block text-xs text-[var(--text-secondary)] mb-1">Map Phone Column *</label>
                   <select
                     value={phoneColumnIdx}
                     onChange={(e) => setPhoneColumnIdx(Number(e.target.value))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-xs text-white focus:outline-none focus:border-pink-500"
+                    className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     {columnOptions.map((col) => (
                       <option key={col.index} value={col.index}>
@@ -685,12 +689,12 @@ export default function SmsMarketingPage() {
                 </div>
 
                 <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-xs text-gray-300 bg-gray-800/80 border border-gray-700 rounded p-2 w-full cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-[var(--text-primary)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded p-2 w-full cursor-pointer">
                     <input
                       type="checkbox"
                       checked={hasHeaderRow}
                       onChange={(e) => setHasHeaderRow(e.target.checked)}
-                      className="rounded bg-gray-800 border-gray-700 accent-purple-600 cursor-pointer"
+                      className="rounded border-[var(--border-subtle)] accent-purple-600 cursor-pointer"
                     />
                     <span>First row contains headers</span>
                   </label>
@@ -699,30 +703,30 @@ export default function SmsMarketingPage() {
 
               {/* Validation Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-950/70 border border-gray-800 rounded-lg p-3">
-                  <p className="text-[11px] text-gray-400">Total Parsed Rows</p>
-                  <p className="text-lg font-bold text-white">{parsedValidation.allRows.length}</p>
+                <div className="bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg p-3">
+                  <p className="text-[11px] text-[var(--text-secondary)]">Total Parsed Rows</p>
+                  <p className="text-lg font-bold text-[var(--text-primary)]">{parsedValidation.allRows.length}</p>
                 </div>
-                <div className="bg-emerald-950/30 border border-emerald-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-emerald-300">Valid Sri Lankan Numbers</p>
-                  <p className="text-lg font-bold text-emerald-400">{parsedValidation.validRows.length}</p>
+                <div className="bg-[var(--badge-ready-bg)] border border-teal-200 dark:border-emerald-800/60 rounded-lg p-3">
+                  <p className="text-[11px] text-[var(--badge-ready-text)]">Valid Sri Lankan Numbers</p>
+                  <p className="text-lg font-bold text-[var(--badge-ready-text)]">{parsedValidation.validRows.length}</p>
                 </div>
-                <div className="bg-red-950/30 border border-red-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-red-300">Invalid (Filtered Out)</p>
-                  <p className="text-lg font-bold text-red-400">{parsedValidation.invalidRows.length}</p>
+                <div className="bg-rose-50 dark:bg-red-950/30 border border-rose-200 dark:border-red-800/60 rounded-lg p-3">
+                  <p className="text-[11px] text-rose-700 dark:text-red-300">Invalid (Filtered Out)</p>
+                  <p className="text-lg font-bold text-rose-600 dark:text-red-400">{parsedValidation.invalidRows.length}</p>
                 </div>
-                <div className="bg-amber-950/30 border border-amber-800/60 rounded-lg p-3">
-                  <p className="text-[11px] text-amber-300">Duplicates (Skipped)</p>
-                  <p className="text-lg font-bold text-amber-400">{parsedValidation.duplicateRows.length}</p>
+                <div className="bg-[var(--badge-pending-bg)] border border-amber-200 dark:border-amber-800/60 rounded-lg p-3">
+                  <p className="text-[11px] text-[var(--badge-pending-text)]">Duplicates (Skipped)</p>
+                  <p className="text-lg font-bold text-[var(--badge-pending-text)]">{parsedValidation.duplicateRows.length}</p>
                 </div>
               </div>
 
               {/* Validation Preview Table */}
               {parsedValidation.allRows.length > 0 && (
-                <div className="border border-gray-800 rounded-xl overflow-hidden">
+                <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden">
                   <div className="max-h-64 overflow-y-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-gray-950 text-gray-400 sticky top-0">
+                      <thead className="bg-[var(--bg-subtle)] text-[var(--text-secondary)] sticky top-0">
                         <tr>
                           <th className="px-3 py-2 font-medium">Row</th>
                           <th className="px-3 py-2 font-medium">Mapped Name</th>
@@ -731,26 +735,26 @@ export default function SmsMarketingPage() {
                           <th className="px-3 py-2 font-medium">Validation Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-800/80 bg-gray-900/60">
+                      <tbody className="divide-y divide-[var(--border-subtle)] bg-[var(--bg-surface)]">
                         {parsedValidation.allRows.map((row) => (
                           <tr
                             key={`${row.rowNumber}-${row.rawPhone}`}
-                            className={row.isValid ? '' : 'bg-red-950/20 text-gray-400'}
+                            className={row.isValid ? '' : 'bg-rose-50 dark:bg-red-950/20 text-[var(--text-secondary)]'}
                           >
-                            <td className="px-3 py-2 font-mono text-gray-400">#{row.rowNumber}</td>
-                            <td className="px-3 py-2 text-white">{row.name}</td>
+                            <td className="px-3 py-2 font-mono text-[var(--text-secondary)]">#{row.rowNumber}</td>
+                            <td className="px-3 py-2 text-[var(--text-primary)]">{row.name}</td>
                             <td className="px-3 py-2 font-mono">{row.rawPhone || '—'}</td>
-                            <td className="px-3 py-2 font-mono text-emerald-300">
+                            <td className="px-3 py-2 font-mono text-emerald-700 dark:text-emerald-300">
                               {row.isValid ? row.formattedPhone : '—'}
                             </td>
                             <td className="px-3 py-2">
                               {row.isValid ? (
-                                <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                                <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-medium">
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   Valid
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-red-400">
+                                <span className="inline-flex items-center gap-1 text-rose-600 dark:text-red-400">
                                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                   {row.reason}
                                 </span>
@@ -766,15 +770,15 @@ export default function SmsMarketingPage() {
 
               {/* Import Action Bar */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-                <p className="text-xs text-gray-400">
-                  Only the <span className="text-emerald-400 font-semibold">{parsedValidation.validRows.length}</span>{' '}
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Only the <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{parsedValidation.validRows.length}</span>{' '}
                   validated Sri Lankan customer record(s) will be imported.
                 </p>
                 <button
                   type="button"
                   onClick={handleBulkImportSubmit}
                   disabled={parsedValidation.validRows.length === 0 || importing}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-40 cursor-pointer transition shadow-md inline-flex items-center justify-center gap-2"
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-40 cursor-pointer transition shadow-sm inline-flex items-center justify-center gap-2"
                 >
                   <Upload className="w-4 h-4" />
                   <span>

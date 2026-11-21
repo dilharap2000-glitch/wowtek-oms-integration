@@ -322,16 +322,16 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {restockToast && (
-        <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 text-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-lg animate-fadeIn">
+        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-200 dark:border-emerald-600/70 text-emerald-800 dark:text-emerald-200 rounded-xl flex items-center justify-between text-xs shadow-sm animate-fadeIn">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <span className="font-medium">{restockToast}</span>
           </div>
           <button
             onClick={() => setRestockToast(null)}
-            className="text-neutral-400 hover:text-white"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <X className="w-4 h-4" />
           </button>
@@ -339,15 +339,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
       )}
 
       {/* Sub Navigation: Catalog Valuation vs Inventory Audit & Missing Stock Tracker */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
-        <div className="flex items-center gap-2 p-1 bg-slate-900/80 border border-slate-800/80 rounded-xl backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 p-1 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl">
           <button
             type="button"
             onClick={() => setActiveSubTab('catalog')}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'catalog'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm border border-purple-400/30'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
             }`}
           >
             <Warehouse className="w-3.5 h-3.5" />
@@ -358,11 +358,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
             onClick={() => setActiveSubTab('audit')}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'audit'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm border border-purple-400/30'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+            <ShieldCheck className="w-3.5 h-3.5" />
             <span>Inventory Audit &amp; Missing Stock Tracker</span>
           </button>
         </div>
@@ -375,10 +375,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">
             Inventory Valuation & Product Profit Margins
           </h2>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
             Cost valuation vs retail valuation, stock breakdown, and real-time profit margin progress bars.
           </p>
         </div>
@@ -387,18 +387,18 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           {products.length === 0 && onLoadSampleProducts && (
             <button
               onClick={() => onLoadSampleProducts()}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-300 bg-purple-950/60 hover:bg-purple-900/60 border border-purple-800 rounded-lg transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800 rounded-lg transition-colors shadow-sm"
               title="Load 5 real stock products with standard barcodes"
             >
-              <Sparkles className="w-4 h-4 text-purple-400" />
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               <span>Add Test Sample Products</span>
             </button>
           )}
           <button
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-neutral-200 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-lg transition-colors shadow-sm"
           >
-            <Camera className="w-4 h-4 text-purple-400" />
+            <Camera className="w-4 h-4 text-purple-600 dark:text-purple-400" />
             <span>Scan Barcode</span>
           </button>
           <button
@@ -413,71 +413,71 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
       {/* INVENTORY VALUATION KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-1 flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-1 flex items-center justify-between">
             <span>Total Cost Valuation</span>
-            <Warehouse className="w-4 h-4 text-purple-400" />
+            <Warehouse className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             Rs. {totalCostValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             Base landed purchase cost of held inventory
           </div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-1 flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-1 flex items-center justify-between">
             <span>Total Retail Valuation</span>
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
+          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
             Rs. {totalRetailValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             Market selling value of all store & warehouse stock
           </div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-1 flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-1 flex items-center justify-between">
             <span>Unrealized Gross Margin</span>
-            <TrendingUp className="w-4 h-4 text-purple-400" />
+            <TrendingUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-purple-300">
+          <div className="text-2xl font-bold font-mono tabular-nums text-purple-700 dark:text-purple-300">
             Rs. {potentialProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
-            Weighted portfolio margin: <strong className="text-white font-mono">{overallMarginPercent}%</strong>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
+            Weighted portfolio margin: <strong className="text-[var(--text-primary)] font-mono">{overallMarginPercent}%</strong>
           </div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-1 flex items-center justify-between">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-1 flex items-center justify-between">
             <span>Active SKUs & Units</span>
-            <Layers className="w-4 h-4 text-amber-400" />
+            <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             {(safeProducts || []).length}{' '}
-            <span className="text-xs font-sans font-normal text-neutral-400">SKUs</span>
+            <span className="text-xs font-sans font-normal text-[var(--text-secondary)]">SKUs</span>
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             {(safeProducts || []).reduce((s, p) => s + (p?.stockStore || 0) + (p?.stockWarehouse || 0), 0)} total units on hand
           </div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-neutral-900 border border-neutral-800">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-1">
           <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search SKU, name, category, barcode, supplier..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-purple-500"
             />
           </div>
 
@@ -486,7 +486,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
               <select
                 value={supplierFilter}
                 onChange={(e) => setSupplierFilter(e.target.value)}
-                className="px-2.5 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                className="px-2.5 py-1.5 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-purple-500"
               >
                 <option value="all">All Suppliers ({(safeSuppliers || []).length})</option>
                 {(safeSuppliers || []).map((s) => (
@@ -499,7 +499,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
+        <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
             <span>&gt;30% Margin</span>
@@ -516,11 +516,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
       </div>
 
       {/* Products Table with Profit Margin Bars */}
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900 overflow-hidden">
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-neutral-800 bg-neutral-950/60 text-neutral-400">
+              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
                 <th className="py-3 px-4 font-medium">SKU / Barcode</th>
                 <th className="py-3 px-4 font-medium">Product Details & Primary Supplier</th>
                 <th className="py-3 px-4 font-medium text-right">Cost Price</th>
@@ -530,14 +530,14 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 <th className="py-3 px-4 font-medium text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/80">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                      <Package className="w-10 h-10 text-neutral-600 mb-1" />
-                      <p className="font-semibold text-white text-sm">No Products Found</p>
-                      <p className="text-xs text-neutral-400">
+                      <Package className="w-10 h-10 text-[var(--text-secondary)] mb-1" />
+                      <p className="font-semibold text-[var(--text-primary)] text-sm">No Products Found</p>
+                      <p className="text-xs text-[var(--text-secondary)]">
                         No items matched your search query or supplier filter. Record your first product GRN batch to calculate valuation.
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
@@ -553,9 +553,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                           <button
                             type="button"
                             onClick={() => onLoadSampleProducts()}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-purple-300 border border-neutral-700 rounded-lg text-xs font-semibold transition-colors"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-purple-700 dark:text-purple-300 border border-[var(--border-subtle)] rounded-lg text-xs font-semibold transition-colors"
                           >
-                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                             <span>Add Test Sample Products</span>
                           </button>
                         )}
@@ -604,38 +604,38 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 }, 0);
 
                 return (
-                  <tr key={p.id} className="hover:bg-neutral-850/40 transition-colors">
+                  <tr key={p.id} className="hover:bg-[var(--bg-subtle)]/50 transition-colors">
                     <td className="py-3 px-4">
-                      <div className="font-mono font-semibold text-purple-300">{p.sku}</div>
-                      <div className="text-[11px] font-mono text-neutral-400 mt-0.5">{p.barcode}</div>
+                      <div className="font-mono font-semibold text-purple-700 dark:text-purple-300">{p.sku}</div>
+                      <div className="text-[11px] font-mono text-[var(--text-secondary)] mt-0.5">{p.barcode}</div>
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="font-medium text-white max-w-xs">{p.name}</div>
-                      <div className="text-[11px] text-neutral-400">{p.category}</div>
+                      <div className="font-medium text-[var(--text-primary)] max-w-xs">{p.name}</div>
+                      <div className="text-[11px] text-[var(--text-secondary)]">{p.category}</div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-purple-300 flex items-center gap-1">
-                          <Building2 className="w-3 h-3 text-purple-400" />
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                          <Building2 className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                           <span className="truncate max-w-[170px]">{p.supplier || 'WOWTEK Direct Import'}</span>
                         </span>
                         {waitingOrders.length > 0 && (
                           <button
                             onClick={() => handleOpenRestock(p)}
-                            className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+                            className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] hover:brightness-95 border border-amber-200 dark:border-amber-500/40 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
                             title={`Click to Inward Restock: ${waitingOrders.length} backlog order(s) waiting for ${waitingUnits} unit(s). Inward stock will auto-deduct and verify net profits.`}
                           >
-                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                            <AlertTriangle className="w-3 h-3" />
                             <span>{waitingOrders.length} Backlog Waiting ({waitingUnits} pcs)</span>
                           </button>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono tabular-nums text-neutral-400">
+                    <td className="py-3 px-4 text-right font-mono tabular-nums text-[var(--text-secondary)]">
                       Rs. {Number(p.costPrice || 0).toLocaleString()}
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-white">
+                    <td className="py-3 px-4 text-right font-mono tabular-nums font-semibold text-[var(--text-primary)]">
                       Rs. {Number(p.sellingPrice || 0).toLocaleString()}
                     </td>
 
@@ -643,10 +643,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                     <td className="py-3 px-4">
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[11px] font-mono">
-                          <span className="font-bold text-white">+{marginPercent}%</span>
-                          <span className="text-neutral-400">Rs. {marginAmount.toLocaleString()}</span>
+                          <span className="font-bold text-[var(--text-primary)]">+{marginPercent}%</span>
+                          <span className="text-[var(--text-secondary)]">Rs. {marginAmount.toLocaleString()}</span>
                         </div>
-                        <div className="w-full h-2 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
+                        <div className="w-full h-2 bg-[var(--bg-subtle)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
                           <div
                             className={`h-full ${barColor} rounded-full transition-all duration-300`}
                             style={{ width: `${Math.min(100, Math.max(0, marginPercent))}%` }}
@@ -657,7 +657,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center font-mono">
-                        <span className="px-2.5 py-1 rounded-lg bg-pink-950/60 border border-pink-800 text-pink-300 font-bold text-xs">
+                        <span className="px-2.5 py-1 rounded-lg bg-pink-50 dark:bg-pink-950/60 border border-pink-200 dark:border-pink-800 text-pink-700 dark:text-pink-300 font-bold text-xs">
                           {p.storeStock ?? p.stockStore ?? p.stockQuantity ?? 0} pcs
                         </span>
                       </div>
@@ -668,28 +668,28 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         {onRestockProduct && (
                           <button
                             onClick={() => handleOpenRestock(p)}
-                            className="p-1.5 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-800/80 text-emerald-300 hover:text-white rounded-lg transition-colors flex items-center gap-1 text-[11px] font-medium"
+                            className="p-1.5 bg-[var(--badge-ready-bg)] border border-teal-200 dark:border-emerald-800/80 text-[var(--badge-ready-text)] hover:brightness-95 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-medium"
                             title="Inward Restock (GRN Receipt) & Auto-Deduct Backlog"
                           >
-                            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <PlusCircle className="w-3.5 h-3.5" />
                             <span className="hidden xl:inline">GRN</span>
                           </button>
                         )}
 
                         <button
                           onClick={() => setSelectedProductForBarcode(p)}
-                          className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg transition-colors"
+                          className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg transition-colors"
                           title="Generate & Print Thermal Barcodes"
                         >
-                          <Barcode className="w-3.5 h-3.5 text-purple-400" />
+                          <Barcode className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                         </button>
 
                         <button
                           onClick={() => setEditingProduct(p)}
-                          className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg transition-colors"
+                          className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg transition-colors"
                           title="Edit Product"
                         >
-                          <Edit className="w-3.5 h-3.5 text-neutral-400" />
+                          <Edit className="w-3.5 h-3.5" />
                         </button>
 
                         {onDeleteProduct && (
@@ -699,7 +699,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                                 onDeleteProduct(p.id);
                               }
                             }}
-                            className="p-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-red-400 rounded-lg transition-colors"
+                            className="p-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-red-500 dark:hover:text-red-400 rounded-lg transition-colors"
                             title="Delete Product"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -741,13 +741,13 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
       {/* Edit Product Modal */}
       {editingProduct && onUpdateProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <h3 className="text-sm font-semibold text-white">Edit Product - {editingProduct.sku}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Edit Product - {editingProduct.sku}</h3>
               <button
                 onClick={() => setEditingProduct(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -755,19 +755,19 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
             <form onSubmit={handleSaveEditProduct} className="p-5 space-y-3 text-xs">
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Product Title</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Product Title</label>
                 <input
                   type="text"
                   required
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Cost Price (LKR)</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Cost Price (LKR)</label>
                   <input
                     type="number"
                     required
@@ -778,11 +778,11 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         costPrice: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Selling Price (LKR)</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Selling Price (LKR)</label>
                   <input
                     type="number"
                     required
@@ -793,13 +793,13 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         sellingPrice: parseInt(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-pink-400 font-medium mb-1">Store Front Stock</label>
+                <label className="block text-pink-600 dark:text-pink-400 font-medium mb-1">Store Front Stock</label>
                 <input
                   type="number"
                   min="0"
@@ -813,12 +813,12 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                       stockWarehouse: 0,
                     });
                   }}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-pink-700/60 rounded-lg text-white font-mono focus:border-pink-500 focus:outline-none"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-pink-400/60 dark:border-pink-700/60 rounded-lg text-[var(--text-primary)] font-mono focus:border-pink-500 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Primary Supplier</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Primary Supplier</label>
                 {suppliers.length > 0 ? (
                   <select
                     value={editingProduct.supplier || ''}
@@ -830,7 +830,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         supplierId: sel?.id,
                       });
                     }}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     <option value="WOWTEK Direct Import">WOWTEK Direct Import</option>
                     {(safeSuppliers || []).map((s) => (
@@ -849,7 +849,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                         supplier: e.target.value,
                       })
                     }
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 )}
               </div>
@@ -858,7 +858,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingProduct(null)}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

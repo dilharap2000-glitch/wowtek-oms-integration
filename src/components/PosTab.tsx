@@ -866,16 +866,16 @@ export const PosTab: React.FC<PosTabProps> = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Sub navigation: Terminal vs Invoices Management vs Credit Customers */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
-        <div className="flex items-center gap-2 p-1 bg-slate-900/80 border border-slate-800/80 rounded-xl backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 p-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl backdrop-blur-md">
           <button
             onClick={() => setActiveSubTab('terminal')}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'terminal'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md border border-purple-400/30'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
             <ShoppingCart className="w-3.5 h-3.5" />
@@ -885,13 +885,17 @@ export const PosTab: React.FC<PosTabProps> = ({
             onClick={() => setActiveSubTab('invoices')}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'invoices'
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-950/40 border border-purple-400/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md border border-purple-400/30'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Invoice History & Returns</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-300 font-mono border border-slate-700/60">
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono border ${
+              activeSubTab === 'invoices'
+                ? 'bg-white/20 text-white border-white/25'
+                : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+            }`}>
               {orders.length}
             </span>
           </button>
@@ -899,14 +903,18 @@ export const PosTab: React.FC<PosTabProps> = ({
             onClick={() => setActiveSubTab('credit')}
             className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-2 ${
               activeSubTab === 'credit'
-                ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md shadow-amber-950/40 border border-amber-400/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md border border-amber-400/30'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
             }`}
           >
-            <Users className="w-3.5 h-3.5 text-amber-400" />
+            <Users className={`w-3.5 h-3.5 ${activeSubTab === 'credit' ? 'text-amber-100' : 'text-amber-600 dark:text-amber-400'}`} />
             <span>Credit Customers &amp; AR</span>
             {creditUnsettledCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold">
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                activeSubTab === 'credit'
+                  ? 'bg-white/20 text-white border-white/30'
+                  : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border-amber-300 dark:border-amber-500/40'
+              }`}>
                 {creditUnsettledCount} Due
               </span>
             )}
@@ -916,7 +924,7 @@ export const PosTab: React.FC<PosTabProps> = ({
         {activeSubTab === 'terminal' && (
           <button
             onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 rounded-xl transition-all shadow-md shadow-purple-950/40 border border-purple-400/30 cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 rounded-xl transition-all shadow-md border border-purple-400/30 cursor-pointer"
           >
             <Camera className="w-4 h-4" />
             <span>Camera Barcode Scanner</span>
@@ -928,23 +936,22 @@ export const PosTab: React.FC<PosTabProps> = ({
       {activeSubTab === 'terminal' && (
         <div className="space-y-4">
           {/* Active Barcode & Serial Scanner Bar */}
-          <div className="bg-slate-900/70 border border-purple-500/30 rounded-2xl p-4 shadow-xl shadow-purple-950/20 backdrop-blur-xl relative overflow-hidden">
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-4 shadow-sm backdrop-blur-xl relative overflow-hidden">
             {/* Ambient subtle glow background */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 relative z-10">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-tr from-purple-600/20 to-indigo-600/20 text-purple-300 border border-purple-500/30 shadow-inner">
+                <div className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30">
                   <Barcode className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">Fast Barcode & Serial Scanner</span>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">Fast Barcode & Serial Scanner</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       Scanner Ready
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     Scan with handheld USB/Bluetooth scanner or type & press Enter. Auto-detects barcodes, SKUs & item serials.
                   </p>
                 </div>
@@ -964,13 +971,13 @@ export const PosTab: React.FC<PosTabProps> = ({
                     value={activeScanInput}
                     onChange={(e) => setActiveScanInput(e.target.value)}
                     placeholder="Scan barcode, SKU, or serial number here (Auto-adds to cart)..."
-                    className="w-full pl-9 pr-4 py-2.5 bg-slate-950/90 border border-purple-500/40 rounded-xl text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 shadow-inner"
+                    className="w-full pl-9 pr-4 py-2.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-xs font-mono focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20"
                   />
-                  <Scan className="w-4 h-4 text-purple-400 absolute left-3 top-3" />
+                  <Scan className="w-4 h-4 text-[var(--accent-primary)] absolute left-3 top-3" />
                 </div>
                 <button
                   type="submit"
-                  className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-purple-950/50 border border-purple-400/30 shrink-0"
+                  className="px-4 py-2.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Add
@@ -978,10 +985,10 @@ export const PosTab: React.FC<PosTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsScannerOpen(true)}
-                  className="px-3.5 py-2.5 bg-slate-800/80 hover:bg-slate-750 text-slate-300 border border-slate-700/80 text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
+                  className="px-3.5 py-2.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm"
                   title="Open Phone Camera Scanner"
                 >
-                  <Camera className="w-3.5 h-3.5 text-purple-400" />
+                  <Camera className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                   Camera
                 </button>
               </form>
@@ -991,8 +998,8 @@ export const PosTab: React.FC<PosTabProps> = ({
               <div
                 className={`mt-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between border backdrop-blur-md ${
                   scanStatus.type === 'success'
-                    ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
-                    : 'bg-rose-950/80 border-rose-500/40 text-rose-200'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-200'
                 }`}
               >
                 <span className="font-mono">{scanStatus.message}</span>
@@ -1007,7 +1014,7 @@ export const PosTab: React.FC<PosTabProps> = ({
             )}
 
             {creditToast && (
-              <div className="mt-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between border bg-amber-950/80 border-amber-500/60 text-amber-200 backdrop-blur-md animate-fadeIn">
+              <div className="mt-3 px-3 py-2 rounded-xl text-xs flex items-center justify-between border bg-[var(--badge-pending-bg)] border-amber-300 dark:border-amber-500/60 text-[var(--badge-pending-text)] backdrop-blur-md animate-fadeIn">
                 <span className="font-semibold">{creditToast}</span>
                 <button
                   type="button"
@@ -1026,13 +1033,13 @@ export const PosTab: React.FC<PosTabProps> = ({
               {/* Search and Category Filter */}
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
                   <input
                     type="text"
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     placeholder="Search products by SKU, name, or barcode..."
-                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-900/80 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 backdrop-blur-md shadow-sm"
+                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/30 shadow-sm"
                   />
                 </div>
               </div>
@@ -1040,10 +1047,10 @@ export const PosTab: React.FC<PosTabProps> = ({
               {/* Product Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 max-h-[640px] overflow-y-auto pr-1">
                 {filteredProducts.length === 0 ? (
-                  <div className="col-span-full py-16 px-4 text-center bg-slate-900/50 border border-slate-800/80 rounded-2xl flex flex-col items-center justify-center gap-2 backdrop-blur-md">
-                    <Package className="w-10 h-10 text-slate-600 mb-1" />
-                    <h4 className="text-sm font-semibold text-white">No Products in Inventory</h4>
-                    <p className="text-xs text-slate-400 max-w-sm">
+                  <div className="col-span-full py-16 px-4 text-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl flex flex-col items-center justify-center gap-2">
+                    <Package className="w-10 h-10 text-[var(--text-secondary)]/50 mb-1" />
+                    <h4 className="text-sm font-semibold text-[var(--text-primary)]">No Products in Inventory</h4>
+                    <p className="text-xs text-[var(--text-secondary)] max-w-sm">
                       Your store inventory is empty. Add products in the Products &amp; Barcode GRN tab or scan barcodes to begin invoicing.
                     </p>
                   </div>
@@ -1058,18 +1065,18 @@ export const PosTab: React.FC<PosTabProps> = ({
                       <div
                         key={prod.id}
                         onClick={() => handleAddProductToCart(prod)}
-                        className="p-3.5 bg-slate-900/60 hover:bg-slate-850/80 border border-slate-800/80 hover:border-purple-500/50 rounded-2xl cursor-pointer transition-all duration-200 flex flex-col justify-between group backdrop-blur-md shadow-sm hover:shadow-lg hover:shadow-purple-950/20 active:scale-[0.99]"
+                        className="p-3.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] rounded-2xl cursor-pointer transition-all duration-200 flex flex-col justify-between group shadow-sm hover:shadow-md active:scale-[0.99]"
                       >
                         <div>
-                          <div className="flex justify-between items-start">
-                            <span className="text-[10px] font-mono font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                          <div className="flex justify-between items-start gap-1">
+                            <span className="text-[10px] font-mono font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-500/20">
                               {prod.sku}
                             </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-950/80 font-mono text-slate-300 border border-slate-800">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--bg-subtle)] font-mono text-[var(--text-secondary)] border border-[var(--border-subtle)]">
                               {prod.stockStore} in store
                             </span>
                           </div>
-                          <h4 className="text-xs font-semibold text-white mt-2 line-clamp-2 group-hover:text-purple-200 transition-colors">
+                          <h4 className="text-xs font-semibold text-[var(--text-primary)] mt-2 line-clamp-2 group-hover:text-[var(--accent-primary)] transition-colors">
                             {prod.name}
                           </h4>
                           {/* Active / Replacement S/N tags */}
@@ -1083,8 +1090,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                                     key={idx}
                                     className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
                                       isReplacement
-                                        ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 shadow-xs'
-                                        : 'bg-purple-950/60 text-purple-300 border-purple-500/30'
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/40'
+                                        : 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30'
                                     }`}
                                     title={isReplacement ? `Supplier RMA Replacement (${s.rmaRef || 'RMA'})` : 'Active Serial'}
                                   >
@@ -1096,16 +1103,16 @@ export const PosTab: React.FC<PosTabProps> = ({
                           )}
                         </div>
 
-                        <div className="mt-3 pt-2.5 border-t border-slate-800/80">
+                        <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)]">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-mono font-bold text-white text-sm">
+                            <span className="font-mono font-bold text-[var(--text-primary)] text-sm">
                               Rs. {prod.sellingPrice.toLocaleString()}
                             </span>
-                            <span className="text-[10px] font-mono text-emerald-300 font-semibold bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                            <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-500/20">
                               +{profitMargin}%
                             </span>
                           </div>
-                          <div className="text-[10px] font-mono text-slate-400 mt-1 truncate">
+                          <div className="text-[10px] font-mono text-[var(--text-secondary)] mt-1 truncate">
                             Barcode: {prod.barcode}
                           </div>
                         </div>
@@ -1117,14 +1124,14 @@ export const PosTab: React.FC<PosTabProps> = ({
             </div>
 
             {/* Right: Active POS Cart & Dynamic Checkout (5 cols) */}
-            <div className="lg:col-span-5 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 flex flex-col justify-between space-y-4 backdrop-blur-xl shadow-xl shadow-purple-950/10">
+            <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm">
               <div>
                 {/* Cart Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
                   <div className="flex items-center gap-2">
-                    <ShoppingCart className="w-4 h-4 text-purple-400" />
-                    <h3 className="text-sm font-semibold text-white">POS Checkout Cart</h3>
-                    <span className="text-[11px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+                    <ShoppingCart className="w-4 h-4 text-[var(--accent-primary)]" />
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">POS Checkout Cart</h3>
+                    <span className="text-[11px] font-mono text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-500/20">
                       {cart.length} item{cart.length !== 1 ? 's' : ''}
                     </span>
                   </div>
@@ -1132,7 +1139,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setCart([])}
-                      className="text-xs text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
+                      className="text-xs text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-red-400 transition-colors cursor-pointer"
                     >
                       Clear Cart
                     </button>
@@ -1142,7 +1149,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                 {/* Cart Items List with Price & Discount Editing */}
                 <div className="my-3 space-y-2.5 max-h-64 overflow-y-auto pr-1">
                   {cart.length === 0 ? (
-                    <div className="py-12 text-center text-neutral-500 text-xs">
+                    <div className="py-12 text-center text-[var(--text-secondary)] text-xs">
                       Cart is currently empty.
                       <br />
                       Scan barcodes or click items from the catalog.
@@ -1151,18 +1158,18 @@ export const PosTab: React.FC<PosTabProps> = ({
                     itemCalculations.map((item) => (
                       <div
                         key={item.sku}
-                        className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2 text-xs shadow-inner"
+                        className="p-3.5 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] space-y-2 text-xs"
                       >
                         {/* Line Item Top: Name, Serial, Quantity, Total, Delete */}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-white truncate">{item.name}</div>
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
+                            <div className="font-semibold text-[var(--text-primary)] truncate">{item.name}</div>
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-[var(--text-secondary)]">
                               <span>SKU: {item.sku}</span>
                               {isItemSerialized(item.sku, item.barcode) ? (
                                 item.serialNumber ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 text-emerald-300 rounded border border-emerald-500/30 text-[10px]">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-200 dark:border-emerald-500/30 text-[10px]">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                     <span>SN: {item.serialNumber}</span>
                                     <button
                                       type="button"
@@ -1171,7 +1178,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                         setPickerScanInput('');
                                         setSerialPickerItem(item);
                                       }}
-                                      className="text-slate-400 hover:text-white underline text-[9px] ml-1 cursor-pointer"
+                                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline text-[9px] ml-1 cursor-pointer"
                                       title="Change serial allocation"
                                     >
                                       Change
@@ -1185,15 +1192,15 @@ export const PosTab: React.FC<PosTabProps> = ({
                                       setPickerScanInput('');
                                       setSerialPickerItem(item);
                                     }}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 text-[10px] font-bold animate-pulse cursor-pointer shadow-sm"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-amber-300 dark:border-amber-500/50 text-[10px] font-bold animate-pulse cursor-pointer shadow-sm"
                                   >
-                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                    <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                                     <span>⚠️ Scan / Select S/N (Mandatory)</span>
                                   </button>
                                 )
                               ) : (
                                 item.serialNumber && (
-                                  <span className="px-1.5 py-0.2 bg-purple-500/15 text-purple-300 rounded border border-purple-500/30">
+                                  <span className="px-1.5 py-0.2 bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 rounded border border-purple-200 dark:border-purple-500/30">
                                     SN: {item.serialNumber}
                                   </span>
                                 )
@@ -1202,21 +1209,21 @@ export const PosTab: React.FC<PosTabProps> = ({
                           </div>
 
                           {/* Quantity Controls */}
-                          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                          <div className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5">
                             <button
                               type="button"
                               onClick={() => handleUpdateQuantity(item.sku, -1)}
-                              className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-subtle)] transition-colors"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
-                            <span className="w-6 text-center font-mono font-semibold text-white text-xs">
+                            <span className="w-6 text-center font-mono font-semibold text-[var(--text-primary)] text-xs">
                               {item.quantity}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleUpdateQuantity(item.sku, 1)}
-                              className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded hover:bg-[var(--bg-subtle)] transition-colors"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
@@ -1224,11 +1231,11 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                           {/* Line Total */}
                           <div className="text-right font-mono min-w-[75px]">
-                            <div className="font-bold text-white text-xs">
+                            <div className="font-bold text-[var(--text-primary)] text-xs">
                               Rs. {item.lineTotal.toLocaleString()}
                             </div>
                             {item.itemDiscountAmount > 0 && (
-                              <div className="text-[10px] text-emerald-300 font-semibold">
+                              <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-semibold">
                                 -Rs. {(item.itemDiscountAmount * item.quantity).toLocaleString()}
                               </div>
                             )}
@@ -1237,7 +1244,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                           <button
                             type="button"
                             onClick={() => handleRemoveFromCart(item.sku)}
-                            className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition cursor-pointer"
+                            className="p-1.5 text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition cursor-pointer"
                             title="Remove item"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1245,19 +1252,19 @@ export const PosTab: React.FC<PosTabProps> = ({
                         </div>
 
                         {/* Line Item Bottom: Price Customization & Item-level Discount */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900 text-[11px]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--border-subtle)] text-[11px]">
                           {/* Unit Price Customization */}
                           <div className="flex items-center gap-1.5">
-                            <span className="text-slate-400">Price:</span>
+                            <span className="text-[var(--text-secondary)]">Price:</span>
                             {editingPriceSku === item.sku ? (
                               <div className="flex items-center gap-1">
-                                <span className="text-slate-400 font-mono">Rs.</span>
+                                <span className="text-[var(--text-secondary)] font-mono">Rs.</span>
                                 <input
                                   type="number"
                                   autoFocus
                                   value={tempPriceInput}
                                   onChange={(e) => setTempPriceInput(e.target.value)}
-                                  className="w-20 px-1.5 py-0.5 bg-slate-900 border border-purple-500 rounded text-white font-mono text-xs focus:outline-none"
+                                  className="w-20 px-1.5 py-0.5 bg-[var(--bg-surface)] border border-[var(--accent-primary)] rounded text-[var(--text-primary)] font-mono text-xs focus:outline-none"
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       handleUpdateItemPrice(item.sku, Number(tempPriceInput));
@@ -1274,7 +1281,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => setEditingPriceSku(null)}
-                                  className="px-1 text-slate-400 hover:text-white text-[10px]"
+                                  className="px-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[10px]"
                                 >
                                   ✕
                                 </button>
@@ -1286,11 +1293,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                                   setEditingPriceSku(item.sku);
                                   setTempPriceInput(String(item.unitPrice));
                                 }}
-                                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 font-mono hover:border-purple-500/50 transition cursor-pointer"
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-mono hover:border-[var(--accent-primary)] transition cursor-pointer"
                                 title="Click to edit unit price"
                               >
                                 <span>Rs. {item.unitPrice.toLocaleString()}</span>
-                                <Edit className="w-2.5 h-2.5 text-slate-400" />
+                                <Edit className="w-2.5 h-2.5 text-[var(--text-secondary)]" />
                               </button>
                             )}
                           </div>
@@ -1298,11 +1305,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                           {/* Item Discount Controls */}
                           <div className="flex items-center gap-1.5">
                             {discountingSku === item.sku ? (
-                              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                              <div className="flex items-center gap-1 bg-[var(--bg-surface)] p-1 rounded-lg border border-[var(--border-subtle)]">
                                 <select
                                   value={tempDiscountType}
                                   onChange={(e) => setTempDiscountType(e.target.value as any)}
-                                  className="bg-slate-950 text-white text-[10px] rounded px-1 py-0.5 border border-slate-800 focus:outline-none"
+                                  className="bg-[var(--bg-app)] text-[var(--text-primary)] text-[10px] rounded px-1 py-0.5 border border-[var(--border-subtle)] focus:outline-none"
                                 >
                                   <option value="percent">%</option>
                                   <option value="fixed">Rs.</option>
@@ -1313,7 +1320,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                   value={tempDiscountVal}
                                   onChange={(e) => setTempDiscountVal(e.target.value)}
                                   placeholder={tempDiscountType === 'percent' ? '10' : '200'}
-                                  className="w-14 px-1 py-0.5 bg-slate-950 border border-purple-500 rounded text-white font-mono text-[10px] focus:outline-none"
+                                  className="w-14 px-1 py-0.5 bg-[var(--bg-app)] border border-[var(--accent-primary)] rounded text-[var(--text-primary)] font-mono text-[10px] focus:outline-none"
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       handleUpdateItemDiscount(item.sku, tempDiscountType, Number(tempDiscountVal));
@@ -1335,7 +1342,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                     handleUpdateItemDiscount(item.sku, 'fixed', 0);
                                     setDiscountingSku(null);
                                   }}
-                                  className="px-1 text-rose-400 hover:text-rose-300 text-[10px]"
+                                  className="px-1 text-rose-600 dark:text-rose-400 hover:text-rose-500 text-[10px]"
                                   title="Remove discount"
                                 >
                                   Clear
@@ -1357,8 +1364,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                                 }}
                                 className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] border transition cursor-pointer ${
                                   item.itemDiscountAmount > 0
-                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 font-semibold'
-                                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                                    ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30 font-semibold'
+                                    : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]'
                                 }`}
                               >
                                 <Tag className="w-2.5 h-2.5" />
@@ -1375,26 +1382,26 @@ export const PosTab: React.FC<PosTabProps> = ({
                 </div>
 
                 {/* Bill / Cart Total Discount Section */}
-                <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 space-y-2.5 mt-2">
+                <div className="bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl p-3 space-y-2.5 mt-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Percent className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                       Total Bill Discount
                     </span>
                     {billDiscountAmount > 0 && (
-                      <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
                         -Rs. {billDiscountAmount.toLocaleString()}
                       </span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="flex rounded-lg bg-slate-900 border border-slate-800 p-0.5 text-[11px]">
+                    <div className="flex rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5 text-[11px]">
                       <button
                         type="button"
                         onClick={() => setBillDiscountType('percent')}
                         className={`px-2.5 py-1 rounded-md transition font-semibold ${
-                          billDiscountType === 'percent' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                          billDiscountType === 'percent' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         %
@@ -1403,7 +1410,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                         type="button"
                         onClick={() => setBillDiscountType('fixed')}
                         className={`px-2.5 py-1 rounded-md transition font-semibold ${
-                          billDiscountType === 'fixed' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                          billDiscountType === 'fixed' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         Rs.
@@ -1415,14 +1422,14 @@ export const PosTab: React.FC<PosTabProps> = ({
                       value={billDiscountValue || ''}
                       onChange={(e) => setBillDiscountValue(Math.max(0, Number(e.target.value) || 0))}
                       placeholder={billDiscountType === 'percent' ? 'e.g. 5%' : 'e.g. 500'}
-                      className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                      className="flex-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/30"
                     />
 
                     {billDiscountValue > 0 && (
                       <button
                         type="button"
                         onClick={() => setBillDiscountValue(0)}
-                        className="px-2 py-1 text-slate-400 hover:text-rose-400 text-xs cursor-pointer"
+                        className="px-2 py-1 text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 text-xs cursor-pointer"
                       >
                         Clear
                       </button>
@@ -1431,7 +1438,7 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                   {/* Presets */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                    <span className="text-[10px] text-slate-500">Presets:</span>
+                    <span className="text-[10px] text-[var(--text-secondary)]">Presets:</span>
                     {[5, 10, 15].map((pct) => (
                       <button
                         key={pct}
@@ -1443,7 +1450,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                         className={`text-[10px] px-2 py-0.5 rounded-md border transition ${
                           billDiscountType === 'percent' && billDiscountValue === pct
                             ? 'bg-purple-600 border-purple-500 text-white font-bold shadow-sm'
-                            : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         {pct}%
@@ -1460,7 +1467,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                         className={`text-[10px] px-2 py-0.5 rounded-md border transition ${
                           billDiscountType === 'fixed' && billDiscountValue === amt
                             ? 'bg-purple-600 border-purple-500 text-white font-bold shadow-sm'
-                            : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         Rs. {amt}
@@ -1470,12 +1477,12 @@ export const PosTab: React.FC<PosTabProps> = ({
                 </div>
 
                 {/* Channel & Payment Gateways */}
-                <div className="space-y-3 pt-3.5 border-t border-slate-800/80 text-xs">
+                <div className="space-y-3 pt-3.5 border-t border-[var(--border-subtle)] text-xs">
                   {/* Platform Selector */}
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-slate-300 font-semibold">Sales Channel / Platform</span>
-                      <span className="text-[11px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                      <span className="text-[var(--text-primary)] font-semibold">Sales Channel / Platform</span>
+                      <span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-500/20">
                         Fee: {activePlatform.feePercent}%
                       </span>
                     </div>
@@ -1487,8 +1494,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                           onClick={() => setSelectedPlatformCode(plt.code)}
                           className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                             selectedPlatformCode === plt.code
-                              ? 'border-purple-500 bg-purple-500/15 text-white shadow-md shadow-purple-950/40 ring-1 ring-purple-500/30'
-                              : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                              ? 'border-purple-500 bg-purple-50 dark:bg-purple-500/15 text-purple-900 dark:text-white shadow-sm ring-1 ring-purple-500/30'
+                              : 'border-[var(--border-subtle)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:border-purple-300 dark:hover:border-slate-700 hover:text-[var(--text-primary)]'
                           }`}
                         >
                           <div className="font-semibold text-xs truncate">{plt.name}</div>
@@ -1501,8 +1508,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                   {/* Payment Gateway Selector */}
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-slate-300 font-semibold">Payment Gateway</span>
-                      <span className="text-[11px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                      <span className="text-[var(--text-primary)] font-semibold">Payment Gateway</span>
+                      <span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-500/20">
                         {isCreditActive ? 'Credit Sale (0% Surcharge)' : `Surcharge: ${Math.round(gatewayFeePercentage * 100)}% added`}
                       </span>
                     </div>
@@ -1530,13 +1537,13 @@ export const PosTab: React.FC<PosTabProps> = ({
                             className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                               isSelected
                                 ? isCredit
-                                  ? 'border-amber-500 bg-amber-500/20 text-white shadow-md shadow-amber-950/40 ring-1 ring-amber-500/30'
-                                  : 'border-purple-500 bg-purple-500/20 text-white shadow-md shadow-purple-950/40 ring-1 ring-purple-500/30'
-                                : 'border-slate-800 bg-slate-950/70 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                                  ? 'border-amber-500 bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] shadow-sm ring-1 ring-amber-500/30'
+                                  : 'border-purple-500 bg-purple-50 dark:bg-purple-500/20 text-purple-900 dark:text-white shadow-sm ring-1 ring-purple-500/30'
+                                : 'border-[var(--border-subtle)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:border-purple-300 dark:hover:border-slate-700 hover:text-[var(--text-primary)]'
                             }`}
                           >
                             <div className="font-semibold text-xs truncate flex items-center gap-1.5">
-                              {isCredit && <Clock className="w-3.5 h-3.5 text-amber-400" />}
+                              {isCredit && <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
                               <span>{gw.name}</span>
                             </div>
                             <div className="text-[10px] font-mono opacity-80 mt-0.5">
@@ -1554,23 +1561,23 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                   {/* Credit Customer Specific Settlement Details & Partial Payment Split */}
                   {isCreditActive && (
-                    <div className="p-4 bg-gradient-to-br from-amber-950/30 via-slate-950/80 to-amber-950/20 border border-amber-500/40 rounded-2xl space-y-3.5 text-xs shadow-lg shadow-amber-950/20 backdrop-blur-md animate-fadeIn">
-                      <div className="flex items-center justify-between pb-2 border-b border-amber-500/30">
-                        <span className="font-bold text-amber-300 flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-amber-400" />
+                    <div className="p-4 bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200 dark:border-amber-500/40 rounded-2xl space-y-3.5 text-xs shadow-sm animate-fadeIn">
+                      <div className="flex items-center justify-between pb-2 border-b border-amber-200 dark:border-amber-500/30">
+                        <span className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                           <span>Partial Payment &amp; Credit Split Terms</span>
                         </span>
-                        <span className="text-[10px] font-mono bg-amber-500/25 text-amber-200 px-2.5 py-0.5 rounded-full border border-amber-500/40 font-bold">
+                        <span className="text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-500/40 font-bold">
                           Accounts Receivable
                         </span>
                       </div>
 
                       {/* Advance Payment Input & Presets */}
-                      <div className="space-y-2 bg-slate-950/90 p-3 rounded-xl border border-slate-800/80">
+                      <div className="space-y-2 bg-[var(--bg-surface)] p-3 rounded-xl border border-[var(--border-subtle)]">
                         <div className="flex justify-between items-center">
-                          <label className="text-[11px] font-semibold text-slate-200 flex items-center gap-1">
+                          <label className="text-[11px] font-semibold text-[var(--text-primary)] flex items-center gap-1">
                             <span>Advance Paid Amount (මුලික ගෙවීම)</span>
-                            <span className="text-[10px] text-slate-400 font-normal">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-normal">
                               (Leave 0 for full credit)
                             </span>
                           </label>
@@ -1578,7 +1585,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             <button
                               type="button"
                               onClick={() => setAdvancePaidAmount(0)}
-                              className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                              className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                             >
                               Reset to 0
                             </button>
@@ -1587,7 +1594,7 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                         <div className="flex items-center gap-2">
                           <div className="relative flex-1">
-                            <span className="absolute left-3 top-2 text-slate-400 font-mono text-xs">Rs.</span>
+                            <span className="absolute left-3 top-2 text-[var(--text-secondary)] font-mono text-xs">Rs.</span>
                             <input
                               type="number"
                               min="0"
@@ -1599,7 +1606,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                 )
                               }
                               placeholder="0 (Full Credit)"
-                              className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                              className="w-full pl-9 pr-3 py-2 bg-[var(--bg-app)] border border-amber-300 dark:border-amber-500/40 rounded-xl text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400"
                             />
                           </div>
 
@@ -1617,8 +1624,8 @@ export const PosTab: React.FC<PosTabProps> = ({
                                 onClick={() => setAdvancePaidAmount(preset.val)}
                                 className={`px-2.5 py-1.5 rounded-lg text-[10px] font-mono border transition-all cursor-pointer ${
                                   advancePaidAmount === preset.val
-                                    ? 'bg-amber-600 border-amber-500 text-white font-bold shadow-md shadow-amber-950/40'
-                                    : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850'
+                                    ? 'bg-amber-600 border-amber-500 text-white font-bold shadow-sm'
+                                    : 'bg-[var(--bg-app)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                                 }`}
                               >
                                 {preset.label}
@@ -1629,8 +1636,8 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                         {/* Advance Payment Method (if advance paid > 0) */}
                         {advancePaidAmount > 0 && (
-                          <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-slate-400 font-medium">Advance Paid Via:</span>
+                          <div className="pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-[var(--text-secondary)] font-medium">Advance Paid Via:</span>
                             <div className="flex gap-1.5 text-[10px]">
                               {['Cash', 'Card', 'Bank Transfer', 'Cheque'].map((m) => (
                                 <button
@@ -1640,7 +1647,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                   className={`px-2.5 py-1 rounded-md border transition cursor-pointer ${
                                     advancePaymentMethod === m
                                       ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white font-bold shadow-sm'
-                                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                      : 'bg-[var(--bg-app)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                   }`}
                                 >
                                   {m}
@@ -1652,16 +1659,16 @@ export const PosTab: React.FC<PosTabProps> = ({
                       </div>
 
                       {/* Calculation Breakdown Box */}
-                      <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950/90 rounded-xl border border-slate-800/90 text-[11px] font-mono shadow-inner">
+                      <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)] text-[11px] font-mono">
                         <div>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans">Advance Collected:</div>
-                          <div className="text-emerald-400 font-bold text-sm mt-0.5">
+                          <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-sans">Advance Collected:</div>
+                          <div className="text-emerald-600 dark:text-emerald-400 font-bold text-sm mt-0.5">
                             Rs. {advancePaidAmount.toLocaleString()}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider font-sans">Credit Balance Due:</div>
-                          <div className="text-amber-400 font-bold text-sm mt-0.5 glow-amber">
+                          <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-sans">Credit Balance Due:</div>
+                          <div className="text-amber-700 dark:text-amber-400 font-bold text-sm mt-0.5">
                             Rs. {creditBalanceDue.toLocaleString()}
                           </div>
                         </div>
@@ -1670,7 +1677,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                       {/* Due Date Presets & Date Picker */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                          <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                          <label className="block text-[10px] text-[var(--text-secondary)] font-semibold mb-1">
                             Settlement Due Date *
                           </label>
                           <input
@@ -1678,11 +1685,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                             value={creditDueDate}
                             onChange={(e) => setCreditDueDate(e.target.value)}
                             min={new Date().toISOString().split('T')[0]}
-                            className="w-full px-3 py-1.5 bg-slate-900 border border-amber-500/50 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                            className="w-full px-3 py-1.5 bg-[var(--bg-surface)] border border-amber-300 dark:border-amber-500/50 rounded-xl text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-400"
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-400 font-semibold mb-1">Due Date Presets</label>
+                          <label className="block text-[10px] text-[var(--text-secondary)] font-semibold mb-1">Due Date Presets</label>
                           <div className="flex items-center gap-1.5">
                             {[7, 14, 30].map((days) => (
                               <button
@@ -1693,7 +1700,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                   d.setDate(d.getDate() + days);
                                   setCreditDueDate(d.toISOString().split('T')[0]);
                                 }}
-                                className="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-[10px] font-mono text-amber-300 font-semibold transition cursor-pointer"
+                                className="flex-1 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl text-[10px] font-mono text-amber-700 dark:text-amber-300 font-semibold transition cursor-pointer"
                               >
                                 +{days}d
                               </button>
@@ -1703,7 +1710,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] text-slate-400 font-semibold mb-1">
+                        <label className="block text-[10px] text-[var(--text-secondary)] font-semibold mb-1">
                           Payment Agreement / Terms Note
                         </label>
                         <input
@@ -1711,12 +1718,12 @@ export const PosTab: React.FC<PosTabProps> = ({
                           value={creditNotes}
                           onChange={(e) => setCreditNotes(e.target.value)}
                           placeholder="e.g. 50% advance received, balance payable upon monthly settlement"
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                          className="w-full px-3 py-2 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
 
-                      <div className="text-[10px] text-amber-200/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/25 flex items-start gap-2">
-                        <Send className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-[10px] text-amber-800 dark:text-amber-200/90 bg-amber-100/70 dark:bg-amber-500/10 p-2.5 rounded-xl border border-amber-200 dark:border-amber-500/25 flex items-start gap-2">
+                        <Send className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <span>
                           Automated SMS with Advance Paid (Rs. {advancePaidAmount.toLocaleString()}), Balance Due (Rs.{' '}
                           {creditBalanceDue.toLocaleString()}), and Due Date ({creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'Due Date'}) will be dispatched upon sale.
@@ -1726,10 +1733,10 @@ export const PosTab: React.FC<PosTabProps> = ({
                   )}
 
                   {/* Customer Info (Searchable & Dynamic) */}
-                  <div className="space-y-2.5 pt-3 border-t border-slate-800/80 text-xs">
+                  <div className="space-y-2.5 pt-3 border-t border-[var(--border-subtle)] text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-200 font-semibold flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-[var(--text-primary)] font-semibold flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                         Customer Details
                       </span>
                       <button
@@ -1740,7 +1747,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                           setCustomerCity('Colombo 04');
                           setIsCustomerDropdownOpen(false);
                         }}
-                        className="text-[10px] text-purple-400 hover:text-purple-300 underline cursor-pointer"
+                        className="text-[10px] text-purple-600 dark:text-purple-400 hover:text-purple-500 dark:hover:text-purple-300 underline cursor-pointer"
                       >
                         Reset to Cash Customer
                       </button>
@@ -1749,7 +1756,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 relative">
                       {/* Customer Name input with autocomplete */}
                       <div className="relative">
-                        <label className="block text-[10px] text-slate-400 font-medium mb-1">Customer Name</label>
+                        <label className="block text-[10px] text-[var(--text-secondary)] font-medium mb-1">Customer Name</label>
                         <input
                           type="text"
                           value={customerName}
@@ -1759,18 +1766,18 @@ export const PosTab: React.FC<PosTabProps> = ({
                           }}
                           onFocus={() => setIsCustomerDropdownOpen(true)}
                           placeholder="Cash Customer (or search/type)"
-                          className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-sans text-xs focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                          className="w-full px-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-sans text-xs focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
                         />
 
                         {/* Customer Autocomplete Dropdown */}
                         {isCustomerDropdownOpen && customerList.length > 0 && (
-                          <div className="absolute top-full left-0 z-50 w-72 mt-1 bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl backdrop-blur-xl max-h-52 overflow-y-auto p-1.5 text-xs">
-                            <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between items-center border-b border-slate-800">
+                          <div className="absolute top-full left-0 z-50 w-72 mt-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl max-h-52 overflow-y-auto p-1.5 text-xs">
+                            <div className="px-2 py-1 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider flex justify-between items-center border-b border-[var(--border-subtle)]">
                               <span>Directory Customers</span>
                               <button
                                 type="button"
                                 onClick={() => setIsCustomerDropdownOpen(false)}
-                                className="text-slate-400 hover:text-white cursor-pointer"
+                                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
                               >
                                 ✕
                               </button>
@@ -1794,13 +1801,13 @@ export const PosTab: React.FC<PosTabProps> = ({
                                     if (c.address) setCustomerAddress(c.address);
                                     setIsCustomerDropdownOpen(false);
                                   }}
-                                  className="p-2 hover:bg-slate-800 rounded-lg cursor-pointer transition flex items-center justify-between"
+                                  className="p-2 hover:bg-[var(--bg-subtle)] rounded-lg cursor-pointer transition flex items-center justify-between"
                                 >
                                   <div>
-                                    <div className="font-semibold text-white">{c.name || 'Customer'}</div>
-                                    <div className="text-[10px] font-mono text-purple-400">{c.phone}</div>
+                                    <div className="font-semibold text-[var(--text-primary)]">{c.name || 'Customer'}</div>
+                                    <div className="text-[10px] font-mono text-purple-600 dark:text-purple-400">{c.phone}</div>
                                   </div>
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-950 text-slate-400 font-mono border border-slate-800">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-app)] text-[var(--text-secondary)] font-mono border border-[var(--border-subtle)]">
                                     {c.source || 'POS'}
                                   </span>
                                 </div>
@@ -1812,10 +1819,10 @@ export const PosTab: React.FC<PosTabProps> = ({
                       {/* Customer Phone */}
                       <div>
                         <div className="flex justify-between items-center mb-1">
-                          <label className="block text-[10px] text-slate-400 font-medium">
-                            Mobile Phone {isCreditActive && <span className="text-amber-400 font-bold">* Required</span>}
+                          <label className="block text-[10px] text-[var(--text-secondary)] font-medium">
+                            Mobile Phone {isCreditActive && <span className="text-amber-600 dark:text-amber-400 font-bold">* Required</span>}
                           </label>
-                          <span className="text-[9px] text-purple-400 font-mono">Auto +94</span>
+                          <span className="text-[9px] text-purple-600 dark:text-purple-400 font-mono">Auto +94</span>
                         </div>
                         <input
                           type="text"
@@ -1827,11 +1834,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                             }
                           }}
                           placeholder="0715330724 (or leave blank)"
-                          className={`w-full px-3 py-2 bg-slate-950 border ${
+                          className={`w-full px-3 py-2 bg-[var(--bg-app)] border ${
                             isCreditActive && (!customerPhone || customerPhone.length < 9)
                               ? 'border-amber-500/80 ring-2 ring-amber-500/30'
-                              : 'border-slate-800 focus:border-purple-500'
-                          } rounded-xl text-white font-mono text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/30`}
+                              : 'border-[var(--border-subtle)] focus:border-purple-500'
+                          } rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-purple-500/30`}
                         />
                       </div>
                     </div>
@@ -1840,72 +1847,72 @@ export const PosTab: React.FC<PosTabProps> = ({
               </div>
 
               {/* Financial Summary & Checkout Button */}
-              <div className="pt-3.5 border-t border-slate-800/80 space-y-3 text-xs">
+              <div className="pt-3.5 border-t border-[var(--border-subtle)] space-y-3 text-xs">
                 <div className="space-y-1.5 font-mono">
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-[var(--text-secondary)]">
                     <span>Gross Item Subtotal:</span>
-                    <span className="text-white">
+                    <span className="text-[var(--text-primary)] font-semibold">
                       Rs. {grossItemSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   {totalDiscount > 0 && (
-                    <div className="flex justify-between text-emerald-400 font-semibold">
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
                       <span>Total Discounts Applied:</span>
                       <span>-Rs. {totalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
                   {billDiscountAmount > 0 && (
-                    <div className="flex justify-between text-slate-500 text-[11px]">
+                    <div className="flex justify-between text-[var(--text-secondary)] text-[11px]">
                       <span>└ Bill Discount ({billDiscountType === 'percent' ? `${billDiscountValue}%` : `Rs. ${billDiscountValue}`}):</span>
                       <span>-Rs. {billDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
                   {paymentFeeAmount > 0 ? (
-                    <div className="flex justify-between text-purple-400">
+                    <div className="flex justify-between text-purple-600 dark:text-purple-400">
                       <span>Payment Fee (+{Math.round(gatewayFeePercentage * 100)}% Add to Total):</span>
                       <span>+Rs. {paymentFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   ) : (
-                    <div className="flex justify-between text-slate-500 text-[11px]">
+                    <div className="flex justify-between text-[var(--text-secondary)] text-[11px]">
                       <span>Payment Fee (0%):</span>
                       <span>Rs. 0.00</span>
                     </div>
                   )}
 
                   {courierFee > 0 && (
-                    <div className="flex justify-between text-slate-400">
+                    <div className="flex justify-between text-[var(--text-secondary)]">
                       <span>Courier Shipping Cost:</span>
                       <span>+Rs. {courierFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center text-white font-bold text-base pt-2 pb-1 border-t border-slate-800/80">
-                    <span className="text-xs uppercase tracking-wider text-slate-300">Final Gross Total:</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-400 font-mono text-lg font-extrabold">
+                  <div className="flex justify-between items-center text-[var(--text-primary)] font-bold text-base pt-2 pb-1 border-t border-[var(--border-subtle)]">
+                    <span className="text-xs uppercase tracking-wider text-[var(--text-secondary)]">Final Gross Total:</span>
+                    <span className="text-[var(--accent-primary)] font-mono text-lg font-extrabold">
                       Rs. {finalGrossTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
 
                   {isCreditActive && (
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-slate-900/80 to-amber-950/30 border border-amber-500/40 space-y-1.5 text-xs font-mono shadow-md">
-                      <div className="flex justify-between text-slate-300">
+                    <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/35 border border-amber-200 dark:border-amber-500/40 space-y-1.5 text-xs font-mono shadow-sm">
+                      <div className="flex justify-between text-[var(--text-secondary)]">
                         <span>Advance Paid Today:</span>
-                        <span className="font-bold text-emerald-400">
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
                           Rs. {advancePaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div className="flex justify-between text-amber-300 font-bold">
+                      <div className="flex justify-between text-amber-800 dark:text-amber-300 font-bold">
                         <span>Balance Due (Credit):</span>
-                        <span className="font-bold text-amber-400 text-sm glow-amber">
+                        <span className="font-bold text-amber-700 dark:text-amber-400 text-sm">
                           Rs. {creditBalanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
-                      <div className="flex justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+                      <div className="flex justify-between text-[10px] text-[var(--text-secondary)] pt-1 border-t border-amber-200 dark:border-amber-500/20">
                         <span>Settlement Due Date:</span>
-                        <span className="font-mono text-white font-semibold">
+                        <span className="font-mono text-[var(--text-primary)] font-semibold">
                           {creditDueDate ? new Date(creditDueDate).toLocaleDateString('en-GB') : 'As agreed'}
                         </span>
                       </div>
@@ -1913,34 +1920,34 @@ export const PosTab: React.FC<PosTabProps> = ({
                   )}
 
                   {platformFeeAmount > 0 && (
-                    <div className="flex justify-between text-amber-400 text-[11px]">
+                    <div className="flex justify-between text-amber-600 dark:text-amber-400 text-[11px]">
                       <span>Platform Fee ({activePlatform.feePercent}%):</span>
                       <span>-Rs. {platformFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between text-slate-400 text-[11px]">
+                  <div className="flex justify-between text-[var(--text-secondary)] text-[11px]">
                     <span>Cost of Goods (COGS):</span>
                     <span>-Rs. {totalCostOfGoods.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </div>
 
                   {hasUnregisteredInCart ? (
-                    <div className="pt-2 pb-1 border-t border-slate-800">
-                      <div className="flex justify-between items-center text-amber-400">
+                    <div className="pt-2 pb-1 border-t border-[var(--border-subtle)]">
+                      <div className="flex justify-between items-center text-amber-700 dark:text-amber-400">
                         <span className="font-semibold text-[11px]">Net Estimated Profit:</span>
-                        <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30 font-mono">
+                        <span className="text-[10px] bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] px-2 py-0.5 rounded border border-amber-200 dark:border-amber-500/30 font-mono">
                           Pending / Inventory Not Found
                         </span>
                       </div>
-                      <p className="text-[10px] text-amber-300/80 mt-1">
+                      <p className="text-[10px] text-amber-700 dark:text-amber-300/80 mt-1">
                         Cart contains unregistered items with missing cost price. Arbitrary profit suppressed.
                       </p>
                     </div>
                   ) : (
-                    <div className="flex justify-between text-emerald-400 font-semibold pt-1.5 border-t border-slate-800">
+                    <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-semibold pt-1.5 border-t border-[var(--border-subtle)]">
                       <div>
                         <span>Net Estimated Profit:</span>
-                        <div className="text-[9px] text-slate-400 font-sans font-normal">
+                        <div className="text-[9px] text-[var(--text-secondary)] font-sans font-normal">
                           (Net Selling Price - COGS - Platform Fee)
                         </div>
                       </div>
@@ -1955,15 +1962,15 @@ export const PosTab: React.FC<PosTabProps> = ({
                   type="button"
                   onClick={handleCheckout}
                   disabled={cart.length === 0}
-                  className={`w-full py-3 px-4 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99] ${
+                  className={`w-full py-3 px-4 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99] ${
                     isCreditActive
-                      ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:brightness-110 shadow-amber-950/60 border border-amber-400/40'
-                      : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 shadow-purple-950/60 border border-purple-400/40'
+                      ? 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:brightness-110 border border-amber-400/40'
+                      : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 border border-purple-400/40'
                   }`}
                 >
                   {isCreditActive ? (
                     <>
-                      <Clock className="w-4 h-4 text-amber-200" />
+                      <Clock className="w-4 h-4 text-amber-100" />
                       <span>
                         {advancePaidAmount > 0
                           ? `Complete Sale (Rs. ${advancePaidAmount.toLocaleString()} Advance, Rs. ${creditBalanceDue.toLocaleString()} Credit)`
@@ -1988,26 +1995,26 @@ export const PosTab: React.FC<PosTabProps> = ({
       {activeSubTab === 'invoices' && (
         <div className="space-y-4">
           {/* Search bar & Stats */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-3.5 bg-slate-900/70 border border-slate-800/80 rounded-2xl backdrop-blur-md shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-3.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-sm">
             <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
               <input
                 type="text"
                 value={orderSearchQuery}
                 onChange={(e) => setOrderSearchQuery(e.target.value)}
                 placeholder="Search invoice #, customer name, gateway..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-950/80 border border-slate-800 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)]/30"
               />
             </div>
 
-            <div className="text-xs text-slate-400 flex items-center gap-3 font-mono">
+            <div className="text-xs text-[var(--text-secondary)] flex items-center gap-3 font-mono">
               <span>
-                Total Invoiced: <strong className="text-white font-mono">{orders.length}</strong>
+                Total Invoiced: <strong className="text-[var(--text-primary)] font-mono">{orders.length}</strong>
               </span>
               <span>·</span>
               <span>
                 Returns Processed:{' '}
-                <strong className="text-amber-400 font-mono">
+                <strong className="text-amber-600 dark:text-amber-400 font-mono">
                   {orders.filter((o) => o.status === 'Returned' || o.status === 'Partially Returned').length}
                 </strong>
               </span>
@@ -2015,11 +2022,11 @@ export const PosTab: React.FC<PosTabProps> = ({
           </div>
 
           {/* Invoices Table */}
-          <div className="rounded-2xl border border-slate-800/80 bg-slate-900/60 backdrop-blur-md overflow-hidden shadow-xl">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800/90 bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider">
+                  <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] uppercase text-[10px] tracking-wider">
                     <th className="py-3.5 px-4 font-semibold">Invoice No & Date</th>
                     <th className="py-3.5 px-4 font-semibold">Customer Details</th>
                     <th className="py-3.5 px-4 font-semibold">Channel & Gateway Fee</th>
@@ -2030,20 +2037,20 @@ export const PosTab: React.FC<PosTabProps> = ({
                     <th className="py-3.5 px-4 font-semibold text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/70">
+                <tbody className="divide-y divide-[var(--border-subtle)]">
                   {filteredOrders.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center">
                         <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                          <ShoppingCart className="w-10 h-10 text-slate-600 mb-1" />
-                          <p className="font-semibold text-white text-sm">No Invoices Found</p>
-                          <p className="text-xs text-slate-400">
+                          <ShoppingCart className="w-10 h-10 text-[var(--text-secondary)]/50 mb-1" />
+                          <p className="font-semibold text-[var(--text-primary)] text-sm">No Invoices Found</p>
+                          <p className="text-xs text-[var(--text-secondary)]">
                             No sales invoices have been created yet. Process an order through the POS terminal to generate your first invoice.
                           </p>
                           <button
                             type="button"
                             onClick={() => setActiveSubTab('terminal')}
-                            className="mt-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white rounded-xl text-xs font-semibold shadow-md shadow-purple-950/40 transition-all cursor-pointer"
+                            className="mt-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
                           >
                             Open POS Terminal
                           </button>
@@ -2052,20 +2059,20 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </tr>
               ) : (
                 (filteredOrders || []).map((order, idx) => (
-                  <tr key={`${order.id || order.invoiceNumber || 'pos-ord'}-${idx}`} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={`${order.id || order.invoiceNumber || 'pos-ord'}-${idx}`} className="hover:bg-[var(--bg-subtle)]/50 transition-colors">
                     <td className="py-3.5 px-4">
-                      <div className="font-mono font-bold text-white text-xs">{order.invoiceNumber}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      <div className="font-mono font-bold text-[var(--text-primary)] text-xs">{order.invoiceNumber}</div>
+                      <div className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
                         {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : '-'}
                       </div>
                       {order.waybillNumber ? (
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-cyan-300 font-mono bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-500/20 w-fit">
+                        <div className="mt-1 flex items-center gap-1 text-[10px] text-cyan-700 dark:text-cyan-300 font-mono bg-cyan-50 dark:bg-cyan-500/10 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-cyan-500/20 w-fit">
                           <Truck className="w-3 h-3" />
                           <span>TX: {order.waybillNumber}</span>
                         </div>
                       ) : order.waybillError ? (
                         <div
-                          className="mt-1 flex items-center gap-1 text-[10px] text-rose-300 font-mono bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 w-fit truncate max-w-[140px]"
+                          className="mt-1 flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-300 font-mono bg-rose-50 dark:bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-500/20 w-fit truncate max-w-[140px]"
                           title={order.waybillError}
                         >
                           <AlertTriangle className="w-3 h-3 flex-shrink-0" />
@@ -2075,17 +2082,17 @@ export const PosTab: React.FC<PosTabProps> = ({
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="font-semibold text-white">{order.customerName}</div>
-                      <div className="text-slate-400 font-mono text-[11px] mt-0.5">{order.customerPhone}</div>
+                      <div className="font-semibold text-[var(--text-primary)]">{order.customerName}</div>
+                      <div className="text-[var(--text-secondary)] font-mono text-[11px] mt-0.5">{order.customerPhone}</div>
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="text-slate-200 font-medium">{order.channelName}</div>
-                      <div className="text-[11px] text-purple-300 font-mono">
+                      <div className="text-[var(--text-primary)] font-medium">{order.channelName}</div>
+                      <div className="text-[11px] text-purple-600 dark:text-purple-300 font-mono">
                         {order.paymentGatewayName} ({order.gatewayFeePercent}%)
                       </div>
                       {order.gatewayFeeAmount > 0 && (
-                        <div className="text-[10px] text-purple-400 font-mono">
+                        <div className="text-[10px] text-purple-600 dark:text-purple-400 font-mono">
                           +Rs. {order.gatewayFeeAmount.toLocaleString()} surcharge
                         </div>
                       )}
@@ -2093,19 +2100,19 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                     <td className="py-3.5 px-4">
                       {((order?.items) || []).map((it, idx) => (
-                        <div key={idx} className="text-slate-300 text-[11px]">
-                          <span className="font-semibold text-white">{it.quantity}x</span> {it.name}
+                        <div key={idx} className="text-[var(--text-secondary)] text-[11px]">
+                          <span className="font-semibold text-[var(--text-primary)]">{it.quantity}x</span> {it.name}
                           {it.returned && (
-                            <span className="ml-1 text-[10px] text-amber-300 font-mono bg-amber-500/10 px-1 rounded">[Returned]</span>
+                            <span className="ml-1 text-[10px] text-amber-700 dark:text-amber-300 font-mono bg-amber-50 dark:bg-amber-500/10 px-1 rounded">[Returned]</span>
                           )}
                         </div>
                       ))}
                     </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono tabular-nums text-white font-bold text-sm">
+                        <td className="py-3.5 px-4 text-right font-mono tabular-nums text-[var(--text-primary)] font-bold text-sm">
                           Rs. {Number(order.grossTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           {order.baseSubtotal && order.baseSubtotal !== order.grossTotal && (
-                            <div className="text-[10px] text-slate-400 font-normal">
+                            <div className="text-[10px] text-[var(--text-secondary)] font-normal">
                               Base: Rs. {Number(order.baseSubtotal || 0).toLocaleString()}
                             </div>
                           )}
@@ -2113,11 +2120,11 @@ export const PosTab: React.FC<PosTabProps> = ({
 
                         <td className="py-3.5 px-4 text-right font-mono tabular-nums font-semibold">
                           {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
-                            <span className="inline-block text-[10px] text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 whitespace-nowrap">
+                            <span className="inline-block text-[10px] bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-500/30 whitespace-nowrap">
                               Pending / Inventory Not Found
                             </span>
                           ) : (
-                            <span className="text-emerald-400 font-bold">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                               Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </span>
                           )}
@@ -2127,12 +2134,12 @@ export const PosTab: React.FC<PosTabProps> = ({
                           <span
                             className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
                               order.status === 'Completed' || order.status === 'Delivered'
-                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border-teal-200 dark:border-emerald-500/30'
                                 : order.status === 'Returned'
-                                ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                                ? 'bg-rose-50 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30'
                                 : order.status === 'Partially Returned'
-                                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                                : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                                ? 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border-amber-200 dark:border-amber-500/30'
+                                : 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/30'
                             }`}
                           >
                             {order.status}
@@ -2144,7 +2151,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             {/* View / Print A4 Warranty Invoice */}
                             <button
                               onClick={() => setSelectedInvoiceForPrint(order)}
-                              className="px-2.5 py-1 text-purple-200 hover:text-white bg-purple-600/20 hover:bg-purple-600 border border-purple-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm"
+                              className="px-2.5 py-1 text-purple-700 dark:text-purple-200 hover:text-white bg-purple-50 dark:bg-purple-600/20 hover:bg-purple-600 border border-purple-200 dark:border-purple-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm"
                               title="Print / Download A4 Warranty Invoice"
                             >
                               <FileText className="w-3 h-3" />
@@ -2154,7 +2161,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             {/* Print 4x6 Daraz-Style Thermal Shipping Label */}
                             <button
                               onClick={() => setSelectedOrderForThermalPrint(order)}
-                              className="px-2.5 py-1 text-emerald-200 hover:text-white bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm"
+                              className="px-2.5 py-1 text-emerald-700 dark:text-emerald-200 hover:text-white bg-emerald-50 dark:bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-200 dark:border-emerald-500/30 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm"
                               title="Print 100mm x 150mm Daraz-Style 4x6 Thermal Shipping Waybill"
                             >
                               <Printer className="w-3 h-3" />
@@ -2165,7 +2172,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             {order.status !== 'Returned' && (
                               <button
                                 onClick={() => setReturnModalOrder(order)}
-                                className="p-1.5 text-amber-400 hover:text-amber-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                                className="p-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors cursor-pointer"
                                 title="Process Customer Return & Restore Stock"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
@@ -2175,7 +2182,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                             {/* Edit Invoice */}
                             <button
                               onClick={() => setEditModalOrder(order)}
-                              className="p-1.5 text-purple-400 hover:text-purple-300 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                              className="p-1.5 text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 rounded-lg hover:bg-[var(--bg-subtle)] transition-colors cursor-pointer"
                               title="Edit Invoice Details"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -2188,7 +2195,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                                   onDeleteOrder(order.id);
                                 }
                               }}
-                              className="p-1.5 text-neutral-500 hover:text-red-400 rounded hover:bg-neutral-800 transition-colors"
+                              className="p-1.5 text-[var(--text-secondary)] hover:text-red-500 dark:hover:text-red-400 rounded hover:bg-[var(--bg-subtle)] transition-colors"
                               title="Delete Invoice"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2229,52 +2236,52 @@ export const PosTab: React.FC<PosTabProps> = ({
 
       {/* Return & Stock Restoration Modal */}
       {returnModalOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
               <div className="flex items-center gap-2">
-                <RotateCcw className="w-4 h-4 text-amber-400" />
-                <h3 className="text-sm font-semibold text-white">
+                <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                   Process Return & Restore Stock
                 </h3>
               </div>
               <button
                 onClick={() => setReturnModalOrder(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-5 space-y-4 text-xs">
-              <div className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl space-y-1">
+              <div className="p-3 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl space-y-1">
                 <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Invoice:</span>
-                  <span className="text-white font-semibold">{returnModalOrder.invoiceNumber}</span>
+                  <span className="text-[var(--text-secondary)]">Invoice:</span>
+                  <span className="text-[var(--text-primary)] font-semibold">{returnModalOrder.invoiceNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-400">Customer:</span>
-                  <span className="text-white">{returnModalOrder.customerName}</span>
+                  <span className="text-[var(--text-secondary)]">Customer:</span>
+                  <span className="text-[var(--text-primary)]">{returnModalOrder.customerName}</span>
                 </div>
                 <div className="flex justify-between font-mono">
-                  <span className="text-neutral-400">Gross Total Refunded:</span>
-                  <span className="text-amber-400 font-bold">
+                  <span className="text-[var(--text-secondary)]">Gross Total Refunded:</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold">
                     Rs. {returnModalOrder.grossTotal.toLocaleString()}
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">
                   Items Returning to Store Stock:
                 </label>
-                <div className="p-2.5 bg-neutral-950 border border-neutral-800 rounded-lg space-y-1.5">
+                <div className="p-2.5 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-lg space-y-1.5">
                   {((returnModalOrder?.items) || []).map((it, idx) => (
                     <div key={idx} className="flex justify-between items-center text-[11px]">
-                      <span className="text-white">
+                      <span className="text-[var(--text-primary)]">
                         {it.quantity}x {it.name}
                       </span>
-                      <span className="font-mono text-emerald-400 font-medium">
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-medium">
                         +{it.quantity} stock will be restored
                       </span>
                     </div>
@@ -2283,17 +2290,17 @@ export const PosTab: React.FC<PosTabProps> = ({
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Reason for Return</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Reason for Return</label>
                 <input
                   type="text"
                   value={returnReason}
                   onChange={(e) => setReturnReason(e.target.value)}
                   placeholder="e.g. Customer change of mind / unopened seal"
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
-              <div className="p-3 bg-amber-950/40 border border-amber-800/40 rounded-lg text-[11px] text-amber-300">
+              <div className="p-3 bg-[var(--badge-pending-bg)] border border-amber-200 dark:border-amber-800/40 rounded-lg text-[11px] text-[var(--badge-pending-text)]">
                 Notice: Confirming this return will automatically increment store inventory stock for all returned items and adjust business net profit calculations.
               </div>
 
@@ -2301,7 +2308,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setReturnModalOrder(null)}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -2328,15 +2335,15 @@ export const PosTab: React.FC<PosTabProps> = ({
 
       {/* Edit Invoice Modal */}
       {editModalOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <h3 className="text-sm font-semibold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 Edit Invoice - {editModalOrder.invoiceNumber}
               </h3>
               <button
                 onClick={() => setEditModalOrder(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2356,46 +2363,46 @@ export const PosTab: React.FC<PosTabProps> = ({
               className="p-5 space-y-3 text-xs"
             >
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Customer Name</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Customer Name</label>
                 <input
                   type="text"
                   value={editModalOrder.customerName}
                   onChange={(e) =>
                     setEditModalOrder({ ...editModalOrder, customerName: e.target.value })
                   }
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Customer Phone</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Customer Phone</label>
                 <input
                   type="text"
                   value={editModalOrder.customerPhone}
                   onChange={(e) =>
                     setEditModalOrder({ ...editModalOrder, customerPhone: e.target.value })
                   }
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">City / Region</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">City / Region</label>
                 <input
                   type="text"
                   value={editModalOrder.city}
                   onChange={(e) => setEditModalOrder({ ...editModalOrder, city: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Invoice Notes</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Invoice Notes</label>
                 <textarea
                   rows={2}
                   value={editModalOrder.notes || ''}
                   onChange={(e) => setEditModalOrder({ ...editModalOrder, notes: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
@@ -2403,7 +2410,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditModalOrder(null)}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
@@ -2440,43 +2447,43 @@ export const PosTab: React.FC<PosTabProps> = ({
 
       {/* Mandatory Serial Number & IMEI Allocation Modal */}
       {serialPickerItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-purple-400" />
-                <h3 className="text-sm font-semibold text-white">Allocate Unique Serial / IMEI</h3>
+                <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Allocate Unique Serial / IMEI</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSerialPickerItem(null)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-5 space-y-4 text-xs">
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
-                <div className="font-semibold text-white text-sm">{serialPickerItem.name}</div>
-                <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+              <div className="p-3 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border-subtle)] space-y-1">
+                <div className="font-semibold text-[var(--text-primary)] text-sm">{serialPickerItem.name}</div>
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] font-mono text-[11px]">
                   <span>SKU: {serialPickerItem.sku}</span>
                   {serialPickerItem.barcode && <span>Barcode: {serialPickerItem.barcode}</span>}
                 </div>
               </div>
 
-              <div className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-xl text-purple-200 text-[11px] leading-relaxed">
-                <strong className="text-purple-300">Mandatory Unique Tracking:</strong> Scan the physical barcode on the box or pick from available store stock. This locks the exact serial number as &quot;Sold&quot; on customer&apos;s invoice.
+              <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/30 rounded-xl text-purple-800 dark:text-purple-200 text-[11px] leading-relaxed">
+                <strong className="text-purple-700 dark:text-purple-300">Mandatory Unique Tracking:</strong> Scan the physical barcode on the box or pick from available store stock. This locks the exact serial number as &quot;Sold&quot; on customer&apos;s invoice.
               </div>
 
               {/* Barcode scanner input inside modal */}
               <div className="space-y-1">
-                <label className="block text-slate-300 font-medium text-[11px]">
+                <label className="block text-[var(--text-secondary)] font-medium text-[11px]">
                   Scan Serial Barcode or Enter IMEI
                 </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Barcode className="w-4 h-4 text-purple-400 absolute left-3 top-2.5" />
+                    <Barcode className="w-4 h-4 text-purple-600 dark:text-purple-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
                       autoFocus
@@ -2496,7 +2503,7 @@ export const PosTab: React.FC<PosTabProps> = ({
                         }
                       }}
                       placeholder="Scan or type serial..."
-                      className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-purple-500/50 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-purple-400"
+                      className="w-full pl-9 pr-3 py-2 bg-[var(--bg-app)] border border-purple-500/50 rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono text-xs focus:outline-none focus:border-purple-500"
                     />
                   </div>
                   <button
@@ -2523,17 +2530,17 @@ export const PosTab: React.FC<PosTabProps> = ({
                 const available = getAvailableSerialsForSku(serialPickerItem.sku, serialPickerItem.barcode);
                 return (
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <div className="flex items-center justify-between text-[var(--text-secondary)] text-[11px]">
                       <span>Available Store Shelf Serials ({available.length})</span>
                       <span className="text-[10px]">Click to allocate</span>
                     </div>
 
                     {available.length === 0 ? (
-                      <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl text-center text-slate-500 text-[11px]">
+                      <div className="p-3 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl text-center text-[var(--text-secondary)] text-[11px]">
                         No pre-registered serials found in stock. You can type/scan any physical unit serial above.
                       </div>
                     ) : (
-                      <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-slate-950 rounded-xl border border-slate-800">
+                      <div className="max-h-40 overflow-y-auto space-y-1.5 p-2 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border-subtle)]">
                         {available.map((sn) => {
                           const isCurrentlyAssigned = serialPickerItem.serialNumber === sn;
                           return (
@@ -2550,15 +2557,15 @@ export const PosTab: React.FC<PosTabProps> = ({
                               }}
                               className={`w-full flex items-center justify-between p-2 rounded-lg border text-left font-mono transition-all cursor-pointer ${
                                 isCurrentlyAssigned
-                                  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
-                                  : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-purple-500/50 hover:bg-slate-850'
+                                  ? 'bg-[var(--badge-ready-bg)] border-teal-300 dark:border-emerald-500/50 text-[var(--badge-ready-text)]'
+                                  : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-purple-500/50 hover:bg-[var(--bg-subtle)]'
                               }`}
                             >
                               <div className="flex items-center gap-2">
-                                <Hash className="w-3.5 h-3.5 text-purple-400" />
+                                <Hash className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                                 <span className="font-semibold text-xs">{sn}</span>
                               </div>
-                              <span className="text-[10px] text-emerald-400 font-sans">
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-sans">
                                 {isCurrentlyAssigned ? '✓ Selected' : 'Select'}
                               </span>
                             </button>
@@ -2570,11 +2577,11 @@ export const PosTab: React.FC<PosTabProps> = ({
                 );
               })()}
 
-              <div className="flex justify-end pt-2 border-t border-slate-800">
+              <div className="flex justify-end pt-2 border-t border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => setSerialPickerItem(null)}
-                  className="px-4 py-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl font-medium cursor-pointer"
+                  className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-xl font-medium cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>

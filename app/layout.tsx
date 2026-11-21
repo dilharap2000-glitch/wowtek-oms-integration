@@ -8,11 +8,27 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0a0a',
+  themeColor: '#0F766E',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
 };
+
+const themeInitScript = `
+(function() {
+  try {
+    var saved = localStorage.getItem('wowtek_theme') || localStorage.getItem('wowtek-theme');
+    var theme = saved === 'midnight-emerald' ? 'midnight-emerald' : 'warm-daylight';
+    var root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    if (theme === 'midnight-emerald') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -20,8 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-purple-500/30 selection:text-purple-200">
+    <html lang="en" data-theme="warm-daylight" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="antialiased min-h-screen selection:bg-[var(--accent-primary)]/20">
         {children}
       </body>
     </html>

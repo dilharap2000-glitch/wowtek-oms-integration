@@ -641,22 +641,22 @@ export function SMSMarketingTab() {
   );
 
   return (
-    <div className="space-y-6 text-slate-100">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Header & CRM Overview Strip */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800/80 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-[var(--border-subtle)] gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-purple-600/20 via-indigo-600/20 to-pink-500/20 text-purple-300 border border-purple-500/30 shadow-inner">
+            <div className="p-2.5 rounded-xl bg-teal-50 dark:bg-purple-500/15 text-[var(--accent-primary)] dark:text-purple-300 border border-teal-200 dark:border-purple-500/30 shadow-sm">
               <MessageSquare className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-wide flex items-center gap-2">
+              <h1 className="text-xl font-bold text-[var(--text-primary)] tracking-wide flex items-center gap-2">
                 <span>SMS Marketing &amp; Customer CRM</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-emerald-500/20">
                   SMSlenz Gateway Active
                 </span>
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 Targeted SMS campaigns, de-duplicated Sri Lankan contact directory, and automated promotional broadcasts.
               </p>
             </div>
@@ -665,10 +665,10 @@ export function SMSMarketingTab() {
 
         {/* Quick KPI Counters & Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-xs font-mono">
-            <Users className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-slate-400">Total Contacts:</span>
-            <span className="text-white font-bold">{customers.length}</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs font-mono">
+            <Users className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
+            <span className="text-[var(--text-secondary)]">Total Contacts:</span>
+            <span className="text-[var(--text-primary)] font-bold">{customers.length}</span>
           </div>
           <button
             type="button"
@@ -676,7 +676,7 @@ export function SMSMarketingTab() {
               setBulkImportError(null);
               setShowBulkImportModal(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600/90 to-teal-600/90 hover:brightness-110 border border-emerald-400/30 text-xs text-white font-semibold transition cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-xs text-white font-semibold transition cursor-pointer shadow-sm"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Bulk Import CSV</span>
@@ -684,9 +684,9 @@ export function SMSMarketingTab() {
           <button
             type="button"
             onClick={fetchCustomers}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] transition cursor-pointer shadow-sm"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
             <span>Sync</span>
           </button>
         </div>
@@ -694,23 +694,23 @@ export function SMSMarketingTab() {
 
       {notification && (
         <div
-          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs backdrop-blur-md animate-fadeIn shadow-lg ${
+          className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs animate-fadeIn shadow-sm ${
             notification.type === 'success'
-              ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-200'
-              : 'bg-rose-950/80 border-rose-500/40 text-rose-200'
+              ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-500/40 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-200'
           }`}
         >
           <div className="flex items-center gap-2.5">
             {notification.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
             )}
             <span>{notification.message}</span>
           </div>
           <button
             onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded cursor-pointer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs px-2 py-0.5 rounded cursor-pointer"
           >
             ✕
           </button>
@@ -722,28 +722,28 @@ export function SMSMarketingTab() {
         {/* Left Column: SMS Campaign Composer & Quick Add Contact (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* SMS Campaign Composer Card */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Send className="w-4 h-4 text-purple-400" />
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+              <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <Send className="w-4 h-4 text-[var(--accent-primary)]" />
                 <span>Dispatch Promotional SMS</span>
               </h2>
-              <span className="text-[10px] bg-purple-500/15 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
+              <span className="text-[10px] bg-teal-50 dark:bg-purple-500/15 text-[var(--accent-primary)] dark:text-purple-300 border border-teal-200 dark:border-purple-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
                 Sender: WOWTEK
               </span>
             </div>
 
             <form onSubmit={handleSendSMS} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1.5">Audience Target</label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px]">
+                <label className="block text-[var(--text-primary)] font-semibold mb-1.5">Audience Target</label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border-subtle)] text-[11px]">
                   <button
                     type="button"
                     onClick={() => setCampaignType('single')}
                     className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
                       campaignType === 'single'
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     Single
@@ -753,8 +753,8 @@ export function SMSMarketingTab() {
                     onClick={() => setCampaignType('selected')}
                     className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
                       campaignType === 'selected'
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     Selected ({selectedCustomers.length})
@@ -764,8 +764,8 @@ export function SMSMarketingTab() {
                     onClick={() => setCampaignType('bulk')}
                     className={`py-1.5 px-2 rounded-lg font-medium transition cursor-pointer text-center truncate ${
                       campaignType === 'bulk'
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[var(--accent-primary)] text-white font-bold shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                     }`}
                   >
                     All ({customers.length})
@@ -775,11 +775,11 @@ export function SMSMarketingTab() {
 
               {campaignType === 'single' && (
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Select Target Recipient</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Select Target Recipient</label>
                   <select
                     value={selectedPhone}
                     onChange={(e) => setSelectedPhone(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 font-mono shadow-inner"
+                    className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono"
                   >
                     <option value="">-- Choose Customer from Directory --</option>
                     {customers.map((c, i) => (
@@ -792,20 +792,20 @@ export function SMSMarketingTab() {
               )}
 
               {campaignType === 'selected' && (
-                <div className="p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30 text-[11px] text-purple-200 flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-teal-50 dark:bg-purple-950/30 border border-teal-200 dark:border-purple-500/30 text-[11px] text-teal-800 dark:text-purple-200 flex items-center justify-between">
                   <span>
                     <strong>{selectedCustomers.length}</strong> contacts checked in customer list.
                   </span>
                   {selectedCustomers.length === 0 && (
-                    <span className="text-amber-400 text-[10px]">Select via checkboxes</span>
+                    <span className="text-[var(--badge-pending-text)] text-[10px]">Select via checkboxes</span>
                   )}
                 </div>
               )}
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="block text-slate-300 font-semibold">Message Content</label>
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono tabular-nums">
+                  <label className="block text-[var(--text-primary)] font-semibold">Message Content</label>
+                  <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] font-mono tabular-nums">
                     <span>{resolvedPreviewMessage.length} chars</span>
                     <span aria-hidden="true">·</span>
                     <span>{Math.max(1, Math.ceil(resolvedPreviewMessage.length / 160))} SMS</span>
@@ -827,25 +827,25 @@ export function SMSMarketingTab() {
                       )
                     }
                     placeholder="Write your message here — type {{ to insert customer variables like {{first_name}} or {{date}}..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-xs resize-none shadow-inner leading-relaxed"
+                    className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-3 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)] text-xs resize-none leading-relaxed"
                     required
                   />
 
                   {varMenuOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-slate-950 border border-slate-700/90 rounded-xl shadow-2xl overflow-hidden">
-                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800 text-[11px] text-slate-400">
-                        <span className="font-medium text-slate-300 flex items-center gap-1.5">
-                          <Tag className="w-3.5 h-3.5 text-purple-400" />
+                    <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl shadow-2xl overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[11px] text-[var(--text-secondary)]">
+                        <span className="font-medium text-[var(--text-primary)] flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                           <span>Personalization Variables</span>
                         </span>
                         <span className="font-mono text-[10px]">↑↓ Navigate · Enter to insert · Esc</span>
                       </div>
                       {filteredVariableSuggestions.length === 0 ? (
-                        <div className="px-3 py-2.5 text-xs text-slate-400">
+                        <div className="px-3 py-2.5 text-xs text-[var(--text-secondary)]">
                           No matching variable for &ldquo;{varTriggerRange?.query}&rdquo;
                         </div>
                       ) : (
-                        <div className="divide-y divide-slate-800/70 max-h-52 overflow-y-auto">
+                        <div className="divide-y divide-[var(--border-subtle)] max-h-52 overflow-y-auto">
                           {filteredVariableSuggestions.map((v, idx) => {
                             const isHighlighted = idx === varHighlightIdx;
                             return (
@@ -859,17 +859,17 @@ export function SMSMarketingTab() {
                                 onMouseEnter={() => setVarHighlightIdx(idx)}
                                 className={`w-full px-3 py-2 flex items-center justify-between gap-3 text-left transition-colors cursor-pointer ${
                                   isHighlighted
-                                    ? 'bg-purple-600/20 text-white'
-                                    : 'text-slate-300 hover:bg-slate-900'
+                                    ? 'bg-teal-50 dark:bg-emerald-500/15 text-[var(--text-primary)]'
+                                    : 'text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                                 }`}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <span className="font-mono text-[11px] text-purple-300 font-semibold shrink-0">
+                                  <span className="font-mono text-[11px] text-[var(--accent-primary)] font-semibold shrink-0">
                                     {v.token}
                                   </span>
-                                  <span className="text-xs text-slate-300 truncate">{v.label}</span>
+                                  <span className="text-xs text-[var(--text-primary)] truncate">{v.label}</span>
                                 </div>
-                                <span className="text-[11px] font-mono tabular-nums text-slate-400 truncate max-w-[140px]">
+                                <span className="text-[11px] font-mono tabular-nums text-[var(--text-secondary)] truncate max-w-[140px]">
                                   {getVariableLiveValue(v.key)}
                                 </span>
                               </button>
@@ -883,7 +883,7 @@ export function SMSMarketingTab() {
 
                 {/* Clean single-line variable quick-insert toolbar (unboxed, zero pills) */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px]">
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-slate-400">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[var(--text-secondary)]">
                     <button
                       type="button"
                       onClick={() => {
@@ -891,7 +891,7 @@ export function SMSMarketingTab() {
                         setVarMenuOpen((prev) => !prev);
                         setVarHighlightIdx(0);
                       }}
-                      className="text-purple-300 hover:text-purple-200 font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                      className="text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <Tag className="w-3 h-3" />
                       <span>Variables:</span>
@@ -906,8 +906,8 @@ export function SMSMarketingTab() {
                           title={`${v.label}: ${v.description}`}
                           className={`font-mono cursor-pointer transition-colors ${
                             isActive
-                              ? 'text-purple-300 underline decoration-purple-400/70 underline-offset-4 font-semibold'
-                              : 'text-slate-400 hover:text-white'
+                              ? 'text-[var(--accent-primary)] underline underline-offset-4 font-semibold'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                           }`}
                         >
                           {v.token}
@@ -915,7 +915,7 @@ export function SMSMarketingTab() {
                       );
                     })}
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                  <span className="text-[10px] text-[var(--text-secondary)] font-mono whitespace-nowrap">
                     Type {'{{'} for menu
                   </span>
                 </div>
@@ -923,22 +923,22 @@ export function SMSMarketingTab() {
 
               {/* Hairline-Separated Live Personalized Preview */}
               {message.trim().length > 0 && (
-                <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
                   <div className="flex items-center justify-between gap-2 text-[11px]">
-                    <div className="flex items-center gap-1.5 text-slate-300 font-medium">
-                      <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                    <div className="flex items-center gap-1.5 text-[var(--text-primary)] font-medium">
+                      <Eye className="w-3.5 h-3.5 text-[var(--accent-primary)]" />
                       <span>
                         Preview{targetRecipients.length === 0 ? ' (Sample)' : ''}
                       </span>
-                      <span aria-hidden="true" className="text-slate-600">·</span>
-                      <span className="text-slate-400 font-mono truncate max-w-[165px]">
+                      <span aria-hidden="true" className="text-[var(--text-secondary)]">·</span>
+                      <span className="text-[var(--text-secondary)] font-mono truncate max-w-[165px]">
                         {activePreviewRecipient.name} · {activePreviewRecipient.phone}
                       </span>
                     </div>
 
                     {targetRecipients.length > 1 && (
                       <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] font-mono tabular-nums text-slate-400 mr-1">
+                        <span className="text-[10px] font-mono tabular-nums text-[var(--text-secondary)] mr-1">
                           {(previewRecipientIdx % targetRecipients.length) + 1}/{targetRecipients.length}
                         </span>
                         <button
@@ -948,7 +948,7 @@ export function SMSMarketingTab() {
                               prev === 0 ? targetRecipients.length - 1 : prev - 1
                             )
                           }
-                          className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                          className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors"
                           aria-label="Previous recipient preview"
                         >
                           <ChevronLeft className="w-3.5 h-3.5" />
@@ -958,7 +958,7 @@ export function SMSMarketingTab() {
                           onClick={() =>
                             setPreviewRecipientIdx((prev) => (prev + 1) % targetRecipients.length)
                           }
-                          className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+                          className="p-1 rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors"
                           aria-label="Next recipient preview"
                         >
                           <ChevronRight className="w-3.5 h-3.5" />
@@ -966,19 +966,19 @@ export function SMSMarketingTab() {
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-slate-100 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-xs text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">
                     {resolvedPreviewMessage}
                   </p>
                 </div>
               )}
 
               {/* Hairline-Separated Suggested Templates List */}
-              <div className="pt-3 border-t border-slate-800/80 space-y-2">
+              <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-300 font-semibold">Suggested Templates</span>
-                  <span className="text-slate-500">Click to apply</span>
+                  <span className="text-[var(--text-primary)] font-semibold">Suggested Templates</span>
+                  <span className="text-[var(--text-secondary)]">Click to apply</span>
                 </div>
-                <div className="divide-y divide-slate-800/70 border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/50">
+                <div className="divide-y divide-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--bg-app)]">
                   {SMS_SUGGESTED_TEMPLATES.map((tpl) => {
                     const isSelectedTemplate = message.trim() === tpl.body.trim();
                     return (
@@ -992,19 +992,19 @@ export function SMSMarketingTab() {
                         }}
                         className={`w-full px-3 py-2 text-left transition-colors cursor-pointer flex items-center justify-between gap-3 ${
                           isSelectedTemplate
-                            ? 'bg-purple-600/15 text-white'
-                            : 'hover:bg-slate-900/90 text-slate-300'
+                            ? 'bg-teal-50 dark:bg-emerald-500/15 text-[var(--text-primary)]'
+                            : 'hover:bg-[var(--bg-subtle)] text-[var(--text-primary)]'
                         }`}
                       >
                         <div className="min-w-0">
-                          <div className="text-[11px] font-semibold text-slate-200">
+                          <div className="text-[11px] font-semibold text-[var(--text-primary)]">
                             {tpl.title}
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                          <div className="text-[11px] text-[var(--text-secondary)] truncate mt-0.5">
                             {resolveSmsVariables(tpl.body, activePreviewRecipient)}
                           </div>
                         </div>
-                        <span className="text-[10px] font-medium text-purple-300 shrink-0">
+                        <span className="text-[10px] font-medium text-[var(--accent-primary)] shrink-0">
                           {isSelectedTemplate ? 'Applied' : 'Use'}
                         </span>
                       </button>
@@ -1016,7 +1016,7 @@ export function SMSMarketingTab() {
               <button
                 type="submit"
                 disabled={loading || (campaignType === 'bulk' && customers.length === 0)}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 disabled:opacity-40 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-950/50 border border-purple-400/30 cursor-pointer text-xs active:scale-[0.99] mt-2"
+                className="w-full py-3 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-40 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer text-xs active:scale-[0.99] mt-2"
               >
                 {loading ? (
                   <>
@@ -1040,32 +1040,32 @@ export function SMSMarketingTab() {
           </div>
 
           {/* Quick Add Manual Contact Card */}
-          <div className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-pink-400" />
+          <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
+              <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-pink-600 dark:text-pink-400" />
                 <span>Add Walk-In / Phone Contact</span>
               </h2>
-              <span className="text-[10px] bg-pink-500/15 text-pink-300 border border-pink-500/30 px-2 py-0.5 rounded-full font-mono">
+              <span className="text-[10px] bg-pink-50 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-500/30 px-2 py-0.5 rounded-full font-mono">
                 Direct Sync
               </span>
             </div>
 
             <form onSubmit={handleAddManualCustomer} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">Customer Full Name</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Customer Full Name</label>
                 <input
                   type="text"
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                   placeholder="e.g. Kasun Chamara"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-pink-500 shadow-inner"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-slate-300 font-medium">Sri Lankan Phone Number *</label>
-                  <span className="text-[10px] text-pink-400 font-mono">Auto +94</span>
+                  <label className="block text-[var(--text-secondary)] font-medium">Sri Lankan Phone Number *</label>
+                  <span className="text-[10px] text-pink-600 dark:text-pink-400 font-mono">Auto +94</span>
                 </div>
                 <input
                   type="text"
@@ -1074,13 +1074,13 @@ export function SMSMarketingTab() {
                   onBlur={handlePhoneBlur}
                   placeholder="0715330724 (auto-converts to +94715330724)"
                   required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white font-mono focus:outline-none focus:border-pink-500 shadow-inner"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-2.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={manualLoading}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-pink-300 border border-pink-500/30 rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                className="w-full py-2.5 bg-[var(--bg-subtle)] hover:opacity-90 text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-xl font-bold text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
               >
                 {manualLoading ? (
                   <>
@@ -1089,7 +1089,7 @@ export function SMSMarketingTab() {
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-3.5 h-3.5" />
+                    <UserPlus className="w-3.5 h-3.5 text-pink-600 dark:text-pink-400" />
                     <span>Save to Customer Directory</span>
                   </>
                 )}
@@ -1101,7 +1101,7 @@ export function SMSMarketingTab() {
                   setBulkImportError(null);
                   setShowBulkImportModal(true);
                 }}
-                className="w-full py-2 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-2 bg-[var(--badge-ready-bg)] hover:opacity-90 text-[var(--badge-ready-text)] border border-emerald-500/20 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Bulk Import Customers via CSV</span>
@@ -1111,15 +1111,15 @@ export function SMSMarketingTab() {
         </div>
 
         {/* Right Column: Saved Customers Directory & Management (7 cols) */}
-        <div className="lg:col-span-7 bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div className="lg:col-span-7 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2.5">
-              <Users className="w-4 h-4 text-purple-400" />
-              <h2 className="text-sm font-bold text-white">
+              <Users className="w-4 h-4 text-[var(--accent-primary)]" />
+              <h2 className="text-sm font-bold text-[var(--text-primary)]">
                 Saved Contacts Directory ({customers.length})
               </h2>
               {selectedCustomers.length > 0 && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-full font-mono font-bold">
+                <span className="text-[10px] bg-teal-50 dark:bg-purple-500/20 text-[var(--accent-primary)] dark:text-purple-300 border border-teal-200 dark:border-purple-500/40 px-2 py-0.5 rounded-full font-mono font-bold">
                   {selectedCustomers.length} selected
                 </span>
               )}
@@ -1132,7 +1132,7 @@ export function SMSMarketingTab() {
                   setBulkImportError(null);
                   setShowBulkImportModal(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--badge-ready-bg)] hover:bg-[var(--accent-primary)] text-[var(--badge-ready-text)] hover:text-white border border-emerald-500/30 rounded-xl text-xs font-semibold transition cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Bulk Import</span>
@@ -1142,7 +1142,7 @@ export function SMSMarketingTab() {
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 dark:bg-rose-600/20 hover:bg-rose-600 text-rose-700 dark:text-rose-300 hover:text-white border border-rose-300 dark:border-rose-500/40 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete ({selectedCustomers.length})</span>
@@ -1160,7 +1160,7 @@ export function SMSMarketingTab() {
                   <button
                     type="button"
                     onClick={() => setConfirmingDelete(false)}
-                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition cursor-pointer"
+                    className="px-2.5 py-1.5 bg-[var(--bg-subtle)] hover:opacity-80 text-[var(--text-primary)] rounded-xl text-xs transition cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1168,38 +1168,38 @@ export function SMSMarketingTab() {
               )}
 
               <div className="relative w-48 sm:w-52">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search name or phone..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
             </div>
           </div>
 
           {/* Select All Row */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-950/70 rounded-xl border border-slate-800/80 text-xs text-slate-300">
+          <div className="flex items-center justify-between px-3.5 py-2.5 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
             <label className="flex items-center gap-2.5 cursor-pointer font-medium">
               <input
                 type="checkbox"
                 onChange={handleSelectAll}
                 checked={customers.length > 0 && selectedCustomers.length === customers.length}
-                className="w-4 h-4 rounded bg-slate-900 border-slate-700 accent-purple-600 cursor-pointer"
+                className="w-4 h-4 rounded border-[var(--border-subtle)] accent-[var(--accent-primary)] cursor-pointer"
               />
-              <span className="text-white text-xs">Select All ({customers.length})</span>
+              <span className="text-[var(--text-primary)] text-xs">Select All ({customers.length})</span>
             </label>
-            <span className="text-[11px] text-slate-400 font-mono">
+            <span className="text-[11px] text-[var(--text-secondary)] font-mono">
               Use checkboxes to batch-select for targeted broadcast
             </span>
           </div>
 
           {/* Customer List Table */}
-          <div className="overflow-x-auto max-h-[580px] overflow-y-auto rounded-xl border border-slate-800/80">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 bg-slate-950/90 sticky top-0 text-slate-400 text-[10px] uppercase tracking-wider font-semibold">
+          <div className="overflow-x-auto max-h-[580px] overflow-y-auto rounded-xl border border-[var(--border-subtle)]">
+            <table className="w-full text-left text-xs text-[var(--text-primary)]">
+              <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] sticky top-0 text-[var(--text-secondary)] text-[10px] uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="py-3 px-3 w-10 text-center">#</th>
                   <th className="py-3 px-3">Customer</th>
@@ -1209,10 +1209,10 @@ export function SMSMarketingTab() {
                   <th className="py-3 px-3 text-right">Quick Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center text-slate-500 text-xs">
+                    <td colSpan={6} className="py-16 text-center text-[var(--text-secondary)] text-xs">
                       {customers.length === 0
                         ? 'No contacts in CRM database yet. Add manual contacts or place orders via POS / Website.'
                         : 'No matching customers found for your search query.'}
@@ -1224,8 +1224,8 @@ export function SMSMarketingTab() {
                     return (
                       <tr
                         key={idx}
-                        className={`hover:bg-slate-850/60 transition-colors ${
-                          isChecked ? 'bg-purple-950/20' : ''
+                        className={`hover:bg-[var(--bg-subtle)]/60 transition-colors ${
+                          isChecked ? 'bg-teal-50/70 dark:bg-purple-950/20' : ''
                         }`}
                       >
                         <td className="py-3 px-3 text-center">
@@ -1233,26 +1233,26 @@ export function SMSMarketingTab() {
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => handleToggleSelect(c.phone)}
-                            className="w-4 h-4 rounded bg-slate-800 border-slate-700 accent-purple-600 cursor-pointer"
+                            className="w-4 h-4 rounded border-[var(--border-subtle)] accent-[var(--accent-primary)] cursor-pointer"
                           />
                         </td>
-                        <td className="py-3 px-3 font-semibold text-white">
+                        <td className="py-3 px-3 font-semibold text-[var(--text-primary)]">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-purple-600/30 to-indigo-600/30 text-purple-300 flex items-center justify-center font-bold text-[11px] border border-purple-500/30">
+                            <div className="w-7 h-7 rounded-full bg-teal-50 dark:bg-purple-600/25 text-[var(--accent-primary)] dark:text-purple-300 flex items-center justify-center font-bold text-[11px] border border-teal-200 dark:border-purple-500/30">
                               {(c.name || 'C').charAt(0).toUpperCase()}
                             </div>
                             <span>{c.name || 'Walk-in Customer'}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-3 font-mono text-purple-300 font-semibold text-xs">
+                        <td className="py-3 px-3 font-mono text-[var(--accent-primary)] font-semibold text-xs">
                           {c.phone}
                         </td>
                         <td className="py-3 px-3">
-                          <span className="text-[10px] bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full text-slate-300 font-mono">
+                          <span className="text-[10px] bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-2 py-0.5 rounded-full text-[var(--text-secondary)] font-mono">
                             {c.source || 'POS'}
                           </span>
                         </td>
-                        <td className="py-3 px-3 text-center font-mono font-bold text-pink-400">
+                        <td className="py-3 px-3 text-center font-mono font-bold text-pink-600 dark:text-pink-400">
                           {c.totalOrders ?? 1}
                         </td>
                         <td className="py-3 px-3 text-right">
@@ -1262,7 +1262,7 @@ export function SMSMarketingTab() {
                               setSelectedPhone(c.phone);
                               setCampaignType('single');
                             }}
-                            className="text-xs text-purple-300 hover:text-white bg-purple-600/20 hover:bg-purple-600 px-2.5 py-1 rounded-lg border border-purple-500/30 transition-all font-semibold cursor-pointer shadow-sm"
+                            className="text-xs text-[var(--accent-primary)] hover:text-white bg-teal-50 dark:bg-purple-600/20 hover:bg-[var(--accent-primary)] px-2.5 py-1 rounded-lg border border-teal-200 dark:border-purple-500/30 transition-all font-semibold cursor-pointer shadow-sm"
                           >
                             Send SMS
                           </button>
@@ -1278,27 +1278,27 @@ export function SMSMarketingTab() {
       </div>
 
       {/* SENT SMS HISTORY & CAMPAIGN DELIVERY LOG */}
-      <section className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+      <section className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
           <div className="space-y-1">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <History className="w-4 h-4 text-purple-400" />
+            <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <History className="w-4 h-4 text-[var(--accent-primary)]" />
               <span>Sent SMS History</span>
             </h2>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-mono tabular-nums">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)] font-mono tabular-nums">
               <span>{historyStatusCounts.total} Campaigns</span>
               <span aria-hidden="true">·</span>
-              <span className="text-indigo-300">{historyStatusCounts.sent} Sent</span>
+              <span className="text-indigo-600 dark:text-indigo-300">{historyStatusCounts.sent} Sent</span>
               <span aria-hidden="true">·</span>
-              <span className="text-emerald-400">{historyStatusCounts.delivered} Delivered</span>
+              <span className="text-emerald-700 dark:text-emerald-400">{historyStatusCounts.delivered} Delivered</span>
               <span aria-hidden="true">·</span>
-              <span className="text-rose-400">{historyStatusCounts.failed} Failed</span>
+              <span className="text-rose-700 dark:text-rose-400">{historyStatusCounts.failed} Failed</span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Status Segmented Filter */}
-            <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px]">
+            <div className="flex items-center gap-1 p-1 bg-[var(--bg-subtle)] rounded-xl border border-[var(--border-subtle)] text-[11px]">
               {(['ALL', 'Sent', 'Delivered', 'Failed'] as const).map((statusOption) => (
                 <button
                   key={statusOption}
@@ -1306,8 +1306,8 @@ export function SMSMarketingTab() {
                   onClick={() => setHistoryStatusFilter(statusOption)}
                   className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                     historyStatusFilter === statusOption
-                      ? 'bg-purple-600/80 text-white'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-[var(--accent-primary)] text-white'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {statusOption === 'ALL' ? 'All' : statusOption}
@@ -1317,13 +1317,13 @@ export function SMSMarketingTab() {
 
             {/* History Search */}
             <div className="relative w-52 sm:w-60">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-[var(--text-secondary)] absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search message or phone..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
 
@@ -1331,24 +1331,24 @@ export function SMSMarketingTab() {
               type="button"
               onClick={fetchSmsHistory}
               disabled={historyLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--bg-subtle)] hover:opacity-85 border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${historyLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-[var(--accent-primary)] ${historyLoading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
           </div>
         </div>
 
         {historyError && (
-          <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-rose-200 text-xs flex items-center justify-between gap-3">
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-200 text-xs flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
               <span>{historyError}</span>
             </div>
             <button
               type="button"
               onClick={fetchSmsHistory}
-              className="px-3 py-1 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 text-rose-100 font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              className="px-3 py-1 rounded-lg bg-rose-600 text-white font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               Retry
             </button>
@@ -1360,13 +1360,13 @@ export function SMSMarketingTab() {
             {[0, 1, 2].map((skeletonIdx) => (
               <div
                 key={skeletonIdx}
-                className="h-11 rounded-xl bg-slate-950/60 border border-slate-800/60 animate-pulse"
+                className="h-11 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] animate-pulse"
               />
             ))}
           </div>
         ) : filteredSmsHistory.length === 0 ? (
-          <div className="py-12 px-4 text-center border border-slate-800/70 rounded-xl bg-slate-950/40 space-y-3">
-            <p className="text-xs text-slate-400">
+          <div className="py-12 px-4 text-center border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-app)] space-y-3">
+            <p className="text-xs text-[var(--text-secondary)]">
               {smsHistory.length === 0
                 ? 'No SMS campaigns have been dispatched yet. Sent, Delivered, and Failed campaign logs will appear here with timestamps.'
                 : 'No campaign logs match the selected status filter or search query.'}
@@ -1379,7 +1379,7 @@ export function SMSMarketingTab() {
                     messageTextareaRef.current?.focus();
                     messageTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                   }}
-                  className="px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs font-semibold transition-colors cursor-pointer"
                 >
                   Compose First Campaign
                 </button>
@@ -1390,7 +1390,7 @@ export function SMSMarketingTab() {
                     setHistoryStatusFilter('ALL');
                     setHistorySearch('');
                   }}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--bg-subtle)] hover:opacity-80 text-[var(--text-primary)] text-xs font-medium transition-colors cursor-pointer"
                 >
                   Clear Filters
                 </button>
@@ -1398,9 +1398,9 @@ export function SMSMarketingTab() {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-xl border border-slate-800/80">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 bg-slate-950/95 sticky top-0 text-slate-400 text-[11px] font-semibold">
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-xl border border-[var(--border-subtle)]">
+            <table className="w-full text-left text-xs text-[var(--text-primary)]">
+              <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] sticky top-0 text-[var(--text-secondary)] text-[11px] font-semibold">
                 <tr>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Timestamp</th>
                   <th className="py-2.5 px-3.5 whitespace-nowrap">Campaign</th>
@@ -1409,7 +1409,7 @@ export function SMSMarketingTab() {
                   <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {filteredSmsHistory.map((log) => {
                   const isExpanded = expandedLogId === log.id;
                   const campaignLabel =
@@ -1423,21 +1423,21 @@ export function SMSMarketingTab() {
                     <React.Fragment key={log.id}>
                       <tr
                         onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                        className="hover:bg-slate-850/60 transition-colors cursor-pointer"
+                        className="hover:bg-[var(--bg-subtle)]/60 transition-colors cursor-pointer"
                       >
-                        <td className="py-3 px-3.5 font-mono tabular-nums text-slate-300 whitespace-nowrap">
+                        <td className="py-3 px-3.5 font-mono tabular-nums text-[var(--text-secondary)] whitespace-nowrap">
                           {formatHistoryTimestamp(log.timestamp)}
                         </td>
                         <td className="py-3 px-3.5 whitespace-nowrap">
-                          <div className="text-slate-100 font-medium">{campaignLabel}</div>
-                          <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5">
+                          <div className="text-[var(--text-primary)] font-medium">{campaignLabel}</div>
+                          <div className="text-[11px] text-[var(--text-secondary)] font-mono tabular-nums mt-0.5">
                             {log.recipientsCount} {log.recipientsCount === 1 ? 'recipient' : 'recipients'} · {log.senderId}
                           </div>
                         </td>
                         <td className="py-3 px-3.5 max-w-md">
-                          <div className="text-slate-100 truncate">{log.previewMessage || log.messageTemplate}</div>
+                          <div className="text-[var(--text-primary)] truncate">{log.previewMessage || log.messageTemplate}</div>
                           {log.messageTemplate && log.messageTemplate !== log.previewMessage && (
-                            <div className="text-[11px] text-slate-500 font-mono truncate mt-0.5">
+                            <div className="text-[11px] text-[var(--text-secondary)] font-mono truncate mt-0.5">
                               Template: {log.messageTemplate}
                             </div>
                           )}
@@ -1446,23 +1446,23 @@ export function SMSMarketingTab() {
                           <div className="inline-flex items-center gap-1.5 font-medium">
                             {log.status === 'Delivered' ? (
                               <>
-                                <CheckCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <span className="text-emerald-400">Delivered</span>
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span className="text-emerald-700 dark:text-emerald-400">Delivered</span>
                               </>
                             ) : log.status === 'Failed' ? (
                               <>
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                                <span className="text-rose-400">Failed</span>
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                                <span className="text-rose-700 dark:text-rose-400">Failed</span>
                               </>
                             ) : (
                               <>
-                                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                <span className="text-indigo-300">Sent</span>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                                <span className="text-indigo-700 dark:text-indigo-300">Sent</span>
                               </>
                             )}
                           </div>
                           {log.recipientsCount > 1 && (
-                            <div className="text-[10px] font-mono tabular-nums text-slate-400 mt-0.5">
+                            <div className="text-[10px] font-mono tabular-nums text-[var(--text-secondary)] mt-0.5">
                               {log.deliveredCount > 0 ? `${log.deliveredCount} delivered` : `${log.sentCount} sent`}
                               {log.failedCount > 0 ? ` · ${log.failedCount} failed` : ''}
                             </div>
@@ -1476,7 +1476,7 @@ export function SMSMarketingTab() {
                             <button
                               type="button"
                               onClick={() => handleReuseHistoryTemplate(log.messageTemplate || log.previewMessage)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-subtle)] hover:opacity-85 text-[var(--text-primary)] text-[11px] font-medium transition-colors cursor-pointer"
                               title="Load this message into composer"
                             >
                               <RotateCcw className="w-3 h-3" />
@@ -1485,7 +1485,7 @@ export function SMSMarketingTab() {
                             <button
                               type="button"
                               onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[11px] transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-app)] hover:bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-[11px] transition-colors cursor-pointer"
                               aria-expanded={isExpanded}
                             >
                               <span>{isExpanded ? 'Hide' : 'Details'}</span>
@@ -1500,22 +1500,22 @@ export function SMSMarketingTab() {
                       </tr>
 
                       {isExpanded && (
-                        <tr className="bg-slate-950/75">
+                        <tr className="bg-[var(--bg-app)]">
                           <td colSpan={5} className="px-4 py-3.5 space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/70 text-[11px]">
-                              <div className="text-slate-300">
-                                <span className="text-slate-500 mr-1.5">Template:</span>
-                                <span className="text-slate-100">{log.messageTemplate}</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[var(--border-subtle)] text-[11px]">
+                              <div className="text-[var(--text-secondary)]">
+                                <span className="mr-1.5">Template:</span>
+                                <span className="text-[var(--text-primary)]">{log.messageTemplate}</span>
                               </div>
-                              <span className="font-mono tabular-nums text-slate-500 shrink-0">
+                              <span className="font-mono tabular-nums text-[var(--text-secondary)] shrink-0">
                                 ID: {log.id}
                               </span>
                             </div>
 
                             {Array.isArray(log.recipients) && log.recipients.length > 0 ? (
                               <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[11px] text-slate-300">
-                                  <thead className="text-slate-500 border-b border-slate-800/70">
+                                <table className="w-full text-left text-[11px] text-[var(--text-primary)]">
+                                  <thead className="text-[var(--text-secondary)] border-b border-[var(--border-subtle)]">
                                     <tr>
                                       <th className="py-1.5 pr-3 font-medium">Recipient</th>
                                       <th className="py-1.5 px-3 font-medium">Phone</th>
@@ -1523,23 +1523,23 @@ export function SMSMarketingTab() {
                                       <th className="py-1.5 pl-3 font-medium">Personalized Message</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-800/40">
+                                  <tbody className="divide-y divide-[var(--border-subtle)]">
                                     {log.recipients.map((rec, recIdx) => (
                                       <tr key={`${log.id}-${rec.phone}-${recIdx}`}>
-                                        <td className="py-2 pr-3 font-medium text-slate-200 whitespace-nowrap">
+                                        <td className="py-2 pr-3 font-medium text-[var(--text-primary)] whitespace-nowrap">
                                           {rec.name || 'Valued Customer'}
                                         </td>
-                                        <td className="py-2 px-3 font-mono tabular-nums text-purple-300 whitespace-nowrap">
+                                        <td className="py-2 px-3 font-mono tabular-nums text-[var(--accent-primary)] whitespace-nowrap">
                                           {rec.phone}
                                         </td>
                                         <td className="py-2 px-3 whitespace-nowrap">
                                           <span
                                             className={`inline-flex items-center gap-1 font-medium ${
                                               rec.status === 'Delivered'
-                                                ? 'text-emerald-400'
+                                                ? 'text-emerald-700 dark:text-emerald-400'
                                                 : rec.status === 'Failed'
-                                                ? 'text-rose-400'
-                                                : 'text-indigo-300'
+                                                ? 'text-rose-700 dark:text-rose-400'
+                                                : 'text-indigo-700 dark:text-indigo-300'
                                             }`}
                                           >
                                             {rec.status === 'Delivered' ? (
@@ -1552,10 +1552,10 @@ export function SMSMarketingTab() {
                                             <span>{rec.status}</span>
                                           </span>
                                         </td>
-                                        <td className="py-2 pl-3 text-slate-300">
+                                        <td className="py-2 pl-3 text-[var(--text-secondary)]">
                                           <div>{rec.renderedMessage}</div>
                                           {rec.gatewayMessage && rec.status === 'Failed' && (
-                                            <div className="text-[10px] text-rose-400 mt-0.5">
+                                            <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5">
                                               {rec.gatewayMessage}
                                             </div>
                                           )}
@@ -1566,7 +1566,7 @@ export function SMSMarketingTab() {
                                 </table>
                               </div>
                             ) : (
-                              <p className="text-[11px] text-slate-500">
+                              <p className="text-[11px] text-[var(--text-secondary)]">
                                 No individual recipient records captured for this entry.
                               </p>
                             )}
@@ -1584,25 +1584,25 @@ export function SMSMarketingTab() {
 
       {/* BULK CSV IMPORT MODAL WITH SRI LANKAN PHONE VALIDATION */}
       {showBulkImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-4xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-4xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/60">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">Bulk Import Customers (CSV)</h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Upload a CSV with <span className="font-mono text-slate-300">name, phone, source</span> columns. Validates &amp; normalizes Sri Lankan numbers (e.g. <span className="font-mono text-emerald-300">0771234567</span> → <span className="font-mono text-emerald-300">+94771234567</span>).
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">Bulk Import Customers (CSV)</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                    Upload a CSV with <span className="font-mono text-[var(--text-primary)]">name, phone, source</span> columns. Validates &amp; normalizes Sri Lankan numbers (e.g. <span className="font-mono text-emerald-700 dark:text-emerald-300">0771234567</span> → <span className="font-mono text-emerald-700 dark:text-emerald-300">+94771234567</span>).
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowBulkImportModal(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition cursor-pointer"
                 aria-label="Close bulk import modal"
               >
                 <X className="w-4 h-4" />
@@ -1623,8 +1623,8 @@ export function SMSMarketingTab() {
                   onClick={() => csvFileInputRef.current?.click()}
                   className={`md:col-span-8 p-5 rounded-xl border-2 border-dashed transition cursor-pointer flex flex-col items-center justify-center text-center gap-2 ${
                     isDraggingCsv
-                      ? 'border-emerald-400 bg-emerald-950/30'
-                      : 'border-slate-700 bg-slate-950/60 hover:border-emerald-500/60 hover:bg-slate-950'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-app)] hover:border-emerald-500/60 hover:bg-[var(--bg-subtle)]'
                   }`}
                 >
                   <input
@@ -1634,49 +1634,49 @@ export function SMSMarketingTab() {
                     onChange={handleBulkFileChange}
                     className="hidden"
                   />
-                  <Upload className="w-6 h-6 text-emerald-400" />
+                  <Upload className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                   {bulkCsvFileName ? (
                     <div className="space-y-0.5">
-                      <p className="text-xs font-semibold text-white">{bulkCsvFileName}</p>
-                      <p className="text-[11px] text-emerald-400">Click or drop another CSV file to replace</p>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">{bulkCsvFileName}</p>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400">Click or drop another CSV file to replace</p>
                     </div>
                   ) : (
                     <div className="space-y-0.5">
-                      <p className="text-xs font-semibold text-white">
-                        Drop your customer CSV file here, or <span className="text-emerald-400 underline">browse</span>
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">
+                        Drop your customer CSV file here, or <span className="text-[var(--accent-primary)] underline">browse</span>
                       </p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[11px] text-[var(--text-secondary)]">
                         Accepts 07XXXXXXXX, +947XXXXXXXX, 947XXXXXXXX, 00947XXXXXXXX, or Sri Lankan fixed-line numbers
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="md:col-span-4 flex flex-col justify-between gap-3 p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs">
+                <div className="md:col-span-4 flex flex-col justify-between gap-3 p-4 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-xs">
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1.5">Default Source Tag</label>
+                    <label className="block text-[var(--text-primary)] font-semibold mb-1.5">Default Source Tag</label>
                     <input
                       type="text"
                       value={bulkDefaultSource}
                       onChange={(e) => handleBulkSourceChange(e.target.value)}
                       placeholder="CSV Import"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={handleDownloadSampleCsv}
-                    className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    className="w-full py-2 px-3 rounded-lg bg-[var(--bg-surface)] hover:bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-primary)] font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
                   >
-                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     <span>Download Sample CSV</span>
                   </button>
                 </div>
               </div>
 
               {bulkImportError && (
-                <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-rose-200 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/70 border border-rose-200 dark:border-rose-500/40 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                   <span>{bulkImportError}</span>
                 </div>
               )}
@@ -1685,21 +1685,21 @@ export function SMSMarketingTab() {
               {bulkParseSummary && bulkParseSummary.totalRows > 0 && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block text-[11px]">Total Parsed Rows</span>
-                      <span className="text-lg font-bold font-mono text-white">{bulkParseSummary.totalRows}</span>
+                    <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
+                      <span className="text-[var(--text-secondary)] block text-[11px]">Total Parsed Rows</span>
+                      <span className="text-lg font-bold font-mono text-[var(--text-primary)]">{bulkParseSummary.totalRows}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
-                      <span className="text-emerald-300 block text-[11px]">Valid Sri Lankan</span>
-                      <span className="text-lg font-bold font-mono text-emerald-400">{bulkParseSummary.validRows.length}</span>
+                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-500/30">
+                      <span className="text-emerald-800 dark:text-emerald-300 block text-[11px]">Valid Sri Lankan</span>
+                      <span className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400">{bulkParseSummary.validRows.length}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30">
-                      <span className="text-rose-300 block text-[11px]">Invalid Phone Format</span>
-                      <span className="text-lg font-bold font-mono text-rose-400">{bulkParseSummary.invalidRows.length}</span>
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-500/30">
+                      <span className="text-rose-800 dark:text-rose-300 block text-[11px]">Invalid Phone Format</span>
+                      <span className="text-lg font-bold font-mono text-rose-700 dark:text-rose-400">{bulkParseSummary.invalidRows.length}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/30">
-                      <span className="text-amber-300 block text-[11px]">Duplicates in CSV</span>
-                      <span className="text-lg font-bold font-mono text-amber-400">{bulkParseSummary.duplicateRows.length}</span>
+                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-500/30">
+                      <span className="text-amber-800 dark:text-amber-300 block text-[11px]">Duplicates in CSV</span>
+                      <span className="text-lg font-bold font-mono text-amber-700 dark:text-amber-400">{bulkParseSummary.duplicateRows.length}</span>
                     </div>
                   </div>
 
@@ -1712,7 +1712,7 @@ export function SMSMarketingTab() {
                         className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
                           bulkPreviewFilter === 'all'
                             ? 'bg-purple-600 text-white'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         All ({bulkParseSummary.totalRows})
@@ -1723,7 +1723,7 @@ export function SMSMarketingTab() {
                         className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
                           bulkPreviewFilter === 'valid'
                             ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         Valid ({bulkParseSummary.validRows.length})
@@ -1734,7 +1734,7 @@ export function SMSMarketingTab() {
                         className={`px-3 py-1 rounded-lg font-medium cursor-pointer transition ${
                           bulkPreviewFilter === 'invalid'
                             ? 'bg-rose-600 text-white'
-                            : 'bg-slate-800 text-slate-300 hover:text-white'
+                            : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                         }`}
                       >
                         Rejected ({bulkParseSummary.invalidRows.length + bulkParseSummary.duplicateRows.length})
@@ -1744,16 +1744,16 @@ export function SMSMarketingTab() {
                     <button
                       type="button"
                       onClick={handleResetBulkImport}
-                      className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                      className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline cursor-pointer"
                     >
                       Clear File
                     </button>
                   </div>
 
                   {/* Preview Table */}
-                  <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border border-slate-800">
-                    <table className="w-full text-left text-xs text-slate-300">
-                      <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase font-mono sticky top-0 border-b border-slate-800">
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-xl border border-[var(--border-subtle)]">
+                    <table className="w-full text-left text-xs text-[var(--text-primary)]">
+                      <thead className="bg-[var(--bg-subtle)] text-[var(--text-secondary)] text-[10px] uppercase font-mono sticky top-0 border-b border-[var(--border-subtle)]">
                         <tr>
                           <th className="py-2.5 px-3">Row</th>
                           <th className="py-2.5 px-3">Customer Name</th>
@@ -1763,7 +1763,7 @@ export function SMSMarketingTab() {
                           <th className="py-2.5 px-3">Validation Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/60">
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
                         {bulkParseSummary.rows
                           .filter((row) => {
                             if (bulkPreviewFilter === 'valid') return row.isValid;
@@ -1774,23 +1774,23 @@ export function SMSMarketingTab() {
                           .map((row) => (
                             <tr
                               key={`${row.rowNumber}-${row.rawPhone}`}
-                              className={row.isValid ? 'hover:bg-slate-800/40' : 'bg-rose-950/15'}
+                              className={row.isValid ? 'hover:bg-[var(--bg-subtle)]/50' : 'bg-rose-50/60 dark:bg-rose-950/15'}
                             >
-                              <td className="py-2 px-3 font-mono text-slate-400">#{row.rowNumber}</td>
-                              <td className="py-2 px-3 font-medium text-white">{row.name}</td>
-                              <td className="py-2 px-3 font-mono text-slate-400">{row.rawPhone || '-'}</td>
-                              <td className="py-2 px-3 font-mono text-purple-300 font-semibold">
+                              <td className="py-2 px-3 font-mono text-[var(--text-secondary)]">#{row.rowNumber}</td>
+                              <td className="py-2 px-3 font-medium text-[var(--text-primary)]">{row.name}</td>
+                              <td className="py-2 px-3 font-mono text-[var(--text-secondary)]">{row.rawPhone || '-'}</td>
+                              <td className="py-2 px-3 font-mono text-purple-700 dark:text-purple-300 font-semibold">
                                 {row.isValid ? row.formattedPhone : '-'}
                               </td>
-                              <td className="py-2 px-3 text-slate-300">{row.source}</td>
+                              <td className="py-2 px-3 text-[var(--text-secondary)]">{row.source}</td>
                               <td className="py-2 px-3">
                                 {row.isValid ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/70 text-[10px] font-mono">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/70 text-[10px] font-mono">
                                     <CheckCircle2 className="w-3 h-3" />
                                     Valid SL
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700/70 text-[10px] font-mono">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-700/70 text-[10px] font-mono">
                                     <AlertCircle className="w-3 h-3" />
                                     {row.error}
                                   </span>
@@ -1806,15 +1806,15 @@ export function SMSMarketingTab() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-slate-800 bg-slate-950/60">
-              <span className="text-[11px] text-slate-400">
-                Existing contacts matching the same <span className="font-mono text-slate-300">+94</span> number will be updated cleanly without duplicates.
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+              <span className="text-[11px] text-[var(--text-secondary)]">
+                Existing contacts matching the same <span className="font-mono text-[var(--text-primary)]">+94</span> number will be updated cleanly without duplicates.
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setShowBulkImportModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--bg-surface)] hover:bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-xs font-medium transition cursor-pointer"
                 >
                   Cancel
                 </button>

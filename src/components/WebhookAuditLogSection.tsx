@@ -168,64 +168,60 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const processedCount = safeEvents.filter((e) => e?.status === 'success').length;
 
   return (
-    <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-md overflow-hidden shadow-xl">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden shadow-sm">
       {/* Header Bar */}
-      <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-950/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-5 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <div className="relative flex items-center justify-center">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="absolute w-4 h-4 rounded-full bg-emerald-400/30 animate-ping"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             </div>
-            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <Globe className="w-4 h-4 text-purple-400" />
+            <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
+              <Globe className="w-4 h-4 text-[var(--accent-primary)]" />
               {title}
             </h3>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]">
               Live Listener Active
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-purple-500/15 text-purple-300 border border-purple-500/30">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               Strict Policy: &apos;processing&apos; Only
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">{subtitle}</p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Copy Webhook URL button */}
           <button
             onClick={handleCopyWebhookUrl}
-            className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 bg-[var(--bg-surface)] hover:opacity-90 border border-[var(--border-subtle)] rounded-xl text-xs font-mono text-[var(--text-primary)] transition-all flex items-center gap-1.5 cursor-pointer"
             title="Copy Public WooCommerce Webhook URL"
           >
-            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-purple-400" />}
+            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[var(--accent-primary)]" />}
             <span>{copiedUrl ? 'Copied URL!' : '/api/webhooks/woocommerce'}</span>
           </button>
 
-          {/* Copy Secret Key button */}
           <button
             onClick={handleCopySecret}
-            className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 bg-[var(--bg-surface)] hover:opacity-90 border border-[var(--border-subtle)] rounded-xl text-xs font-mono text-[var(--text-primary)] transition-all flex items-center gap-1.5 cursor-pointer"
             title="Secret: WOWTEK-WC-Webhook-2026-9X7Kl42"
           >
-            {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Key className="w-3.5 h-3.5 text-amber-400" />}
+            {copiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Key className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
             <span>{copiedSecret ? 'Secret Copied!' : 'Secret: WOWTEK-WC-...'}</span>
           </button>
 
-          {/* Simulate Live Order Buttons */}
           {onTriggerTestOrder && (
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleRunTestOrder('processing')}
                 disabled={isSimulating}
-                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="Test order with status 'processing' (triggers TE waybill + SMS)"
               >
                 {isSimulating ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <Zap className="w-3.5 h-3.5" />
                 )}
                 <span>Test &apos;Processing&apos; Order</span>
               </button>
@@ -233,10 +229,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <button
                 onClick={() => handleRunTestOrder('pending')}
                 disabled={isSimulating}
-                className="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-800 disabled:opacity-50 text-amber-300 border border-amber-900/60 rounded-xl text-xs font-medium shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                className="px-3 py-1.5 bg-[var(--badge-pending-bg)] hover:opacity-90 disabled:opacity-50 text-[var(--badge-pending-text)] border border-[var(--border-subtle)] rounded-xl text-xs font-medium shadow-sm flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="Test order with status 'pending' (verifies strict skip filter)"
               >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <AlertTriangle className="w-3.5 h-3.5" />
                 <span>Test &apos;Pending&apos; (Skip)</span>
               </button>
             </div>
@@ -245,7 +241,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {onRefreshEvents && (
             <button
               onClick={onRefreshEvents}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] rounded-xl transition-colors cursor-pointer"
               title="Refresh Audit Stream"
             >
               <RefreshCw className="w-4 h-4" />
@@ -255,7 +251,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           {onClearEvents && events.length > 0 && (
             <button
               onClick={onClearEvents}
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-[var(--bg-surface)] rounded-xl transition-colors cursor-pointer"
               title="Reset Audit Log"
             >
               <Trash2 className="w-4 h-4" />
@@ -265,14 +261,14 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       </div>
 
       {/* Filter Tabs */}
-      <div className="px-4 py-2.5 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto text-xs">
-        <span className="text-slate-400 font-medium">Filter Audit Feed:</span>
+      <div className="px-4 py-2.5 bg-[var(--bg-app)] border-b border-[var(--border-subtle)] flex items-center gap-2 overflow-x-auto text-xs">
+        <span className="text-[var(--text-secondary)] font-medium">Filter Audit Feed:</span>
         <button
           onClick={() => setFilterStatus('all')}
           className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
             filterStatus === 'all'
-              ? 'bg-purple-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-[var(--accent-primary)] text-white shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
           }`}
         >
           All Events ({safeEvents.length})
@@ -282,10 +278,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
             filterStatus === 'processing'
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
           }`}
         >
-          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+          <CheckCircle2 className="w-3 h-3" />
           <span>Processed ({processedCount})</span>
         </button>
         <button
@@ -293,10 +289,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
             filterStatus === 'skipped'
               ? 'bg-amber-600 text-white shadow-sm'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
           }`}
         >
-          <AlertTriangle className="w-3 h-3 text-amber-400" />
+          <AlertTriangle className="w-3 h-3" />
           <span>Skipped / Pending Payment ({skippedCount})</span>
         </button>
       </div>
@@ -305,7 +301,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-800/80 bg-slate-950/80 text-slate-400 uppercase font-mono text-[10px] tracking-wider">
+            <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
               <th className="py-2.5 px-4">Timestamp & Event</th>
               <th className="py-2.5 px-4">Order / Invoice Ref</th>
               <th className="py-2.5 px-4">Customer Details</th>
@@ -315,30 +311,30 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <th className="py-2.5 px-4 text-center">Raw Payload</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-800/60 font-sans">
+          <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
             {filteredEvents.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-neutral-400">
+                <td colSpan={7} className="py-12 text-center text-[var(--text-secondary)]">
                   <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                    <Radio className="w-8 h-8 text-neutral-600 animate-pulse" />
-                    <p className="font-semibold text-white text-xs">Waiting for Incoming WooCommerce Orders...</p>
-                    <p className="text-[11px] text-neutral-400">
+                    <Radio className="w-8 h-8 text-[var(--text-secondary)] opacity-60 animate-pulse" />
+                    <p className="font-semibold text-[var(--text-primary)] text-xs">Waiting for Incoming WooCommerce Orders...</p>
+                    <p className="text-[11px] text-[var(--text-secondary)]">
                       Strict Filter Active: Orders are only ingested when payment is confirmed and status is &apos;processing&apos;. Pending and on-hold orders are safely skipped.
                     </p>
                     {onTriggerTestOrder && (
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => handleRunTestOrder('processing')}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                          className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                           <Zap className="w-3.5 h-3.5" />
                           <span>Test &apos;Processing&apos; Order</span>
                         </button>
                         <button
                           onClick={() => handleRunTestOrder('pending')}
-                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-amber-800/80 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                          className="px-3 py-1.5 bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-[var(--border-subtle)] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                          <AlertTriangle className="w-3.5 h-3.5" />
                           <span>Test &apos;Pending&apos; Skip</span>
                         </button>
                       </div>
@@ -359,34 +355,34 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                 const dateStr = new Date(evt.receivedAt).toLocaleDateString('en-GB');
 
                 return (
-                  <tr key={evt.id} className="hover:bg-neutral-850/50 transition-colors">
+                  <tr key={evt.id} className="hover:bg-[var(--bg-subtle)]/50 transition-colors">
                     {/* Timestamp & Source */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 font-mono text-[11px] text-white">
-                        <Clock className="w-3 h-3 text-neutral-500" />
+                      <div className="flex items-center gap-1.5 font-mono text-[11px] text-[var(--text-primary)]">
+                        <Clock className="w-3 h-3 text-[var(--text-secondary)]" />
                         <span>{timeStr}</span>
-                        <span className="text-neutral-500 text-[10px]">({dateStr})</span>
+                        <span className="text-[var(--text-secondary)] text-[10px]">({dateStr})</span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                         <span
                           className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
                             evt.source === 'woocommerce'
-                              ? 'bg-purple-950/70 text-purple-300 border-purple-800'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800'
                               : evt.source === 'pickme'
-                              ? 'bg-amber-950/70 text-amber-300 border-amber-800'
+                              ? 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border-[var(--border-subtle)]'
                               : evt.source === 'ubereats'
-                              ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800'
-                              : 'bg-neutral-800 text-neutral-300 border-neutral-700'
+                              ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border-[var(--border-subtle)]'
+                              : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
                           }`}
                         >
                           {evt.source}
                         </span>
                         {evt.branchName && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-neutral-950 text-amber-300/90 border border-neutral-800">
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--bg-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)]">
                             📍 {evt.branchName}
                           </span>
                         )}
-                        <span className="text-[10px] text-neutral-400 font-mono truncate max-w-[120px]">
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono truncate max-w-[120px]">
                           {evt.event}
                         </span>
                       </div>
@@ -395,7 +391,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     {/* Order Reference */}
                     <td className="py-3 px-4">
                       {evt.invoiceNumber ? (
-                        <div className="font-mono font-bold text-white flex items-center gap-1">
+                        <div className="font-mono font-bold text-[var(--text-primary)] flex items-center gap-1">
                           <span>
                             {evt.source === 'ubereats'
                               ? String((evt as any).display_id || (evt as any).order_number || evt.invoiceNumber || '')
@@ -405,22 +401,22 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                           </span>
                         </div>
                       ) : (
-                        <span className="text-neutral-500 font-mono text-[11px]">{evt.id}</span>
+                        <span className="text-[var(--text-secondary)] font-mono text-[11px]">{evt.id}</span>
                       )}
                       <div className="mt-1">
                         {isSkipped ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-amber-950/80 text-amber-300 border border-amber-800">
-                            <AlertTriangle className="w-3 h-3 text-amber-400" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
+                            <AlertTriangle className="w-3 h-3" />
                             Skipped (Pending Payment)
                           </span>
                         ) : isSuccess ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]">
+                            <CheckCircle2 className="w-3 h-3" />
                             Processed (Payment Confirmed)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-red-950/80 text-red-300 border border-red-800">
-                            <AlertTriangle className="w-3 h-3 text-red-400" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold font-mono bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-800">
+                            <AlertTriangle className="w-3 h-3" />
                             Failed / Parse Error
                           </span>
                         )}
@@ -431,22 +427,22 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4">
                       {evt.customerName ? (
                         <div>
-                          <div className="font-medium text-white">{evt.customerName}</div>
-                          <div className="text-neutral-400 font-mono text-[11px]">{evt.customerPhone}</div>
+                          <div className="font-medium text-[var(--text-primary)]">{evt.customerName}</div>
+                          <div className="text-[var(--text-secondary)] font-mono text-[11px]">{evt.customerPhone}</div>
                         </div>
                       ) : (
-                        <span className="text-neutral-500 italic">Listener Ping / System Handshake</span>
+                        <span className="text-[var(--text-secondary)] italic">Listener Ping / System Handshake</span>
                       )}
                     </td>
 
                     {/* Order Amount */}
                     <td className="py-3 px-4 text-right">
                       {evt.amount !== undefined ? (
-                        <div className="font-mono font-bold text-emerald-400 tabular-nums">
+                        <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                           Rs. {evt.amount.toLocaleString()}
                         </div>
                       ) : (
-                        <span className="text-neutral-500 font-mono">-</span>
+                        <span className="text-[var(--text-secondary)] font-mono">-</span>
                       )}
                     </td>
 
@@ -454,23 +450,23 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4 text-center">
                       {evt.waybillNumber ? (
                         <div className="inline-flex flex-col items-center">
-                          <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-300 font-mono text-[10px] flex items-center gap-1">
-                            <Truck className="w-3 h-3 text-emerald-400" />
+                          <span className="px-2 py-0.5 rounded bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] font-mono text-[10px] flex items-center gap-1">
+                            <Truck className="w-3 h-3" />
                             <span>{evt.waybillNumber}</span>
                           </span>
-                          <span className="text-[9px] text-emerald-400 mt-0.5 font-mono">Live API Waybill</span>
+                          <span className="text-[9px] text-[var(--badge-ready-text)] mt-0.5 font-mono">Live API Waybill</span>
                         </div>
                       ) : evt.waybillError ? (
                         <div className="inline-flex flex-col items-center max-w-[150px]">
                           <span
-                            className="px-2 py-0.5 rounded bg-red-950/80 border border-red-800 text-red-300 font-mono text-[10px] flex items-center gap-1"
+                            className="px-2 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 dark:bg-red-950/80 dark:border-red-800 dark:text-red-300 font-mono text-[10px] flex items-center gap-1"
                             title={evt.waybillError}
                           >
-                            <AlertTriangle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                             <span>Courier Rejected</span>
                           </span>
                           <span
-                            className="text-[9px] text-red-400 mt-0.5 font-mono truncate max-w-[140px] text-center"
+                            className="text-[9px] text-rose-700 dark:text-red-400 mt-0.5 font-mono truncate max-w-[140px] text-center"
                             title={evt.waybillError}
                           >
                             {evt.waybillError}
@@ -478,15 +474,15 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                         </div>
                       ) : isSkipped ? (
                         <div className="inline-flex flex-col items-center">
-                          <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-amber-400/90 font-mono text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] font-mono text-[10px]">
                             No Waybill
                           </span>
-                          <span className="text-[9px] text-neutral-500 mt-0.5 font-mono">Awaiting Payment</span>
+                          <span className="text-[9px] text-[var(--text-secondary)] mt-0.5 font-mono">Awaiting Payment</span>
                         </div>
                       ) : isSuccess && !evt.orderId ? (
-                        <span className="text-[10px] text-neutral-500 font-mono">N/A (Ping)</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono">N/A (Ping)</span>
                       ) : (
-                        <span className="text-[10px] text-amber-400 font-mono">Queued</span>
+                        <span className="text-[10px] text-[var(--badge-pending-text)] font-mono">Queued</span>
                       )}
                     </td>
 
@@ -494,47 +490,48 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4 text-center">
                       {evt.smsSent ? (
                         <div className="inline-flex flex-col items-center">
-                          <span className="px-2 py-0.5 rounded bg-purple-950/80 border border-purple-800 text-purple-300 font-mono text-[10px] flex items-center gap-1">
-                            <MessageSquare className="w-3 h-3 text-purple-400" />
+                          <span className="px-2 py-0.5 rounded bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] font-mono text-[10px] flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" />
                             <span>Dispatched</span>
                           </span>
-                          <span className="text-[9px] text-neutral-400 mt-0.5 font-mono">
+                          <span className="text-[9px] text-[var(--text-secondary)] mt-0.5 font-mono">
                             {evt.smsMessageId || 'SMSlenz Gateway'}
                           </span>
                         </div>
                       ) : isSkipped ? (
                         <div className="inline-flex flex-col items-center">
-                          <span className="px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-neutral-500 font-mono text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] font-mono text-[10px]">
                             Skipped
                           </span>
-                          <span className="text-[9px] text-neutral-600 mt-0.5 font-mono">Unpaid Order</span>
+                          <span className="text-[9px] text-[var(--text-secondary)] mt-0.5 font-mono">Unpaid Order</span>
                         </div>
                       ) : evt.customerPhone ? (
-                        <span className="text-[10px] text-neutral-500 font-mono">Pending</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono">Pending</span>
                       ) : (
-                        <span className="text-[10px] text-neutral-500 font-mono">-</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono">-</span>
                       )}
                     </td>
 
-                    {/* Action Column with Uber Eats Accept/Cancel & Raw Payload Button */}
+                    {/* Action Column */}
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {/* Feed Row එක ඇතුළේ Action column එකට මේ කොටස දාන්න */}
                         {item.source === 'ubereats' && (() => {
                           const uberStatus = item.orderStatus || (item as any).state;
                           if (!uberStatus || uberStatus === 'PENDING_ACCEPTANCE' || uberStatus === 'Pending' || uberStatus === 'PENDING') {
                             return (
                               <div className="flex gap-1.5 justify-end items-center">
                                 <button
+                                  type="button"
                                   onClick={() => handleOrderAction('accept', item as any)}
-                                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer"
                                   title="Accept on Uber"
                                 >
                                   Accept
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleOrderAction('cancel', item as any)}
-                                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer"
                                   title="Cancel Order"
                                 >
                                   Cancel
@@ -546,15 +543,17 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                             return (
                               <div className="flex gap-1.5 justify-end items-center">
                                 <button
+                                  type="button"
                                   onClick={() => handleOrderAction('ready', item as any)}
-                                  className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer"
                                   title="Mark Order Ready for Delivery"
                                 >
                                   Ready
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleOrderAction('cancel', item as any)}
-                                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer"
                                   title="Cancel Order"
                                 >
                                   Cancel
@@ -567,10 +566,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
 
                         <button
                           onClick={() => setSelectedEventForPayload(evt)}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white rounded-lg text-[11px] font-mono transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg text-[11px] font-mono transition-colors cursor-pointer"
                           title="Inspect Raw JSON Payload"
                         >
-                          <Code className="w-3 h-3 text-purple-400" />
+                          <Code className="w-3 h-3 text-[var(--accent-primary)]" />
                           <span>View JSON</span>
                         </button>
                       </div>
@@ -585,49 +584,49 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
 
       {/* Raw Payload Modal */}
       {selectedEventForPayload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="p-4 border-b border-neutral-800 bg-neutral-950 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-purple-400" />
-                <h4 className="text-sm font-semibold text-white">
+                <Code className="w-4 h-4 text-[var(--accent-primary)]" />
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">
                   Raw WooCommerce Webhook Payload: {selectedEventForPayload.invoiceNumber || selectedEventForPayload.id}
                 </h4>
               </div>
               <button
                 onClick={() => setSelectedEventForPayload(null)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface)]"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 bg-neutral-950/80 border-b border-neutral-800 text-xs flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-3 font-mono text-[11px] text-neutral-300">
-                <span>Source: <strong className="text-purple-300">{selectedEventForPayload.source}</strong></span>
+            <div className="p-4 bg-[var(--bg-app)] border-b border-[var(--border-subtle)] text-xs flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3 font-mono text-[11px] text-[var(--text-secondary)]">
+                <span>Source: <strong className="text-[var(--accent-primary)]">{selectedEventForPayload.source}</strong></span>
                 <span>·</span>
-                <span>Event: <strong className="text-white">{selectedEventForPayload.event}</strong></span>
+                <span>Event: <strong className="text-[var(--text-primary)]">{selectedEventForPayload.event}</strong></span>
                 <span>·</span>
                 <span>Received: {new Date(selectedEventForPayload.receivedAt).toLocaleString()}</span>
               </div>
 
               <button
                 onClick={() => handleCopyPayload(selectedEventForPayload.rawPayload)}
-                className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+                className="px-2.5 py-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                {copiedPayload ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedPayload ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedPayload ? 'Copied JSON!' : 'Copy Raw Payload'}</span>
               </button>
             </div>
 
             {selectedEventForPayload.waybillError && (
-              <div className="px-4 py-2.5 bg-red-950/70 border-b border-red-900/80 flex items-start gap-2.5 text-xs text-red-200">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <div className="px-4 py-2.5 bg-rose-50 dark:bg-red-950/70 border-b border-rose-200 dark:border-red-900/80 flex items-start gap-2.5 text-xs text-rose-800 dark:text-red-200">
+                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-red-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-semibold text-red-300">Trans Express Courier Gateway Rejection:</div>
-                  <div className="text-red-200 font-mono text-[11px] mt-0.5">{selectedEventForPayload.waybillError}</div>
+                  <div className="font-semibold">Trans Express Courier Gateway Rejection:</div>
+                  <div className="font-mono text-[11px] mt-0.5">{selectedEventForPayload.waybillError}</div>
                   {selectedEventForPayload.transExpressResponse && (
-                    <div className="mt-1 text-[10px] text-neutral-400 font-mono">
+                    <div className="mt-1 text-[10px] opacity-80 font-mono">
                       API Response: {typeof selectedEventForPayload.transExpressResponse === 'object' ? JSON.stringify(selectedEventForPayload.transExpressResponse) : String(selectedEventForPayload.transExpressResponse)}
                     </div>
                   )}
@@ -636,24 +635,24 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
             )}
 
             {selectedEventForPayload.status === 'skipped' && (
-              <div className="px-4 py-2 bg-amber-950/60 border-b border-amber-900/60 flex items-center gap-2 text-xs text-amber-300">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div className="px-4 py-2 bg-[var(--badge-pending-bg)] border-b border-[var(--border-subtle)] flex items-center gap-2 text-xs text-[var(--badge-pending-text)]">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
                   {selectedEventForPayload.skipReason || 'Order skipped: Payment Pending (strict filter requires "processing" status).'}
                 </span>
               </div>
             )}
 
-            <div className="p-4 overflow-y-auto flex-1 font-mono text-xs bg-neutral-950">
-              <pre className="text-emerald-400 whitespace-pre-wrap leading-relaxed select-text">
+            <div className="p-4 overflow-y-auto flex-1 font-mono text-xs bg-[var(--bg-app)]">
+              <pre className="text-[var(--accent-primary)] whitespace-pre-wrap leading-relaxed select-text">
                 {JSON.stringify(selectedEventForPayload.rawPayload, null, 2)}
               </pre>
             </div>
 
-            <div className="p-3 border-t border-neutral-800 bg-neutral-950 flex justify-end">
+            <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] flex justify-end">
               <button
                 onClick={() => setSelectedEventForPayload(null)}
-                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-semibold"
+                className="px-4 py-1.5 bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Close Viewer
               </button>
@@ -667,14 +666,14 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         <div
           className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 border ${
             orderActionFeedback.isError
-              ? 'bg-rose-950 text-rose-200 border-rose-700/60'
-              : 'bg-emerald-950 text-emerald-200 border-emerald-700/60'
+              ? 'bg-rose-50 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200 dark:border-rose-700/60'
+              : 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border-[var(--border-subtle)]'
           }`}
         >
           {orderActionFeedback.isError ? (
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
           ) : (
-            <Check className="w-4 h-4 text-emerald-400" />
+            <Check className="w-4 h-4" />
           )}
           <span>{orderActionFeedback.message}</span>
         </div>

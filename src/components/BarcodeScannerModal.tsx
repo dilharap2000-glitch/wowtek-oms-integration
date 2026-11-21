@@ -346,22 +346,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 border border-purple-200 dark:bg-purple-500/10 dark:border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
               <Camera className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm font-semibold text-white">{title}</h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/80">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-800/80">
                   Direct Video Stream · 720p
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-400">{description}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">{description}</p>
             </div>
           </div>
 
@@ -369,7 +369,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             <button
               type="button"
               onClick={() => startScanner()}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] transition-colors cursor-pointer"
               title="Restart Camera"
             >
               <RotateCcw className="w-4 h-4" />
@@ -378,7 +378,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -386,12 +386,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         </div>
 
         {/* Viewfinder Viewport */}
-        <div className="p-4 flex flex-col items-center justify-center bg-neutral-950 space-y-3">
+        <div className="p-4 flex flex-col items-center justify-center bg-[var(--bg-app)] space-y-3">
           <div
             className={`relative w-full h-72 sm:h-80 bg-black rounded-xl overflow-hidden border transition-all duration-300 flex items-center justify-center ${
               isFlashing
                 ? 'border-emerald-400 ring-4 ring-emerald-500/50 shadow-[0_0_35px_#10b981]'
-                : 'border-neutral-800'
+                : 'border-[var(--border-subtle)]'
             }`}
           >
             {/* Native Video Element (Direct decoding stream) */}
@@ -467,7 +467,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                 <button
                   type="button"
                   onClick={() => startScanner()}
-                  className="mt-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg"
+                  className="mt-1 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Restart Camera</span>
@@ -481,22 +481,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             <div
               className={`w-full p-3 rounded-xl border text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200 ${
                 feedback.type === 'success'
-                  ? 'bg-emerald-950/90 border-emerald-700/80 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                  : 'bg-amber-950/90 border-amber-700/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                  ? 'bg-[var(--badge-ready-bg)] border-teal-200 dark:border-emerald-700/80 text-[var(--badge-ready-text)]'
+                  : 'bg-[var(--badge-pending-bg)] border-amber-200 dark:border-amber-700/80 text-[var(--badge-pending-text)]'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 {feedback.type === 'success' ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-[var(--accent-primary)] flex-shrink-0" />
                 ) : (
-                  <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                 )}
                 <div className="min-w-0">
-                  <div className="font-semibold text-white truncate">{feedback.title}</div>
+                  <div className="font-semibold text-[var(--text-primary)] truncate">{feedback.title}</div>
                   <div className="text-[11px] opacity-90 truncate">{feedback.message}</div>
                 </div>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/60 border border-white/10 text-white flex-shrink-0">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] flex-shrink-0">
                 {feedback.code}
               </span>
             </div>
@@ -505,7 +505,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           {/* Cart Status Indicator */}
           {cartItemCount > 0 && (
             <div className="w-full flex items-center justify-end text-xs px-1">
-              <div className="flex items-center gap-1.5 text-[11px] font-mono font-semibold text-purple-400">
+              <div className="flex items-center gap-1.5 text-[11px] font-mono font-semibold text-purple-600 dark:text-purple-400">
                 <ShoppingCart className="w-3.5 h-3.5" />
                 <span>{cartItemCount} in cart</span>
               </div>
@@ -517,38 +517,38 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         {/* UNKNOWN BARCODE PROMPT (QUICK-ADD CUSTOM ITEM)                      */}
         {/* ------------------------------------------------------------------- */}
         {unknownItemPrompt && (
-          <div className="p-4 bg-amber-950/40 border-t border-b border-amber-800/80 animate-in fade-in duration-150">
+          <div className="p-4 bg-[var(--badge-pending-bg)] border-t border-b border-amber-200 dark:border-amber-800/80 animate-in fade-in duration-150">
             <form onSubmit={handleConfirmAddUnknownItem} className="space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                  <div className="text-xs font-semibold text-white">
-                    Uncataloged Barcode: <span className="font-mono text-amber-300">{unknownItemPrompt.code}</span>
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                  <div className="text-xs font-semibold text-[var(--text-primary)]">
+                    Uncataloged Barcode: <span className="font-mono text-amber-700 dark:text-amber-300">{unknownItemPrompt.code}</span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setUnknownItemPrompt(null)}
-                  className="text-neutral-400 hover:text-white text-xs"
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs cursor-pointer"
                 >
                   ✕ Dismiss
                 </button>
               </div>
 
-              <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              <p className="text-[11px] text-[var(--badge-pending-text)] leading-relaxed">
                 Item not in stock. Quick-add this SKU to POS Cart?
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div>
-                  <label className="block text-[10px] text-neutral-400 mb-0.5">Item Name</label>
+                  <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Item Name</label>
                   <input
                     type="text"
                     value={unknownItemPrompt.name}
                     onChange={(e) =>
                       setUnknownItemPrompt({ ...unknownItemPrompt, name: e.target.value })
                     }
-                    className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white text-xs focus:outline-none focus:border-amber-400"
+                    className="w-full px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-[var(--text-primary)] text-xs focus:outline-none focus:border-amber-500"
                     placeholder="e.g. Scanned USB Cable"
                     required
                   />
@@ -556,7 +556,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] text-neutral-400 mb-0.5">Selling Price (Rs.)</label>
+                    <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Selling Price (Rs.)</label>
                     <input
                       type="number"
                       min="1"
@@ -568,13 +568,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                           price: val,
                         });
                       }}
-                      className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                      className="w-full px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-amber-500"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] text-neutral-400 mb-0.5">Cost Price / COGS (Rs.)</label>
+                    <label className="block text-[10px] text-[var(--text-secondary)] mb-0.5">Cost Price / COGS (Rs.)</label>
                     <input
                       type="number"
                       min="0"
@@ -587,14 +587,14 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                           costPrice: val,
                         });
                       }}
-                      className="w-full px-2.5 py-1.5 bg-neutral-950 border border-neutral-700 rounded text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                      className="w-full px-2.5 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-amber-500"
                     />
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-1.5 text-[11px] text-neutral-300 cursor-pointer">
+                <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-primary)] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={unknownItemPrompt.saveToInventory}
@@ -604,7 +604,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                         saveToInventory: e.target.checked,
                       })
                     }
-                    className="w-3.5 h-3.5 rounded border-neutral-700 bg-neutral-950 text-amber-500 focus:ring-amber-400"
+                    className="w-3.5 h-3.5 rounded border-[var(--border-subtle)] bg-[var(--bg-surface)] text-amber-500 focus:ring-amber-400"
                   />
                   <span>Save to Inventory catalog as new SKU</span>
                 </label>
@@ -613,13 +613,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setUnknownItemPrompt(null)}
-                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs"
+                    className="px-3 py-1.5 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] rounded text-xs cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded text-xs shadow-md transition-colors"
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded text-xs shadow-sm transition-colors cursor-pointer"
                   >
                     Add to Cart Now →
                   </button>
@@ -630,22 +630,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         )}
 
         {/* Manual Barcode Entry Fallback (Always Responsive) */}
-        <div className="p-4 border-t border-neutral-800 bg-neutral-900/60 space-y-3">
+        <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] space-y-3">
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <div className="relative flex-1">
-              <Barcode className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Barcode className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
               <input
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Type barcode or SKU and press Enter..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
             <button
               type="submit"
               disabled={!manualCode.trim()}
-              className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Item</span>
@@ -655,9 +655,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           {/* Quick Test Barcode Buttons / Load Test Sample Products Button */}
           {products.length > 0 ? (
             <div>
-              <div className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+              <div className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 flex items-center justify-between">
                 <span>Quick-Simulate Barcode Scan (From Stock):</span>
-                <Volume2 className="w-3 h-3 text-purple-400" />
+                <Volume2 className="w-3 h-3 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto pr-1">
                 {products.slice(0, 6).map((prod) => (
@@ -665,13 +665,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
                     key={prod.id}
                     type="button"
                     onClick={() => handleDecodedBarcode(prod.barcode, true)}
-                    className="p-1.5 text-left bg-neutral-950 hover:bg-purple-950/40 border border-neutral-800 hover:border-purple-500/50 rounded-lg transition-all text-xs"
+                    className="p-1.5 text-left bg-[var(--bg-app)] hover:bg-purple-50 dark:hover:bg-purple-950/40 border border-[var(--border-subtle)] hover:border-purple-400 dark:hover:border-purple-500/50 rounded-lg transition-all text-xs cursor-pointer"
                   >
-                    <div className="font-mono text-[11px] text-purple-300 font-medium truncate">
+                    <div className="font-mono text-[11px] text-purple-700 dark:text-purple-300 font-medium truncate">
                       {prod.barcode}
                     </div>
-                    <div className="text-[10px] text-neutral-300 truncate">{prod.name}</div>
-                    <div className="text-[10px] text-neutral-500 font-mono">
+                    <div className="text-[10px] text-[var(--text-primary)] truncate">{prod.name}</div>
+                    <div className="text-[10px] text-[var(--text-secondary)] font-mono">
                       Rs. {prod.sellingPrice.toLocaleString()}
                     </div>
                   </button>
@@ -679,16 +679,16 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="p-3 rounded-lg bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-secondary)] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Barcode className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                <Barcode className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
                 <span>Catalog currently empty. Scan any item to trigger Quick-Add fallback!</span>
               </div>
               {onLoadSampleProducts && (
                 <button
                   type="button"
                   onClick={() => onLoadSampleProducts()}
-                  className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold whitespace-nowrap shadow-sm flex items-center gap-1.5"
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold whitespace-nowrap shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Load 5 Test Products</span>
@@ -702,7 +702,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 text-xs font-semibold text-neutral-200 bg-neutral-800 hover:bg-neutral-700 rounded-lg transition-colors"
+              className="px-4 py-1.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-lg transition-colors cursor-pointer"
             >
               Done Scanning
             </button>

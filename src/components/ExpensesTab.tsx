@@ -96,12 +96,12 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Financials & Expense Ledger</h2>
-          <p className="text-xs text-neutral-400 mt-1">
+          <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Financials & Expense Ledger</h2>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
             Gross Revenue vs Net Operating Profit, channel commissions, and detailed expense categorization.
           </p>
         </div>
@@ -117,54 +117,54 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
 
       {/* Financial Analytics Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-2">
             Gross Invoiced Revenue
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             Rs. {totalGrossRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             All 3 channels (WooCommerce, PickMe, Uber)
           </div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-2">
             Cost of Goods (COGS)
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-neutral-300">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[var(--text-primary)]">
             Rs. {totalCogs.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             {pendingOrdersCount > 0 ? (
-              <span className="text-amber-400 font-mono">Verified records ({pendingOrdersCount} pending)</span>
+              <span className="text-amber-600 dark:text-amber-400 font-mono">Verified records ({pendingOrdersCount} pending)</span>
             ) : (
               'Direct verified stock import cost'
             )}
           </div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-2">
             Operating & Ledger Expenses
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-amber-400">
+          <div className="text-2xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400">
             Rs. {totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">{expenses.length} logged ledger entries</div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">{expenses.length} logged ledger entries</div>
         </div>
 
-        <div className="p-5 rounded-xl bg-neutral-900 border border-neutral-800">
-          <div className="text-xs font-medium uppercase tracking-wider text-neutral-400 mb-2">
+        <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--text-secondary)] mb-2">
             Net Business Balance
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400">
+          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
             Rs. {netBusinessProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-2">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-2">
             {pendingOrdersCount > 0 ? (
-              <span className="text-amber-400 font-mono">Real verified records only</span>
+              <span className="text-amber-600 dark:text-amber-400 font-mono">Real verified records only</span>
             ) : (
               'After all commissions & logged costs'
             )}
@@ -174,42 +174,42 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
 
       {/* Channel Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="font-semibold text-white">WooCommerce Website</span>
-            <span className="font-mono text-purple-400">0% Comm</span>
+            <span className="font-semibold text-[var(--text-primary)]">WooCommerce Website</span>
+            <span className="font-mono text-purple-600 dark:text-purple-400">0% Comm</span>
           </div>
-          <div className="text-lg font-bold font-mono text-white">
+          <div className="text-lg font-bold font-mono text-[var(--text-primary)]">
             Rs. {wcGross.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-xs text-neutral-400 mt-1">Direct payment gateway & Trans Express COD</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">Direct payment gateway & Trans Express COD</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="font-semibold text-white">PickMe Market / Food</span>
-            <span className="font-mono text-amber-400">-12% Comm</span>
+            <span className="font-semibold text-[var(--text-primary)]">PickMe Market / Food</span>
+            <span className="font-mono text-amber-600 dark:text-amber-400">-12% Comm</span>
           </div>
-          <div className="text-lg font-bold font-mono text-white">
+          <div className="text-lg font-bold font-mono text-[var(--text-primary)]">
             Rs. {pkmGross.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-xs text-neutral-400 mt-1">Automated 12% deduction per linehaul invoice</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">Automated 12% deduction per linehaul invoice</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800">
+        <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
           <div className="flex items-center justify-between text-xs mb-2">
-            <span className="font-semibold text-white">Uber Eats Retail</span>
-            <span className="font-mono text-amber-400">-12% Comm</span>
+            <span className="font-semibold text-[var(--text-primary)]">Uber Eats Retail</span>
+            <span className="font-mono text-amber-600 dark:text-amber-400">-12% Comm</span>
           </div>
-          <div className="text-lg font-bold font-mono text-white">
+          <div className="text-lg font-bold font-mono text-[var(--text-primary)]">
             Rs. {ubrGross.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </div>
-          <div className="text-xs text-neutral-400 mt-1">Weekly merchant settlement directly reconciled</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">Weekly merchant settlement directly reconciled</div>
         </div>
       </div>
 
       {/* Expense Filter & Table */}
-      <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-neutral-900 border border-neutral-800">
+      <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
           {['all', 'Stock Purchases', 'Operational', 'Logistics', 'Platform Fees', 'Staff & Utility'].map(
             (c) => (
@@ -218,8 +218,8 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 onClick={() => setCategoryFilter(c)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                   categoryFilter === c
-                    ? 'bg-purple-600 text-white'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                 }`}
               >
                 {c === 'all' ? 'All Categories' : c}
@@ -229,23 +229,23 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
         </div>
 
         <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search description, reference..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-neutral-950 border border-neutral-800 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
       </div>
 
       {/* Expense Table */}
-      <div className="rounded-xl border border-neutral-800 bg-neutral-900 overflow-hidden">
+      <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-neutral-800 bg-neutral-950/60 text-neutral-400">
+              <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
                 <th className="py-3 px-4 font-medium">Date & Reference</th>
                 <th className="py-3 px-4 font-medium">Category</th>
                 <th className="py-3 px-4 font-medium">Description</th>
@@ -253,14 +253,14 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 <th className="py-3 px-4 font-medium text-right">Amount (LKR)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/80">
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {filteredExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                      <DollarSign className="w-10 h-10 text-neutral-600 mb-1" />
-                      <p className="font-semibold text-white text-sm">No Ledger Expenses Logged</p>
-                      <p className="text-xs text-neutral-400">
+                      <DollarSign className="w-10 h-10 text-[var(--text-secondary)]/50 mb-1" />
+                      <p className="font-semibold text-[var(--text-primary)] text-sm">No Ledger Expenses Logged</p>
+                      <p className="text-xs text-[var(--text-secondary)]">
                         Track inventory imports, utility bills, courier costs, and operational payouts to maintain accurate business ledger balances.
                       </p>
                       <button
@@ -278,26 +278,26 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 (filteredExpenses || []).map((exp, idx) => (
                   <tr
                     key={exp.id ? `${exp.id}-${idx}` : `exp-${idx}`}
-                    className="hover:bg-neutral-850/40 transition-colors"
+                    className="hover:bg-[var(--bg-subtle)]/50 transition-colors"
                   >
                     <td className="py-3 px-4">
-                      <div className="font-mono text-white font-medium">{exp.reference || '—'}</div>
-                      <div className="text-[11px] text-neutral-400">{exp.date || '—'}</div>
+                      <div className="font-mono text-[var(--text-primary)] font-medium">{exp.reference || '—'}</div>
+                      <div className="text-[11px] text-[var(--text-secondary)]">{exp.date || '—'}</div>
                     </td>
 
                     <td className="py-3 px-4">
-                      <span className="text-purple-300 font-medium">{exp.category}</span>
+                      <span className="text-purple-600 dark:text-purple-300 font-medium">{exp.category}</span>
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="text-white">{exp.description}</div>
+                      <div className="text-[var(--text-primary)]">{exp.description}</div>
                     </td>
 
-                    <td className="py-3 px-4 text-neutral-300">
+                    <td className="py-3 px-4 text-[var(--text-secondary)]">
                       {exp.channel || 'General'}
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-white">
+                    <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-[var(--text-primary)]">
                       Rs. {Number(exp.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -310,13 +310,13 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
 
       {/* Add Expense Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
-              <h3 className="text-sm font-semibold text-white">Log Operational / Stock Expense</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Log Operational / Stock Expense</h3>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800"
+                className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -325,11 +325,11 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
             <form onSubmit={handleAddExpense} className="p-5 space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Expense Category</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Expense Category</label>
                   <select
                     value={category}
                     onChange={(e: any) => setCategory(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     <option value="Stock Purchases">Stock Purchases</option>
                     <option value="Operational">Operational</option>
@@ -340,11 +340,11 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 </div>
 
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Channel Association</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Channel Association</label>
                   <select
                     value={channel}
                     onChange={(e: any) => setChannel(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     <option value="General">General / All</option>
                     <option value="WooCommerce">WooCommerce Website</option>
@@ -355,38 +355,38 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
               </div>
 
               <div>
-                <label className="block text-neutral-300 font-medium mb-1">Description</label>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Description</label>
                 <input
                   type="text"
                   required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. Courier plastic flyers & thermal label rolls"
-                  className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Amount (LKR)</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Amount (LKR)</label>
                   <input
                     type="number"
                     required
                     min="1"
                     value={amount}
                     onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-neutral-300 font-medium mb-1">Reference / Voucher No</label>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Reference / Voucher No</label>
                   <input
                     type="text"
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
                     placeholder="e.g. INV-2026-9901"
-                    className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
@@ -395,7 +395,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({ expenses, orders, onAd
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-medium text-neutral-400 hover:text-white bg-neutral-800 rounded-lg"
+                  className="px-4 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

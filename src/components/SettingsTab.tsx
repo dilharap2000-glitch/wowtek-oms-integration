@@ -158,43 +158,43 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     simSellingPrice > 0 ? ((calculatedNetProfit / simSellingPrice) * 100).toFixed(1) : '0';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Dynamic Platform & Payment Gateway Fee Engine
+          <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">
+            Dynamic Platform &amp; Payment Gateway Fee Engine
           </h2>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
             Configure dynamic platform commissions (PickMe: 20%, Uber Eats: 15.4%), payment gateway fees (Payzy: 12%, Koko: 12%, Mintpay: 12%, Cash: 0%), and test real-time profit calculations.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-neutral-300">
-          <Percent className="w-4 h-4 text-purple-400" />
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] shadow-sm">
+          <Percent className="w-4 h-4 text-[var(--accent-primary)]" />
           <span>Real-Time Formula Synchronization</span>
         </div>
       </div>
 
       {savedNotification && (
-        <div className="p-3 bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="p-3 bg-[var(--badge-ready-bg)] border border-teal-200 dark:border-emerald-700/60 text-[var(--badge-ready-text)] text-xs rounded-xl flex items-center gap-2 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-[var(--accent-primary)]" />
           <span>{savedNotification}</span>
         </div>
       )}
 
       {/* FORMULA ARCHITECTURE BANNER */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-neutral-900 to-neutral-950 border border-purple-800/40">
+      <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-purple-200 dark:border-purple-800/40 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold text-purple-300 uppercase tracking-wider">
+            <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
               System Core Net Profit Formula
             </div>
-            <div className="text-sm font-mono font-bold text-white mt-1">
+            <div className="text-sm font-mono font-bold text-[var(--text-primary)] mt-1">
               Net Profit = Total Selling Price - Cost Price - (Total Selling Price × (Platform Fee % + Gateway Fee %))
             </div>
           </div>
-          <span className="text-[11px] px-2.5 py-1 rounded bg-purple-900/50 text-purple-200 border border-purple-700/50 font-mono">
+          <span className="text-[11px] px-2.5 py-1 rounded bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/50 dark:text-purple-200 dark:border-purple-700/50 font-mono">
             Auto-Evaluated
           </span>
         </div>
@@ -203,13 +203,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* TWO COLUMN GRID: PLATFORM COMMISSIONS & PAYMENT GATEWAY FEES */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales Platform Fees (PickMe 20%, Uber Eats 15.4%, etc.) */}
-        <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-semibold text-white">Platform Commission Rates</h3>
+              <Building className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Platform Commission Rates</h3>
             </div>
-            <span className="text-[10px] font-mono text-neutral-400">
+            <span className="text-[10px] font-mono text-[var(--text-secondary)]">
               PickMe: 20% · Uber: 15.4%
             </span>
           </div>
@@ -218,18 +218,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {(localPlatforms || []).map((plt) => (
               <div
                 key={plt.id}
-                className="p-3 bg-neutral-950 border border-neutral-800/80 rounded-xl flex items-center justify-between text-xs"
+                className="p-3 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl flex items-center justify-between text-xs"
               >
                 <div>
-                  <div className="font-semibold text-white flex items-center gap-2">
+                  <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
                     <span>{plt.name}</span>
                     {plt.isCustom && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 font-mono">
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800 font-mono">
                         Custom
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                  <div className="text-[10px] font-mono text-[var(--text-secondary)] mt-0.5">
                     Platform Code: {plt.code}
                   </div>
                 </div>
@@ -245,15 +245,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       onChange={(e) =>
                         handleUpdatePlatformFee(plt.id, parseFloat(e.target.value) || 0)
                       }
-                      className="w-16 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-center text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-500"
+                      className="w-16 px-2 py-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-center text-[var(--text-primary)] font-mono font-bold text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                     />
-                    <span className="font-mono text-purple-400 font-bold">%</span>
+                    <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">%</span>
                   </div>
 
                   {plt.isCustom && (
                     <button
                       onClick={() => handleDeletePlatform(plt.id)}
-                      className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors"
+                      className="p-1.5 text-[var(--text-secondary)] hover:text-red-500 transition-colors cursor-pointer"
                       title="Delete custom platform"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -267,9 +267,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {/* Add Custom Platform Form */}
           <form
             onSubmit={handleAddCustomPlatform}
-            className="p-3 bg-neutral-950/60 border border-neutral-800 rounded-xl space-y-2 text-xs"
+            className="p-3 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl space-y-2 text-xs"
           >
-            <div className="text-[11px] font-semibold text-neutral-300">
+            <div className="text-[11px] font-semibold text-[var(--text-primary)]">
               + Add New Sales Platform / Channel
             </div>
             <div className="flex gap-2">
@@ -279,7 +279,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 value={newPlatformName}
                 onChange={(e) => setNewPlatformName(e.target.value)}
                 placeholder="e.g. Daraz Mall"
-                className="flex-1 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white text-xs"
+                className="flex-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-xs focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <div className="flex items-center gap-1">
                 <input
@@ -290,13 +290,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   value={newPlatformFee}
                   onChange={(e) => setNewPlatformFee(parseFloat(e.target.value) || 0)}
                   placeholder="Fee %"
-                  className="w-16 px-2 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white font-mono text-xs text-center"
+                  className="w-16 px-2 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs text-center focus:outline-none focus:border-[var(--accent-primary)]"
                 />
-                <span className="font-mono text-neutral-400">%</span>
+                <span className="font-mono text-[var(--text-secondary)]">%</span>
               </div>
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-xs"
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-xs cursor-pointer transition-colors"
               >
                 Add
               </button>
@@ -305,13 +305,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
         {/* Payment Gateway Fees (Cash 0%, Payzy 12%, Koko 12%, Mintpay 12%, etc.) */}
-        <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+        <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-purple-400" />
-              <h3 className="text-sm font-semibold text-white">Payment Gateway Fee Schedule</h3>
+              <CreditCard className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Payment Gateway Fee Schedule</h3>
             </div>
-            <span className="text-[10px] font-mono text-neutral-400">
+            <span className="text-[10px] font-mono text-[var(--text-secondary)]">
               Payzy, Koko, Mintpay: 12%
             </span>
           </div>
@@ -320,18 +320,18 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             {(localGateways || []).map((gw) => (
               <div
                 key={gw.id}
-                className="p-3 bg-neutral-950 border border-neutral-800/80 rounded-xl flex items-center justify-between text-xs"
+                className="p-3 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl flex items-center justify-between text-xs"
               >
                 <div>
-                  <div className="font-semibold text-white flex items-center gap-2">
+                  <div className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
                     <span>{gw.name}</span>
                     {gw.isCustom && (
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-800 font-mono">
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800 font-mono">
                         Custom
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                  <div className="text-[10px] font-mono text-[var(--text-secondary)] mt-0.5">
                     Gateway Code: {gw.code}
                   </div>
                 </div>
@@ -347,15 +347,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       onChange={(e) =>
                         handleUpdateGatewayFee(gw.id, parseFloat(e.target.value) || 0)
                       }
-                      className="w-16 px-2 py-1 bg-neutral-900 border border-neutral-700 rounded text-center text-white font-mono font-bold text-xs focus:outline-none focus:border-purple-500"
+                      className="w-16 px-2 py-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded text-center text-[var(--text-primary)] font-mono font-bold text-xs focus:outline-none focus:border-[var(--accent-primary)]"
                     />
-                    <span className="font-mono text-purple-400 font-bold">%</span>
+                    <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">%</span>
                   </div>
 
                   {gw.isCustom && (
                     <button
                       onClick={() => handleDeleteGateway(gw.id)}
-                      className="p-1.5 text-neutral-500 hover:text-red-400 transition-colors"
+                      className="p-1.5 text-[var(--text-secondary)] hover:text-red-500 transition-colors cursor-pointer"
                       title="Delete custom gateway"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -369,9 +369,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           {/* Add Custom Payment Gateway Form */}
           <form
             onSubmit={handleAddCustomGateway}
-            className="p-3 bg-neutral-950/60 border border-neutral-800 rounded-xl space-y-2 text-xs"
+            className="p-3 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl space-y-2 text-xs"
           >
-            <div className="text-[11px] font-semibold text-neutral-300">
+            <div className="text-[11px] font-semibold text-[var(--text-primary)]">
               + Add New Payment Gateway / Wallet
             </div>
             <div className="flex gap-2">
@@ -381,7 +381,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 value={newGatewayName}
                 onChange={(e) => setNewGatewayName(e.target.value)}
                 placeholder="e.g. Genie / FriMi / WebXPay"
-                className="flex-1 px-3 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white text-xs"
+                className="flex-1 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-xs focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <div className="flex items-center gap-1">
                 <input
@@ -392,13 +392,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                   value={newGatewayFee}
                   onChange={(e) => setNewGatewayFee(parseFloat(e.target.value) || 0)}
                   placeholder="Fee %"
-                  className="w-16 px-2 py-1.5 bg-neutral-900 border border-neutral-800 rounded-lg text-white font-mono text-xs text-center"
+                  className="w-16 px-2 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs text-center focus:outline-none focus:border-[var(--accent-primary)]"
                 />
-                <span className="font-mono text-neutral-400">%</span>
+                <span className="font-mono text-[var(--text-secondary)]">%</span>
               </div>
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-xs"
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-lg text-xs cursor-pointer transition-colors"
               >
                 Add
               </button>
@@ -408,56 +408,56 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </div>
 
       {/* INTERACTIVE PROFIT / LOSS CALCULATOR DEMO */}
-      <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+      <div className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-2">
-            <Calculator className="w-4 h-4 text-purple-400" />
-            <h3 className="text-sm font-semibold text-white">
-              Interactive Net Profit Simulator & Fee Verifier
+            <Calculator className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+              Interactive Net Profit Simulator &amp; Fee Verifier
             </h3>
           </div>
-          <span className="text-[11px] text-neutral-400">
+          <span className="text-[11px] text-[var(--text-secondary)]">
             Tests the exact formula in real-time
           </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
           <div>
-            <label className="block text-neutral-400 mb-1">Selling Price (LKR)</label>
+            <label className="block text-[var(--text-secondary)] mb-1">Selling Price (LKR)</label>
             <input
               type="number"
               value={simSellingPrice}
               onChange={(e) => setSimSellingPrice(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+              className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
 
           <div>
-            <label className="block text-neutral-400 mb-1">Cost Price (LKR)</label>
+            <label className="block text-[var(--text-secondary)] mb-1">Cost Price (LKR)</label>
             <input
               type="number"
               value={simCostPrice}
               onChange={(e) => setSimCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+              className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
 
           <div>
-            <label className="block text-neutral-400 mb-1">Courier Shipping Cost (LKR)</label>
+            <label className="block text-[var(--text-secondary)] mb-1">Courier Shipping Cost (LKR)</label>
             <input
               type="number"
               value={simCourierCost}
               onChange={(e) => setSimCourierCost(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white font-mono"
+              className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
             />
           </div>
 
           <div>
-            <label className="block text-neutral-400 mb-1">Platform Commission</label>
+            <label className="block text-[var(--text-secondary)] mb-1">Platform Commission</label>
             <select
               value={simPlatformId}
               onChange={(e) => setSimPlatformId(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+              className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             >
               {(localPlatforms || []).map((p) => (
                 <option key={p.id} value={p.id}>
@@ -468,11 +468,11 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
 
           <div>
-            <label className="block text-neutral-400 mb-1">Payment Gateway</label>
+            <label className="block text-[var(--text-secondary)] mb-1">Payment Gateway</label>
             <select
               value={simGatewayId}
               onChange={(e) => setSimGatewayId(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-lg text-white"
+              className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             >
               {(localGateways || []).map((g) => (
                 <option key={g.id} value={g.id}>
@@ -484,39 +484,39 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
 
         {/* Calculation Result */}
-        <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono">
+        <div className="p-4 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono">
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase">Gross Product Margin</div>
-            <div className="text-base font-bold text-neutral-200 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] uppercase">Gross Product Margin</div>
+            <div className="text-base font-bold text-[var(--text-primary)] mt-0.5">
               Rs. {(simSellingPrice - simCostPrice).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-neutral-500 mt-0.5">Selling Price - Cost Price</div>
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">Selling Price - Cost Price</div>
           </div>
 
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase">Gateway & Platform Fee</div>
-            <div className="text-base font-bold text-amber-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] uppercase">Gateway &amp; Platform Fee</div>
+            <div className="text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
               -Rs. {totalFeeDeduction.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-neutral-500 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
               Gateway ({simGatewayPct}%): Rs. {simGatewayFeeAmount.toFixed(2)}
             </div>
           </div>
 
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase">Courier Shipping Cost</div>
-            <div className="text-base font-bold text-amber-400 mt-0.5">
+            <div className="text-[10px] text-[var(--text-secondary)] uppercase">Courier Shipping Cost</div>
+            <div className="text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
               -Rs. {simCourierCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-neutral-500 mt-0.5">Courier delivery charge</div>
+            <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">Courier delivery charge</div>
           </div>
 
           <div>
-            <div className="text-[10px] text-neutral-400 uppercase">Calculated Net Profit</div>
-            <div className={`text-base font-bold mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <div className="text-[10px] text-[var(--text-secondary)] uppercase">Calculated Net Profit</div>
+            <div className={`text-base font-bold mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               Rs. {calculatedNetProfit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <div className={`text-[10px] mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+            <div className={`text-[10px] mt-0.5 ${calculatedNetProfit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'}`}>
               Net Margin: {calculatedProfitMargin}%
             </div>
           </div>

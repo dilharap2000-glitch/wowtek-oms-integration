@@ -170,20 +170,20 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-400" />
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               Suppliers & Purchasing
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-purple-950 text-purple-300 border border-purple-800/80">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80">
               {suppliers.length} Vendors
             </span>
           </div>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
             Directory of equipment distributors, credit terms, and direct inventory procurement links.
           </p>
         </div>
@@ -191,7 +191,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
         <div className="flex items-center gap-2.5">
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-md flex items-center gap-2 transition-colors"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-sm flex items-center gap-2 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Supplier</span>
@@ -201,66 +201,66 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
+        <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] mb-2">
             <span className="text-xs font-medium">Total Registered</span>
-            <Building2 className="w-4 h-4 text-purple-400" />
+            <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-2xl font-bold text-white font-mono">{totalSuppliers}</div>
-          <div className="text-[11px] text-neutral-400 mt-1">Direct equipment vendors</div>
+          <div className="text-2xl font-bold text-[var(--text-primary)] font-mono">{totalSuppliers}</div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-1">Direct equipment vendors</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
+        <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] mb-2">
             <span className="text-xs font-medium">Credit Accounts</span>
-            <Clock className="w-4 h-4 text-emerald-400" />
+            <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
             {activeCreditSuppliers}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-1">14-60 days credit terms</div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-1">14-60 days credit terms</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
+        <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] mb-2">
             <span className="text-xs font-medium">Supplied Stock Items</span>
-            <Package className="w-4 h-4 text-blue-400" />
+            <Package className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-bold text-white font-mono">{totalLinkedProducts}</div>
-          <div className="text-[11px] text-neutral-400 mt-1">SKUs in catalog linked</div>
+          <div className="text-2xl font-bold text-[var(--text-primary)] font-mono">{totalLinkedProducts}</div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-1">SKUs in catalog linked</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800">
-          <div className="flex items-center justify-between text-neutral-400 mb-2">
+        <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
+          <div className="flex items-center justify-between text-[var(--text-secondary)] mb-2">
             <span className="text-xs font-medium">Active Supplier RMAs</span>
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <div className="text-2xl font-bold text-amber-400 font-mono">
+          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
             {activeRmaWithSuppliers}
           </div>
-          <div className="text-[11px] text-neutral-400 mt-1">Units sent for warranty</div>
+          <div className="text-[11px] text-[var(--text-secondary)] mt-1">Units sent for warranty</div>
         </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800 flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex flex-col md:flex-row gap-3 items-center justify-between shadow-sm">
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search suppliers, brands, contacts..."
-            className="w-full pl-9 pr-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+            className="w-full pl-9 pr-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
-          <span className="text-xs text-neutral-400 whitespace-nowrap">Terms:</span>
+          <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap">Terms:</span>
           <select
             value={termsFilter}
             onChange={(e) => setTermsFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
+            className="px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
           >
             <option value="all">All Payment Terms</option>
             <option value="net">Net 30 / 60 Days</option>
@@ -291,66 +291,66 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
           return (
             <div
               key={sup.id}
-              className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col justify-between space-y-4 group"
+              className="p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/40 transition-all flex flex-col justify-between space-y-4 group shadow-sm"
             >
               <div>
                 {/* Header Info */}
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-white truncate group-hover:text-purple-300 transition-colors">
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors">
                       {sup.name}
                     </h3>
-                    <div className="text-xs text-neutral-400 flex items-center gap-1.5 mt-0.5">
+                    <div className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5 mt-0.5">
                       <span>{sup.contactPerson}</span>
                       {sup.active ? (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       ) : (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-neutral-500" />
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--text-secondary)]" />
                       )}
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-300 border border-purple-800/60 whitespace-nowrap">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 whitespace-nowrap">
                     {sup.paymentTerms}
                   </span>
                 </div>
 
                 {/* Brands/Categories */}
                 <div className="mb-3">
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-neutral-400" />
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-[var(--text-secondary)]" />
                     <span>Brands & Product Categories</span>
                   </div>
-                  <p className="text-xs text-neutral-300 leading-relaxed line-clamp-2">
+                  <p className="text-xs text-[var(--text-primary)] leading-relaxed line-clamp-2">
                     {sup.categories}
                   </p>
                 </div>
 
                 {/* Contact Data */}
-                <div className="space-y-1.5 text-xs text-neutral-400 bg-neutral-950/70 p-3 rounded-xl border border-neutral-800/60">
+                <div className="space-y-1.5 text-xs text-[var(--text-secondary)] bg-[var(--bg-subtle)] p-3 rounded-xl border border-[var(--border-subtle)]">
                   <div className="flex items-center gap-2 truncate">
-                    <Phone className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                    <Phone className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
                     <a
                       href={`tel:${sup.phone}`}
-                      className="hover:text-purple-300 transition-colors font-mono"
+                      className="hover:text-purple-600 dark:hover:text-purple-300 transition-colors font-mono text-[var(--text-primary)]"
                     >
                       {sup.phone}
                     </a>
                   </div>
 
                   <div className="flex items-center gap-2 truncate">
-                    <Mail className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <Mail className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                     <a
                       href={`mailto:${sup.email}`}
-                      className="hover:text-blue-300 transition-colors truncate"
+                      className="hover:text-blue-600 dark:hover:text-blue-300 transition-colors truncate"
                     >
                       {sup.email}
                     </a>
                   </div>
 
                   {sup.address && (
-                    <div className="flex items-start gap-2 text-[11px] text-neutral-400 pt-0.5">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2 text-[11px] text-[var(--text-secondary)] pt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                       <span className="line-clamp-1">{sup.address}</span>
                     </div>
                   )}
@@ -358,34 +358,34 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
               </div>
 
               {/* Footer Meta & Actions */}
-              <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between">
-                <div className="flex items-center gap-3 text-[11px] text-neutral-400 font-mono">
+              <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between">
+                <div className="flex items-center gap-3 text-[11px] text-[var(--text-secondary)] font-mono">
                   <span className="flex items-center gap-1">
-                    <Package className="w-3.5 h-3.5 text-purple-400" />
+                    <Package className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                     <span>{linkedProds.length} SKUs</span>
                   </span>
 
                   {activeClaims.length > 0 ? (
-                    <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
                       <ShieldAlert className="w-3.5 h-3.5" />
                       <span>{activeClaims.length} RMA Pending</span>
                     </span>
                   ) : (
-                    <span className="text-neutral-500">0 Active RMA</span>
+                    <span className="text-[var(--text-secondary)]">0 Active RMA</span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setSelectedSupplierDetail(sup)}
-                    className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] rounded-lg transition-colors"
                     title="View Linked Inventory & RMAs"
                   >
                     <ExternalLink className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleOpenEdit(sup)}
-                    className="p-1.5 text-neutral-400 hover:text-purple-300 hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-1.5 text-[var(--text-secondary)] hover:text-purple-600 dark:hover:text-purple-300 hover:bg-[var(--bg-subtle)] rounded-lg transition-colors"
                     title="Edit Profile"
                   >
                     <Edit className="w-4 h-4" />
@@ -396,7 +396,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                         onDeleteSupplier(sup.id);
                       }
                     }}
-                    className="p-1.5 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 rounded-lg transition-colors"
+                    className="p-1.5 text-[var(--text-secondary)] hover:text-red-500 dark:hover:text-red-400 hover:bg-[var(--bg-subtle)] rounded-lg transition-colors"
                     title="Delete Supplier"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -408,10 +408,10 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
         })}
 
         {filteredSuppliers.length === 0 && (
-          <div className="col-span-full p-12 text-center rounded-2xl bg-neutral-900 border border-neutral-800 space-y-3">
-            <Building2 className="w-10 h-10 text-neutral-600 mx-auto" />
-            <h3 className="text-sm font-semibold text-white">No suppliers found</h3>
-            <p className="text-xs text-neutral-400 max-w-sm mx-auto">
+          <div className="col-span-full p-12 text-center rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-3 shadow-sm">
+            <Building2 className="w-10 h-10 text-[var(--text-secondary)]/50 mx-auto" />
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">No suppliers found</h3>
+            <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
               No suppliers matched your search query. Add a new supplier profile or clear filters.
             </p>
             <button
@@ -426,18 +426,18 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
 
       {/* Add / Edit Supplier Modal */}
       {(showAddModal || editingSupplier) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                     {editingSupplier ? 'Edit Supplier Profile' : 'Add New Supplier Profile'}
                   </h3>
-                  <p className="text-[11px] text-neutral-400">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     Register vendor details for stock linking and warranty returns
                   </p>
                 </div>
@@ -447,7 +447,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                   setShowAddModal(false);
                   setEditingSupplier(null);
                 }}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+                className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -456,21 +456,21 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
             <form onSubmit={handleSubmitForm} className="p-5 space-y-3.5 max-h-[80vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-full">
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
-                    Supplier / Company Name <span className="text-purple-400">*</span>
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
+                    Supplier / Company Name <span className="text-purple-600 dark:text-purple-400">*</span>
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Chama Computers (Pvt) Ltd"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Contact Person
                   </label>
                   <input
@@ -478,12 +478,12 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
                     placeholder="e.g. Nuwan Jayasinghe"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Phone Number
                   </label>
                   <input
@@ -491,12 +491,12 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="e.g. +94 11 258 4400"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white font-mono placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] font-mono placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Email Address
                   </label>
                   <input
@@ -504,18 +504,18 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="e.g. warranty@supplier.lk"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Payment Terms
                   </label>
                   <select
                     value={paymentTerms}
                     onChange={(e) => setPaymentTerms(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
                   >
                     {COMMON_PAYMENT_TERMS.map((term) => (
                       <option key={term} value={term}>
@@ -526,7 +526,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                 </div>
 
                 <div className="col-span-full">
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Office / Service Center Address
                   </label>
                   <input
@@ -534,12 +534,12 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="e.g. 142 Galle Road, Bambalapitiya, Colombo 04"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div className="col-span-full">
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Provided Brands & Categories
                   </label>
                   <input
@@ -547,12 +547,12 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={categories}
                     onChange={(e) => setCategories(e.target.value)}
                     placeholder="e.g. Kingston, ASUS, Storage & SSDs, Motherboards"
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
 
                 <div className="col-span-full">
-                  <label className="block text-xs text-neutral-300 font-medium mb-1">
+                  <label className="block text-xs text-[var(--text-secondary)] font-medium mb-1">
                     Procurement Notes / Return Policy
                   </label>
                   <textarea
@@ -560,25 +560,25 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="e.g. 7-day turnaround for RMA replacements. RMA point of contact: Nuwan."
-                    className="w-full px-3 py-2 text-xs bg-neutral-950 border border-neutral-800 rounded-xl text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 text-xs bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-800">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingSupplier(null);
                   }}
-                  className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold transition-colors"
+                  className="px-4 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-xl text-xs font-semibold transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-md transition-colors"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors"
                 >
                   {editingSupplier ? 'Save Changes' : 'Create Supplier Profile'}
                 </button>
@@ -590,26 +590,26 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
 
       {/* Supplier Details & Linked Stock / Claims Drawer */}
       {selectedSupplierDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
             {/* Header */}
-            <div className="p-4 border-b border-neutral-800 bg-neutral-950 flex items-center justify-between">
+            <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
                   <Building2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                     {selectedSupplierDetail.name}
                   </h3>
-                  <p className="text-[11px] text-neutral-400">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     Contact: {selectedSupplierDetail.contactPerson} · {selectedSupplierDetail.phone}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedSupplierDetail(null)}
-                className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+                className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -619,34 +619,34 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
             <div className="p-5 overflow-y-auto space-y-5 text-xs">
               {/* Profile Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-0.5">
+                <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">
                     Payment Terms
                   </div>
-                  <div className="font-semibold text-purple-300 font-mono">
+                  <div className="font-semibold text-purple-600 dark:text-purple-300 font-mono">
                     {selectedSupplierDetail.paymentTerms}
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-0.5">
+                <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">
                     Phone Contact
                   </div>
                   <a
                     href={`tel:${selectedSupplierDetail.phone}`}
-                    className="font-semibold text-white font-mono hover:text-purple-300"
+                    className="font-semibold text-[var(--text-primary)] font-mono hover:text-purple-600 dark:hover:text-purple-300"
                   >
                     {selectedSupplierDetail.phone}
                   </a>
                 </div>
 
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 col-span-2 sm:col-span-1">
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-0.5">
+                <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] col-span-2 sm:col-span-1">
+                  <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider mb-0.5">
                     Email
                   </div>
                   <a
                     href={`mailto:${selectedSupplierDetail.email}`}
-                    className="font-semibold text-white truncate block hover:text-blue-300"
+                    className="font-semibold text-[var(--text-primary)] truncate block hover:text-blue-600 dark:hover:text-blue-300"
                   >
                     {selectedSupplierDetail.email}
                   </a>
@@ -654,13 +654,13 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
               </div>
 
               {/* Brands */}
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800">
-                <span className="text-[10px] text-neutral-500 uppercase tracking-wider block mb-1">
+              <div className="p-3 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
+                <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider block mb-1">
                   Product Specialization
                 </span>
-                <span className="text-neutral-200">{selectedSupplierDetail.categories}</span>
+                <span className="text-[var(--text-primary)]">{selectedSupplierDetail.categories}</span>
                 {selectedSupplierDetail.notes && (
-                  <p className="text-[11px] text-neutral-400 mt-2 pt-2 border-t border-neutral-800/80">
+                  <p className="text-[11px] text-[var(--text-secondary)] mt-2 pt-2 border-t border-[var(--border-subtle)]">
                     {selectedSupplierDetail.notes}
                   </p>
                 )}
@@ -669,8 +669,8 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
               {/* Linked Inventory Products */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-white flex items-center gap-1.5">
-                    <Package className="w-4 h-4 text-purple-400" />
+                  <h4 className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     <span>Linked Stock Products</span>
                   </h4>
                   {onNavigateTab && (
@@ -679,7 +679,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                         setSelectedSupplierDetail(null);
                         onNavigateTab('products');
                       }}
-                      className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                      className="text-[11px] text-purple-600 dark:text-purple-400 hover:text-purple-500 flex items-center gap-1"
                     >
                       <span>View in Inventory</span>
                       <ChevronRight className="w-3 h-3" />
@@ -693,7 +693,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     (p?.supplier || '').toLowerCase().trim() ===
                       selectedSupplierDetail.name.toLowerCase().trim()
                 ).length > 0 ? (
-                  <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800/80">
+                  <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden divide-y divide-[var(--border-subtle)]">
                     {safeProducts
                       .filter(
                         (p) =>
@@ -704,19 +704,19 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                       .map((p, idx) => (
                         <div
                           key={`${p.id || p.sku || 'sup-prod'}-${idx}`}
-                          className="p-2.5 bg-neutral-950 flex items-center justify-between text-xs"
+                          className="p-2.5 bg-[var(--bg-subtle)] flex items-center justify-between text-xs"
                         >
                           <div>
-                            <div className="font-medium text-white">{p.name}</div>
-                            <div className="text-[10px] text-neutral-400 font-mono">
+                            <div className="font-medium text-[var(--text-primary)]">{p.name}</div>
+                            <div className="text-[10px] text-[var(--text-secondary)] font-mono">
                               SKU: {p.sku} · Barcode: {p.barcode}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-mono text-purple-300">
+                            <div className="font-mono text-purple-600 dark:text-purple-300">
                               Rs. {Number(p.costPrice || 0).toLocaleString()}
                             </div>
-                            <div className="text-[10px] text-neutral-400">
+                            <div className="text-[10px] text-[var(--text-secondary)]">
                               Stock: {Number(p.stockStore || 0) + Number(p.stockWarehouse || 0)} units
                             </div>
                           </div>
@@ -724,7 +724,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                       ))}
                   </div>
                 ) : (
-                  <div className="p-4 text-center rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-400 text-xs">
+                  <div className="p-4 text-center rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs">
                     No inventory products currently tagged with this supplier.
                   </div>
                 )}
@@ -733,8 +733,8 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
               {/* Active Supplier RMA Claims */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-semibold text-white flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-400" />
+                  <h4 className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     <span>Warranty Return Claims (RMA)</span>
                   </h4>
                   {onNavigateTab && (
@@ -743,7 +743,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                         setSelectedSupplierDetail(null);
                         onNavigateTab('warranty');
                       }}
-                      className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                      className="text-[11px] text-purple-600 dark:text-purple-400 hover:text-purple-500 flex items-center gap-1"
                     >
                       <span>Open Warranty RMA</span>
                       <ChevronRight className="w-3 h-3" />
@@ -757,7 +757,7 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                     (r?.supplierName || '').toLowerCase().trim() ===
                       selectedSupplierDetail.name.toLowerCase().trim()
                 ).length > 0 ? (
-                  <div className="border border-neutral-800 rounded-xl overflow-hidden divide-y divide-neutral-800/80">
+                  <div className="border border-[var(--border-subtle)] rounded-xl overflow-hidden divide-y divide-[var(--border-subtle)]">
                     {safeRmaClaims
                       .filter(
                         (r) =>
@@ -768,16 +768,16 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                       .map((claim) => (
                         <div
                           key={claim.id}
-                          className="p-2.5 bg-neutral-950 flex items-center justify-between text-xs"
+                          className="p-2.5 bg-[var(--bg-subtle)] flex items-center justify-between text-xs"
                         >
                           <div>
-                            <div className="font-medium text-white flex items-center gap-2">
+                            <div className="font-medium text-[var(--text-primary)] flex items-center gap-2">
                               <span>{claim.productName}</span>
-                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
                                 {claim.rmaNumber}
                               </span>
                             </div>
-                            <div className="text-[10px] text-neutral-400 font-mono">
+                            <div className="text-[10px] text-[var(--text-secondary)] font-mono">
                               S/N: {claim.serialNumber} · Sent: {claim.dateSent}
                             </div>
                           </div>
@@ -786,17 +786,17 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                             <span
                               className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
                                 claim.status === 'Repaired'
-                                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                  ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)] border border-teal-200 dark:border-emerald-800'
                                   : claim.status === 'Replaced'
-                                  ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                                  ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                                   : claim.status === 'Pending with Supplier'
-                                  ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                                  : 'bg-red-950 text-red-300 border border-red-800'
+                                  ? 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] border border-amber-200 dark:border-amber-800'
+                                  : 'bg-rose-50 dark:bg-red-950 text-rose-700 dark:text-red-300 border border-rose-200 dark:border-red-800'
                               }`}
                             >
                               {claim.status}
                             </span>
-                            <div className="text-[10px] text-neutral-400 mt-1">
+                            <div className="text-[10px] text-[var(--text-secondary)] mt-1">
                               Due: {claim.expectedReturnDate}
                             </div>
                           </div>
@@ -804,17 +804,17 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({
                       ))}
                   </div>
                 ) : (
-                  <div className="p-4 text-center rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-400 text-xs">
+                  <div className="p-4 text-center rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] text-xs">
                     No active or past RMA claims with this vendor.
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="p-3 border-t border-neutral-800 bg-neutral-950 flex justify-end">
+            <div className="p-3 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex justify-end">
               <button
                 onClick={() => setSelectedSupplierDetail(null)}
-                className="px-4 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold transition-colors"
+                className="px-4 py-1.5 bg-[var(--bg-surface)] hover:bg-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-xl text-xs font-semibold transition-colors"
               >
                 Close View
               </button>

@@ -306,35 +306,35 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-5xl bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+      <div className="w-full max-w-5xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[94vh]">
         {/* Modal Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-neutral-800 bg-neutral-950 gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <div className="w-8 h-8 rounded-lg bg-purple-100 border border-purple-200 dark:bg-purple-600/20 dark:border-purple-500/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
               <Barcode className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-white">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                   Bulk Barcode &amp; GRN Label Generator
                 </h3>
                 {hasSerials && (
-                  <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-purple-400" />
+                  <span className="text-[10px] bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                     <span>{uniqueSerials.length} Unique S/N</span>
                   </span>
                 )}
                 {isFiltered && (
-                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                    <Filter className="w-2.5 h-2.5 text-indigo-400" />
+                  <span className="text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
+                    <Filter className="w-2.5 h-2.5 text-indigo-600 dark:text-indigo-400" />
                     <span>Filtered Batch/Date</span>
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-neutral-400">
-                Product: <strong className="text-neutral-200 font-semibold">{product.name || product.title}</strong>{' '}
-                · SKU: <span className="font-mono text-purple-400">{product.sku || product.skuCode}</span>{' '}
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Product: <strong className="text-[var(--text-primary)] font-semibold">{product.name || product.title}</strong>{' '}
+                · SKU: <span className="font-mono text-purple-600 dark:text-purple-400">{product.sku || product.skuCode}</span>{' '}
                 · Total Stock: {effectiveStoreStock} units
               </p>
             </div>
@@ -342,8 +342,8 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Print Count Control */}
-            <div className="flex items-center gap-2 text-xs text-neutral-300 bg-neutral-900 px-2.5 py-1 rounded-lg border border-neutral-800">
-              <label htmlFor="barcode-count-input" className="text-neutral-400 font-medium">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-primary)] bg-[var(--bg-surface)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
+              <label htmlFor="barcode-count-input" className="text-[var(--text-secondary)] font-medium">
                 Labels:
               </label>
               <input
@@ -356,7 +356,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   const val = parseInt(e.target.value, 10);
                   setPrintCount(isNaN(val) || val < 0 ? 0 : val);
                 }}
-                className="w-14 px-1.5 py-0.5 bg-neutral-950 border border-neutral-700 rounded text-center text-white font-mono focus:border-purple-500 focus:outline-none"
+                className="w-14 px-1.5 py-0.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded text-center text-[var(--text-primary)] font-mono focus:border-[var(--accent-primary)] focus:outline-none"
               />
             </div>
 
@@ -364,10 +364,10 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
             <button
               onClick={() => window.print()}
               disabled={printCount <= 0}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white rounded-lg transition-all shadow-md shadow-purple-950/40 cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-sm cursor-pointer ${
                 printCount > 0
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110'
-                  : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white'
+                  : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] cursor-not-allowed'
               }`}
             >
               <Printer className="w-3.5 h-3.5" />
@@ -376,7 +376,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
 
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--border-subtle)] transition-colors cursor-pointer"
               title="Close"
             >
               <X className="w-5 h-5" />
@@ -385,25 +385,25 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
         </div>
 
         {/* Primary Filter Bar: Batch Selector & Date Filter */}
-        <div className="px-4 py-2.5 bg-neutral-900 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="px-4 py-2.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-2.5">
             {/* 1. GRN Batch Selector Dropdown */}
-            <div className="flex items-center gap-1.5 bg-neutral-950 px-2.5 py-1 rounded-lg border border-neutral-800">
-              <Package className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              <label htmlFor="batch-selector-dropdown" className="text-neutral-400 text-[11px] font-medium shrink-0">
+            <div className="flex items-center gap-1.5 bg-[var(--bg-app)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
+              <Package className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+              <label htmlFor="batch-selector-dropdown" className="text-[var(--text-secondary)] text-[11px] font-medium shrink-0">
                 Batch:
               </label>
               <select
                 id="batch-selector-dropdown"
                 value={selectedBatch}
                 onChange={(e) => setSelectedBatch(e.target.value)}
-                className="bg-transparent text-white text-[11px] font-medium focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-[var(--text-primary)] text-[11px] font-medium focus:outline-none cursor-pointer pr-1"
               >
-                <option value="all" className="bg-neutral-900 text-white">
+                <option value="all" className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
                   All Batches ({availableBatches.length > 0 ? availableBatches.reduce((a, b) => a + b.count, 0) : effectiveStoreStock} units)
                 </option>
                 {availableBatches.map((b) => (
-                  <option key={b.batch} value={b.batch} className="bg-neutral-900 text-white">
+                  <option key={b.batch} value={b.batch} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
                     {b.batch} ({b.count} units{b.date ? ` · ${b.date}` : ''})
                   </option>
                 ))}
@@ -411,22 +411,22 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
             </div>
 
             {/* 2. Product Add Date / GRN Date Filter Dropdown */}
-            <div className="flex items-center gap-1.5 bg-neutral-950 px-2.5 py-1 rounded-lg border border-neutral-800">
-              <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <label htmlFor="date-filter-dropdown" className="text-neutral-400 text-[11px] font-medium shrink-0">
+            <div className="flex items-center gap-1.5 bg-[var(--bg-app)] px-2.5 py-1 rounded-lg border border-[var(--border-subtle)]">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <label htmlFor="date-filter-dropdown" className="text-[var(--text-secondary)] text-[11px] font-medium shrink-0">
                 Add Date:
               </label>
               <select
                 id="date-filter-dropdown"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent text-white text-[11px] font-medium focus:outline-none cursor-pointer pr-1"
+                className="bg-transparent text-[var(--text-primary)] text-[11px] font-medium focus:outline-none cursor-pointer pr-1"
               >
-                <option value="all" className="bg-neutral-900 text-white">
+                <option value="all" className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
                   All Dates ({availableDates.length > 0 ? availableDates.reduce((a, d) => a + d.count, 0) : effectiveStoreStock} units)
                 </option>
                 {availableDates.map((d) => (
-                  <option key={d.date} value={d.date} className="bg-neutral-900 text-white">
+                  <option key={d.date} value={d.date} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">
                     {d.date} ({d.count} units)
                   </option>
                 ))}
@@ -439,7 +439,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                 onChange={(e) => {
                   if (e.target.value) setSelectedDate(e.target.value);
                 }}
-                className="bg-neutral-900 text-neutral-300 text-[10px] px-1 py-0.5 rounded border border-neutral-700 focus:outline-none cursor-pointer"
+                className="bg-[var(--bg-surface)] text-[var(--text-primary)] text-[10px] px-1 py-0.5 rounded border border-[var(--border-subtle)] focus:outline-none cursor-pointer"
                 title="Select specific date from calendar"
               />
             </div>
@@ -449,10 +449,10 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
               <button
                 type="button"
                 onClick={resetBatchDateFilters}
-                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/80 border border-amber-800/80 rounded-lg transition cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[var(--badge-pending-text)] bg-[var(--badge-pending-bg)] border border-amber-200 dark:border-amber-800/80 rounded-lg transition cursor-pointer"
                 title="Reset Batch & Date filters"
               >
-                <RotateCcw className="w-3 h-3 text-amber-400" />
+                <RotateCcw className="w-3 h-3" />
                 <span>Show All</span>
               </button>
             )}
@@ -461,7 +461,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
           {/* Barcode Encoding Toggle (Serial vs Product Barcode) */}
           {hasSerials && filterMode !== 'sku' && (
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-neutral-400">Barcode Encodes:</span>
+              <span className="text-[11px] text-[var(--text-secondary)]">Barcode Encodes:</span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -469,7 +469,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold transition cursor-pointer ${
                     barcodeEncoding === 'serial'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   Unique S/N (Scannable)
@@ -480,7 +480,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold transition cursor-pointer ${
                     barcodeEncoding === 'product'
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   Product SKU Barcode
@@ -491,10 +491,10 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
         </div>
 
         {/* Secondary Toolbar: Serial Status Mode Selection */}
-        <div className="px-4 py-2 bg-neutral-950/80 border-b border-neutral-800/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="px-4 py-2 bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-neutral-400 font-medium flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-[11px] text-[var(--text-secondary)] font-medium flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               <span>Status Filter:</span>
             </span>
 
@@ -506,7 +506,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
                     filterMode === 'available'
                       ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
                   }`}
                 >
                   Available In-Stock S/N ({availableSerials.length})
@@ -517,7 +517,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
                     filterMode === 'all'
                       ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
                   }`}
                 >
                   All Registered S/N ({uniqueSerials.length})
@@ -528,26 +528,26 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
                   className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
                     filterMode === 'sku'
                       ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                      : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
                   }`}
                 >
                   Generic SKU Only
                 </button>
               </div>
             ) : (
-              <span className="text-[11px] text-neutral-400">
+              <span className="text-[11px] text-[var(--text-secondary)]">
                 Non-serialized product (standard SKU barcode generated)
               </span>
             )}
           </div>
 
-          <div className="text-[11px] font-mono text-neutral-400 flex items-center gap-2">
+          <div className="text-[11px] font-mono text-[var(--text-secondary)] flex items-center gap-2">
             {isFiltered ? (
-              <span className="text-purple-300 bg-purple-950/60 border border-purple-800/80 px-2 py-0.5 rounded font-semibold">
+              <span className="text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/80 px-2 py-0.5 rounded font-semibold">
                 Mapped: {activeSerialList.length} item(s) for selected batch/date
               </span>
             ) : (
-              <span className="text-neutral-400">
+              <span className="text-[var(--text-secondary)]">
                 Displaying all batches ({availableBatches.length} batch groups)
               </span>
             )}
@@ -555,13 +555,13 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
         </div>
 
         {/* Modal Body / Stickers Preview */}
-        <div className="p-4 sm:p-6 overflow-y-auto bg-neutral-950 flex-1">
-          <div className="text-xs text-neutral-400 mb-3 flex items-center justify-between pb-2 border-b border-neutral-900">
+        <div className="p-4 sm:p-6 overflow-y-auto bg-[var(--bg-app)] flex-1">
+          <div className="text-xs text-[var(--text-secondary)] mb-3 flex items-center justify-between pb-2 border-b border-[var(--border-subtle)]">
             <span className="flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-purple-400" />
+              <Tag className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
               <span>Standard Retail Thermal Sticker Preview: 50mm × 30mm</span>
             </span>
-            <span className="font-mono text-purple-400 font-semibold text-[11px]">
+            <span className="font-mono text-purple-600 dark:text-purple-400 font-semibold text-[11px]">
               {selectedBatch !== 'all' ? `Batch: ${selectedBatch}` : `All Batches`}
               {selectedDate !== 'all' ? ` · Date: ${selectedDate}` : ''}
               {filterMode !== 'sku' && hasSerials ? ` · ${activeSerialList.length} Unique S/N Available` : ''}
@@ -570,10 +570,10 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
 
           {/* Empty State when no items match the chosen batch/date filter */}
           {hasSerials && filterMode !== 'sku' && activeSerialList.length === 0 ? (
-            <div className="p-8 my-6 text-center bg-neutral-900/60 rounded-xl border border-neutral-800 max-w-md mx-auto">
-              <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-white">No Matching Serial Numbers</p>
-              <p className="text-xs text-neutral-400 mt-1">
+            <div className="p-8 my-6 text-center bg-[var(--bg-surface)] rounded-xl border border-[var(--border-subtle)] max-w-md mx-auto">
+              <AlertCircle className="w-8 h-8 text-amber-500 dark:text-amber-400 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-[var(--text-primary)]">No Matching Serial Numbers</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
                 {selectedBatch !== 'all' && `Batch "${selectedBatch}" `}
                 {selectedDate !== 'all' && `Date "${selectedDate}" `}
                 has no {filterMode === 'available' ? 'available in-stock' : 'registered'} serials.
@@ -588,7 +588,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
               </button>
             </div>
           ) : (
-            /* Sticker Sheet Grid */
+            /* Sticker Sheet Grid (Keep physical thermal sticker cards white/black) */
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 print:grid-cols-3 print:gap-2 print:m-0 print:p-0">
               {Array.from({ length: printCount }).map((_, index) => {
                 // Map each unique serial number strictly from the active filtered list
@@ -708,16 +708,16 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
         </div>
 
         {/* Modal Footer / Summary */}
-        <div className="px-4 py-2.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
+        <div className="px-4 py-2.5 bg-[var(--bg-subtle)] border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-secondary)]">
           <span className="text-[11px]">
             {isFiltered ? (
-              <span className="text-purple-300">
+              <span className="text-purple-700 dark:text-purple-300">
                 ✓ Filtered by {selectedBatch !== 'all' ? `Batch: ${selectedBatch}` : ''}
                 {selectedBatch !== 'all' && selectedDate !== 'all' ? ' & ' : ''}
                 {selectedDate !== 'all' ? `Add Date: ${selectedDate}` : ''}. Only shipment units mapped.
               </span>
             ) : hasSerials ? (
-              <span className="text-purple-300">
+              <span className="text-purple-700 dark:text-purple-300">
                 ✓ Each label displays a distinct, non-duplicate S/N mapped from active store inventory.
               </span>
             ) : (
@@ -727,7 +727,7 @@ export function BarcodeModal({ product, isOpen = true, onClose }: BarcodeModalPr
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-md text-xs transition cursor-pointer"
+            className="px-3 py-1 bg-[var(--bg-surface)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-md text-xs transition cursor-pointer"
           >
             Close
           </button>

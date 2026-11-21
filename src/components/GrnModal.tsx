@@ -67,25 +67,25 @@ export default function GrnModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-xl p-6 text-white relative shadow-2xl">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl w-full max-w-xl p-6 text-[var(--text-primary)] relative shadow-2xl">
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"
+          className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl cursor-pointer"
         >
           ✕
         </button>
 
-        <h2 className="text-xl font-bold text-red-500 mb-1">Add New Product & GRN Inward (Store Only)</h2>
-        <p className="text-xs text-gray-400 mb-6">Store Front Stock Inward · Warehouse removed · Auto-deducts pending orders</p>
+        <h2 className="text-xl font-bold text-rose-600 dark:text-red-500 mb-1">Add New Product &amp; GRN Inward (Store Only)</h2>
+        <p className="text-xs text-[var(--text-secondary)] mb-6">Store Front Stock Inward · Warehouse removed · Auto-deducts pending orders</p>
 
         {feedback && (
           <div
-            className={`mb-4 p-3 rounded-lg text-xs font-medium ${
+            className={`mb-4 p-3 rounded-lg text-xs font-medium border ${
               feedback.type === 'success'
-                ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-200'
-                : 'bg-rose-950/80 border border-rose-700 text-rose-200'
+                ? 'bg-[var(--badge-ready-bg)] border-teal-200 dark:border-emerald-700 text-[var(--badge-ready-text)]'
+                : 'bg-rose-50 dark:bg-rose-950/80 border-rose-200 dark:border-rose-700 text-rose-700 dark:text-rose-200'
             }`}
           >
             {feedback.message}
@@ -95,47 +95,47 @@ export default function GrnModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-300 mb-1">SKU Code</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">SKU Code</label>
               <input
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 required
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 placeholder="WT-56DQK4"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Category</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">Category</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
               >
                 <option value="Mobile Accessories">Mobile Accessories</option>
                 <option value="Electronics">Electronics</option>
                 <option value="Audio">Audio</option>
                 <option value="Peripherals">Peripherals</option>
-                <option value="Cables & Chargers">Cables & Chargers</option>
+                <option value="Cables & Chargers">Cables &amp; Chargers</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-gray-300 mb-1">Product Title</label>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Product Title</label>
             <input
               type="text"
               value={productTitle}
               onChange={(e) => setProductTitle(e.target.value)}
               required
-              className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
               placeholder="e.g. Anker R50i Earbuds"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Cost Price (LKR)</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">Cost Price (LKR)</label>
               <input
                 type="number"
                 value={costPrice}
@@ -143,12 +143,12 @@ export default function GrnModal({
                 required
                 min="0"
                 step="any"
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 placeholder="0"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Selling Price (LKR)</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">Selling Price (LKR)</label>
               <input
                 type="number"
                 value={sellingPrice}
@@ -156,7 +156,7 @@ export default function GrnModal({
                 required
                 min="0"
                 step="any"
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 placeholder="0"
               />
             </div>
@@ -164,7 +164,7 @@ export default function GrnModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Store Stock Quantity</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">Store Stock Quantity</label>
               <input
                 type="number"
                 value={storeStockQuantity}
@@ -172,45 +172,45 @@ export default function GrnModal({
                 required
                 min="1"
                 step="1"
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 placeholder="10"
               />
-              <p className="text-[10px] text-gray-500 mt-0.5">Direct store shelf inventory (Warehouse removed)</p>
+              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Direct store shelf inventory (Warehouse removed)</p>
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Warranty (Months)</label>
+              <label className="block text-xs text-[var(--text-secondary)] mb-1">Warranty (Months)</label>
               <input
                 type="number"
                 value={warrantyMonths}
                 onChange={(e) => setWarrantyMonths(e.target.value)}
                 min="0"
                 step="1"
-                className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)]"
                 placeholder="12"
               />
-              <p className="text-[10px] text-gray-500 mt-0.5">Official WOWTEK warranty period</p>
+              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">Official WOWTEK warranty period</p>
             </div>
           </div>
 
-          {/* 🌟 මෙන්න අලුතින් එකතු කළ Serial Numbers Input එක */}
+          {/* Serial Numbers Input */}
           <div>
-            <label className="block text-xs text-gray-300 mb-1">Serial Numbers (Optional - Comma separated)</label>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Serial Numbers (Optional - Comma separated)</label>
             <textarea
               rows={2}
               placeholder="Leave blank to auto-generate barcodes, or enter serials separated by comma (e.g. SN1001, SN1002)"
               value={serialNumbersInput}
               onChange={(e) => setSerialNumbersInput(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white text-sm focus:outline-none focus:border-red-500 resize-none font-mono"
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 text-sm focus:outline-none focus:border-[var(--accent-primary)] resize-none font-mono"
             />
-            <p className="text-[10px] text-purple-400 mt-0.5">ප්රමාණයට අදාළව Serials දෙන්න. නැත්නම් සිස්ටම් එකෙන් Auto Barcodes හැදේ.</p>
+            <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">ප්‍රමාණයට අදාළව Serials දෙන්න. නැත්නම් සිස්ටම් එකෙන් Auto Barcodes හැදේ.</p>
           </div>
 
           <div>
-            <label className="block text-xs text-gray-300 mb-1">Primary Supplier</label>
+            <label className="block text-xs text-[var(--text-secondary)] mb-1">Primary Supplier</label>
             <select
               value={supplier}
               onChange={(e) => setSupplier(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-red-500"
+              className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded p-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
             >
               <option value="max buy (100% Advance Payment)">max buy (100% Advance Payment)</option>
               <option value="Direct Supplier">Direct Supplier</option>
@@ -220,19 +220,19 @@ export default function GrnModal({
             </select>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-800">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm text-gray-300"
+              className="px-4 py-2 bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] rounded text-sm text-[var(--text-primary)] cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 rounded text-sm font-bold text-white shadow-lg cursor-pointer disabled:opacity-50"
+              className="px-6 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-90 rounded text-sm font-bold text-white shadow-sm cursor-pointer disabled:opacity-50"
             >
               {loading ? 'Processing...' : 'Confirm GRN Receipt'}
             </button>

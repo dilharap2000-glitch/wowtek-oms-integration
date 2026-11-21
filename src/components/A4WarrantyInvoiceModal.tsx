@@ -126,23 +126,23 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
       {/* Container Dialog */}
-      <div className="relative w-full max-w-4xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[96vh]">
+      <div className="relative w-full max-w-4xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[96vh]">
         {/* Modal Toolbar (Hidden on Print) */}
-        <div className="no-print flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-neutral-800 bg-neutral-950 flex-shrink-0">
+        <div className="no-print flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-600/10 text-purple-400 rounded-xl border border-purple-500/20">
+            <div className="p-2 bg-purple-100 text-purple-700 dark:bg-purple-600/15 dark:text-purple-400 rounded-xl border border-purple-200 dark:border-purple-500/20">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm sm:text-base font-bold text-white tracking-wide">
+                <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] tracking-wide">
                   Official Warranty Invoice
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/20">
                   {order.invoiceNumber}
                 </span>
               </div>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-[var(--text-secondary)]">
                 Print-ready official document with full warranty terms & customer signatures
               </p>
             </div>
@@ -150,14 +150,14 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
 
           <div className="flex items-center gap-2">
             {/* Format toggle: A4 vs 80mm */}
-            <div className="hidden sm:flex items-center bg-neutral-900 border border-neutral-800 rounded-lg p-0.5 text-xs">
+            <div className="hidden sm:flex items-center bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setFormat('a4')}
                 className={`px-2.5 py-1 rounded-md font-medium transition-all ${
                   format === 'a4'
                     ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 A4 Official Sheet
@@ -168,7 +168,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
                 className={`px-2.5 py-1 rounded-md font-medium transition-all ${
                   format === 'thermal'
                     ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-neutral-400 hover:text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 80mm Thermal Slip
@@ -179,7 +179,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 active:scale-95 rounded-lg transition-all shadow-md shadow-purple-900/30"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 active:scale-95 rounded-lg transition-all shadow-md shadow-purple-600/25"
               title="Print directly or save as PDF via browser print"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
               type="button"
               onClick={handleDownloadHtml}
               disabled={downloading}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-300 bg-neutral-800 hover:bg-neutral-700 active:scale-95 rounded-lg border border-neutral-700 transition-all"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-app)] active:scale-95 rounded-lg border border-[var(--border-subtle)] transition-all"
               title="Download standalone HTML file"
             >
               <Download className="w-3.5 h-3.5" />
@@ -200,7 +200,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors ml-1"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-surface)] transition-colors ml-1"
               aria-label="Close invoice"
             >
               <X className="w-5 h-5" />
@@ -209,7 +209,7 @@ export const A4WarrantyInvoiceModal: React.FC<A4WarrantyInvoiceModalProps> = ({
         </div>
 
         {/* Scrollable Document Preview Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-neutral-950 flex justify-center items-start">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[var(--bg-app)] flex justify-center items-start">
           {format === 'a4' ? (
             /* =========================================================================
              * A4 OFFICIAL WARRANTY INVOICE (CLEAN PRINTABLE VIEW)
