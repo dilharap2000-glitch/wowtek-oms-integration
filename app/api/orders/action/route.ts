@@ -2,127 +2,173 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerStore, saveServerOrder, broadcastLiveUpdate } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
 
-export const maxDuration = 30; // Max 30 seconds
+export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const action = body.action;
-    const order_id = body.order_id || body.orderId;
-    const cancellation_reason = body.cancellation_reason;
+    const rawOrderId = body.order_id || body.orderId;
+    const storeId = body.storeId;
+    const cancellationReason = body.cancellation_reason;
 
-    if (!order_id || !action) {
-      return NextResponse.json({ error: 'Missing order_id or action' }, { status: 400 });
+    if (!action || !rawOrderId) {
+      return NextResponse.json(
+        { success: false, error: 'action සහ order_id අනිවාර්යයි' },
+        { status: 400 }
+      );
     }
 
-    let rawInputId = String(order_id).trim();
-    if (rawInputId.startsWith('UBER-')) {
-      rawInputId = rawInputId.replace('UBER-', '');
-    }
-    let cleanInputId = rawInputId;
-    if (rawInputId.toLowerCase().startsWith('c') && rawInputId.length > 5) {
-      cleanInputId = rawInputId.substring(1);
+    const order_id = String(rawOrderId).trim();
+    const cleanInputId = order_id.replace(/^UBER-/i, '');
+
+    // 1. Environment & Token හරියට ගන්න (Sandbox vs Production)
+    const isSandbox = process.env.UBER_ENV === 'sandbox' || !process.env.UBER_PROD_TOKEN;
+    const baseUrl = isSandbox
+      ? process.env.UBER_SANDBOX_BASE_URL || 'https://sandbox-api.uber.com'
+      : process.env.UBER_PROD_BASE_URL || 'https://api.uber.com';
+
+    const accessToken = isSandbox
+      ? process.env.UBER_SANDBOX_ACCESS_TOKEN ||
+        process.env.UBER_ACCESS_TOKEN ||
+        process.env.UBER_EATS_ACCESS_TOKEN
+      : process.env.UBER_PROD_TOKEN ||
+        process.env.UBER_ACCESS_TOKEN ||
+        process.env.UBER_EATS_ACCESS_TOKEN;
+
+    if (!accessToken) {
+      console.error('[Uber Action] Missing access token');
+      return NextResponse.json(
+        { success: false, error: 'Uber Access Token සෙට් කර නැත' },
+        { status: 500 }
+      );
     }
 
-    let uberOriginalId = cleanInputId;
+    // Resolve Uber Order UUID if a short ID was passed (never mutate an already-valid UUID)
+    let uberOrderUuid = order_id;
+    let mongoConn: Awaited<ReturnType<typeof connectToMongoDB>> = null;
     try {
       const serverStore = getServerStore();
-      const existing = serverStore.orders.find(
-        (o) => o.id === order_id || o.id === cleanInputId || o.invoiceNumber === order_id || o.invoiceNumber === `UBER-${cleanInputId}` || (o as any).display_id === `UBER-${cleanInputId}` || (o as any).uber_order_id === cleanInputId
-      );
-      if (existing && (existing as any).uber_order_id) {
-        uberOriginalId = (existing as any).uber_order_id;
+      const existingLocal = serverStore.orders.find((o) => {
+        const anyO = o as any;
+        return (
+          o.id === order_id ||
+          anyO.orderId === order_id ||
+          anyO.uber_order_id === order_id ||
+          o.invoiceNumber === order_id ||
+          o.invoiceNumber === `UBER-${cleanInputId}` ||
+          anyO.display_id === order_id ||
+          anyO.display_id === `UBER-${cleanInputId}`
+        );
+      });
+      if (existingLocal && (existingLocal as any).uber_order_id) {
+        uberOrderUuid = String((existingLocal as any).uber_order_id).trim();
       } else {
-        const mongoConn = await connectToMongoDB();
+        mongoConn = await connectToMongoDB();
         if (mongoConn) {
           const doc = await mongoConn.db.collection('oms_orders').findOne({
             $or: [
-              { uber_order_id: cleanInputId },
-              { uber_order_id: rawInputId },
               { uber_order_id: order_id },
+              { orderId: order_id },
+              { orderId: cleanInputId },
               { display_id: cleanInputId.toUpperCase() },
-              { display_id: cleanInputId },
               { display_id: `UBER-${cleanInputId.toUpperCase()}` },
-              { display_id: `UBER-${cleanInputId}` },
-              { display_id: order_id.toUpperCase() },
               { display_id: order_id },
               { short_display_id: cleanInputId.toUpperCase() },
-              { orderId: cleanInputId },
-              { orderId: order_id },
-            ]
+            ],
           });
           if (doc?.uber_order_id) {
-            uberOriginalId = doc.uber_order_id;
+            uberOrderUuid = String(doc.uber_order_id).trim();
           }
         }
       }
-    } catch {}
-
-    let endpoint = '';
-    let payload: any = {};
-
-    // Map actions to Uber API Endpoints using raw uberOriginalId
-    switch (action) {
-      case 'accept':
-        endpoint = `/v1/delivery/order/${uberOriginalId}/accept`;
-        break;
-      case 'ready':
-        endpoint = `/v1/delivery/order/${uberOriginalId}/ready`;
-        break;
-      case 'cancel':
-        endpoint = `/v1/delivery/order/${uberOriginalId}/cancel`;
-        payload = {
-          cancellation_reason: cancellation_reason || {
-            type: 'RESTAURANT_TOO_BUSY',
-            info: 'Cancelled via WOWTEK OMS',
-          },
-        };
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    } catch (lookupErr) {
+      console.warn('[Uber Action UUID Lookup Notice]:', lookupErr);
     }
 
-    const baseUrl = process.env.UBER_BASE_URL || 'https://api.uber.com';
-    const accessToken = process.env.UBER_ACCESS_TOKEN || process.env.UBER_EATS_ACCESS_TOKEN;
+    // 2. Action එකට අදාළ Uber Endpoint Path එක තෝරන්න
+    let uberPath = '';
+    let payload: Record<string, unknown> = {};
 
-    // Only dispatch to live Uber API if token is configured
-    if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
-      // Setup AbortController to timeout after 8 seconds if Uber doesn't respond
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      try {
-        const uberResponse = await fetch(`${baseUrl}${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: Object.keys(payload).length > 0 ? JSON.stringify(payload) : undefined,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!uberResponse.ok && uberResponse.status !== 204) {
-          const errorText = await uberResponse.text();
-          console.error(`Uber API Error [${action}]:`, errorText);
-          return NextResponse.json({ error: `Uber API failed: ${errorText}` }, { status: uberResponse.status });
-        }
-      } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === 'AbortError') {
-          console.error('Uber API Request Timed Out');
-          return NextResponse.json({ error: 'Uber API request timed out. Please try again.' }, { status: 504 });
-        }
-        throw fetchErr;
-      }
+    if (action === 'accept') {
+      uberPath = `/v1/eats/orders/${uberOrderUuid}/accept_pos_order`;
+      payload = { reason: 'Accepted via WOWTEK OMS' };
+    } else if (action === 'ready') {
+      uberPath = `/v1/eats/orders/${uberOrderUuid}/restaurant_delivery_status`;
+      payload = { status: 'READY_FOR_PICKUP' };
+    } else if (action === 'cancel') {
+      uberPath = `/v1/eats/orders/${uberOrderUuid}/cancel`;
+      payload = {
+        reason: cancellationReason || {
+          code: 'OTHER',
+          explanation: 'Cancelled via WOWTEK OMS',
+        },
+      };
+    } else {
+      return NextResponse.json(
+        { success: false, error: `Unsupported action: ${action}` },
+        { status: 400 }
+      );
     }
 
-    // Sync state locally in OMS & broadcast live update
+    // 3. Uber Eats API එකට ඇත්තම Call එක යවන්න
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    let uberRes: Response;
+    try {
+      uberRes = await fetch(`${baseUrl}${uberPath}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    const rawText = await uberRes.text();
+    let uberData: unknown = rawText;
+    try {
+      uberData = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      // plain text response
+    }
+
+    console.log('[Uber Action Result]', {
+      action,
+      order_id: uberOrderUuid,
+      storeId,
+      url: `${baseUrl}${uberPath}`,
+      uberStatus: uberRes.status,
+      uberData,
+    });
+
+    // Uber API එකෙන් 200 / 204 නොඑනවා නම් error එක return කරන්න (false "success: true" නොයවන්න)
+    if (!uberRes.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          uberStatus: uberRes.status,
+          error: 'Uber API rejected the action',
+          uberResponse: uberData,
+        },
+        { status: uberRes.status }
+      );
+    }
+
+    // 4. Uber API සාර්ථක වුණාට පස්සේ DB / OMS state update කරන්න
     const now = new Date().toISOString();
-    const newStatus = action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled';
+    const nextStatus =
+      action === 'accept'
+        ? 'Processing'
+        : action === 'ready'
+        ? 'READY_FOR_PICKUP'
+        : 'Cancelled';
 
     try {
       const serverStore = getServerStore();
@@ -131,19 +177,19 @@ export async function POST(req: NextRequest) {
         return (
           o.id === order_id ||
           o.id === cleanInputId ||
-          o.id === uberOriginalId ||
+          o.id === uberOrderUuid ||
           o.invoiceNumber === order_id ||
           o.invoiceNumber === `UBER-${cleanInputId}` ||
           anyO.orderId === order_id ||
           anyO.orderId === cleanInputId ||
-          anyO.orderId === uberOriginalId ||
+          anyO.orderId === uberOrderUuid ||
           anyO.uber_order_id === order_id ||
           anyO.uber_order_id === cleanInputId ||
-          anyO.uber_order_id === uberOriginalId
+          anyO.uber_order_id === uberOrderUuid
         );
       });
       for (const existing of matchedOrders) {
-        existing.status = newStatus;
+        existing.status = nextStatus;
         existing.updatedAt = now;
         saveServerOrder(existing);
       }
@@ -151,30 +197,32 @@ export async function POST(req: NextRequest) {
       broadcastLiveUpdate({
         type: 'order_status_updated',
         orderId: order_id,
-        uber_order_id: uberOriginalId,
-        status: newStatus,
+        uber_order_id: uberOrderUuid,
+        status: nextStatus,
         timestamp: now,
       });
 
-      const mongoConn = await connectToMongoDB();
+      if (!mongoConn) {
+        mongoConn = await connectToMongoDB();
+      }
       if (mongoConn) {
         await mongoConn.db.collection('orders').updateMany(
           {
             $or: [
               { id: order_id },
               { id: cleanInputId },
-              { id: uberOriginalId },
+              { id: uberOrderUuid },
               { invoiceNumber: order_id },
               { invoiceNumber: `UBER-${cleanInputId}` },
               { orderId: order_id },
               { orderId: cleanInputId },
-              { orderId: uberOriginalId },
+              { orderId: uberOrderUuid },
               { uber_order_id: order_id },
               { uber_order_id: cleanInputId },
-              { uber_order_id: uberOriginalId },
+              { uber_order_id: uberOrderUuid },
             ],
           },
-          { $set: { status: newStatus, updatedAt: now } }
+          { $set: { status: nextStatus, updatedAt: now } }
         );
 
         await mongoConn.db.collection('oms_orders').updateMany(
@@ -182,16 +230,16 @@ export async function POST(req: NextRequest) {
             $or: [
               { orderId: order_id },
               { orderId: cleanInputId },
-              { orderId: uberOriginalId },
+              { orderId: uberOrderUuid },
               { external_order_id: order_id },
               { uber_order_id: order_id },
-              { uber_order_id: uberOriginalId },
+              { uber_order_id: uberOrderUuid },
               { uber_order_id: cleanInputId },
               { display_id: order_id },
               { display_id: `UBER-${cleanInputId}` },
             ],
           },
-          { $set: { status: newStatus, updated_at: new Date(), updatedAt: now } }
+          { $set: { status: nextStatus, updated_at: new Date(), updatedAt: now } }
         );
 
         await mongoConn.db.collection('webhook_events').updateMany(
@@ -199,27 +247,43 @@ export async function POST(req: NextRequest) {
             $or: [
               { orderId: order_id },
               { orderId: cleanInputId },
-              { orderId: uberOriginalId },
+              { orderId: uberOrderUuid },
               { uber_order_id: order_id },
-              { uber_order_id: uberOriginalId },
+              { uber_order_id: uberOrderUuid },
               { invoiceNumber: order_id },
             ],
           },
-          { $set: { orderStatus: newStatus } }
+          { $set: { orderStatus: nextStatus } }
         );
       }
-    } catch (syncErr: any) {
-      console.warn('[Order Action OMS State Sync Notice]:', syncErr?.message);
+    } catch (syncErr: unknown) {
+      console.warn(
+        '[Order Action OMS State Sync Notice]:',
+        syncErr instanceof Error ? syncErr.message : syncErr
+      );
     }
 
-    return NextResponse.json({ success: true, status: newStatus, message: `Order successfully ${action}ed` });
-
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error('Uber API Request Timed Out');
-      return NextResponse.json({ error: 'Uber API request timed out. Please try again.' }, { status: 504 });
+    return NextResponse.json({
+      success: true,
+      message: `Order successfully ${action}ed`,
+      status: nextStatus,
+      uberStatus: uberRes.status,
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      console.error('[Uber Action Timeout]');
+      return NextResponse.json(
+        { success: false, error: 'Uber API request timed out. Please try again.' },
+        { status: 504 }
+      );
     }
-    console.error('Action Handler Exception:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    console.error('[Uber Action Fatal Error]:', err);
+    return NextResponse.json(
+      {
+        success: false,
+        error: err instanceof Error ? err.message : 'Internal Server Error',
+      },
+      { status: 500 }
+    );
   }
 }

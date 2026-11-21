@@ -70,6 +70,7 @@ export type OrderStatus =
   | 'ACCEPTED'
   | 'Processing'
   | 'Ready for Pickup'
+  | 'READY_FOR_PICKUP'
   | 'Completed'
   | 'Delivered'
   | 'Returned'

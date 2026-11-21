@@ -163,7 +163,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       if (res.ok && data.success) {
         const nextStatus =
           data.status ||
-          (action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled');
+          (action === 'accept' ? 'Processing' : action === 'ready' ? 'READY_FOR_PICKUP' : 'Cancelled');
         setLiveOrders((prev) =>
           (prev || []).map((o) => {
             const anyO = o as any;
@@ -879,9 +879,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       <td className="py-3 px-3.5 text-center">
                         <span
                           className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
-                            order.status === 'Completed' || order.status === 'Delivered'
+                            order.status === 'Completed' || order.status === 'Delivered' || order.status === 'READY_FOR_PICKUP' || order.status === 'Ready for Pickup'
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                              : order.status === 'Returned'
+                              : order.status === 'Returned' || order.status === 'Cancelled'
                               ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                               : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                           }`}
