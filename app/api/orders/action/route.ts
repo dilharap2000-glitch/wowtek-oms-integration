@@ -126,10 +126,23 @@ export async function POST(req: NextRequest) {
 
     try {
       const serverStore = getServerStore();
-      const existing = serverStore.orders.find(
-        (o) => o.id === order_id || o.invoiceNumber === order_id || o.id.includes(order_id) || (o as any).orderId === order_id
-      );
-      if (existing) {
+      const matchedOrders = serverStore.orders.filter((o) => {
+        const anyO = o as any;
+        return (
+          o.id === order_id ||
+          o.id === cleanInputId ||
+          o.id === uberOriginalId ||
+          o.invoiceNumber === order_id ||
+          o.invoiceNumber === `UBER-${cleanInputId}` ||
+          anyO.orderId === order_id ||
+          anyO.orderId === cleanInputId ||
+          anyO.orderId === uberOriginalId ||
+          anyO.uber_order_id === order_id ||
+          anyO.uber_order_id === cleanInputId ||
+          anyO.uber_order_id === uberOriginalId
+        );
+      });
+      for (const existing of matchedOrders) {
         existing.status = newStatus;
         existing.updatedAt = now;
         saveServerOrder(existing);
@@ -138,24 +151,60 @@ export async function POST(req: NextRequest) {
       broadcastLiveUpdate({
         type: 'order_status_updated',
         orderId: order_id,
+        uber_order_id: uberOriginalId,
         status: newStatus,
         timestamp: now,
       });
 
       const mongoConn = await connectToMongoDB();
       if (mongoConn) {
-        await mongoConn.db.collection('orders').updateOne(
-          { $or: [{ id: order_id }, { invoiceNumber: order_id }, { invoiceNumber: `UBER-${cleanInputId}` }, { orderId: order_id }, { orderId: cleanInputId }] },
+        await mongoConn.db.collection('orders').updateMany(
+          {
+            $or: [
+              { id: order_id },
+              { id: cleanInputId },
+              { id: uberOriginalId },
+              { invoiceNumber: order_id },
+              { invoiceNumber: `UBER-${cleanInputId}` },
+              { orderId: order_id },
+              { orderId: cleanInputId },
+              { orderId: uberOriginalId },
+              { uber_order_id: order_id },
+              { uber_order_id: cleanInputId },
+              { uber_order_id: uberOriginalId },
+            ],
+          },
           { $set: { status: newStatus, updatedAt: now } }
         );
 
-        await mongoConn.db.collection('oms_orders').updateOne(
-          { $or: [{ orderId: order_id }, { orderId: cleanInputId }, { external_order_id: order_id }, { uber_order_id: uberOriginalId }, { uber_order_id: cleanInputId }, { display_id: order_id }, { display_id: `UBER-${cleanInputId}` }] },
-          { $set: { status: newStatus, updated_at: new Date() } }
+        await mongoConn.db.collection('oms_orders').updateMany(
+          {
+            $or: [
+              { orderId: order_id },
+              { orderId: cleanInputId },
+              { orderId: uberOriginalId },
+              { external_order_id: order_id },
+              { uber_order_id: order_id },
+              { uber_order_id: uberOriginalId },
+              { uber_order_id: cleanInputId },
+              { display_id: order_id },
+              { display_id: `UBER-${cleanInputId}` },
+            ],
+          },
+          { $set: { status: newStatus, updated_at: new Date(), updatedAt: now } }
         );
 
-        await mongoConn.db.collection('webhook_events').updateOne(
-          { $or: [{ orderId: order_id }, { orderId: cleanInputId }, { invoiceNumber: order_id }] },
+        await mongoConn.db.collection('webhook_events').updateMany(
+          {
+            $or: [
+              { orderId: order_id },
+              { orderId: cleanInputId },
+              { orderId: uberOriginalId },
+              { uber_order_id: order_id },
+              { uber_order_id: uberOriginalId },
+              { invoiceNumber: order_id },
+            ],
+          },
           { $set: { orderStatus: newStatus } }
         );
       }
@@ -163,7 +212,7 @@ export async function POST(req: NextRequest) {
       console.warn('[Order Action OMS State Sync Notice]:', syncErr?.message);
     }
 
-    return NextResponse.json({ success: true, message: `Order successfully ${action}ed` });
+    return NextResponse.json({ success: true, status: newStatus, message: `Order successfully ${action}ed` });
 
   } catch (error: any) {
     if (error.name === 'AbortError') {

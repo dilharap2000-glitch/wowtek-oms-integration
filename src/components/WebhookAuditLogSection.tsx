@@ -63,6 +63,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       id?: string;
       display_id?: string;
       storeId?: string;
+      externalStoreId?: string;
     }
   ) => {
     // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
@@ -90,29 +91,29 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         body: JSON.stringify({
           action,
           order_id: targetOrderId,
-          ...(order.storeId ? { storeId: order.storeId } : {}),
+          storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || data.success === false) {
-        console.error(`Action [${action}] failed:`, res.status, data);
+      if (res.ok && data.success) {
+        console.log(`Action [${action}] success for ${targetOrderId}:`, data);
         setOrderActionFeedback({
-          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-          isError: true,
+          message: data.message || `Order successfully ${action}ed!`,
+          isError: false,
         });
-        setTimeout(() => setOrderActionFeedback(null), 5000);
+        setTimeout(() => setOrderActionFeedback(null), 4000);
+        if (onRefreshEvents) await onRefreshEvents();
         return;
       }
 
-      console.log(`Action [${action}] success for ${targetOrderId}:`, data);
+      console.error(`Action [${action}] failed:`, res.status, data);
       setOrderActionFeedback({
-        message: data.message || `Order successfully ${action}ed!`,
-        isError: false,
+        message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
+        isError: true,
       });
-      setTimeout(() => setOrderActionFeedback(null), 4000);
-      if (onRefreshEvents) onRefreshEvents();
+      setTimeout(() => setOrderActionFeedback(null), 5000);
     } catch (err) {
       console.error('Network/Client error on action:', err);
       setOrderActionFeedback({

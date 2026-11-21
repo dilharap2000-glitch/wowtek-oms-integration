@@ -92,7 +92,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders'); // ඔයාගේ orders ගන්න API එක
+      const res = await fetch('/api/orders', { cache: 'no-store' }); // ඔයාගේ orders ගන්න API එක
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.orders || []);
       if (Array.isArray(list) && list.length > 0) {
@@ -154,34 +154,46 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         body: JSON.stringify({
           action,
           order_id: targetOrderId,
-          ...(order.externalStoreId || order.storeId
-            ? { storeId: order.externalStoreId || order.storeId }
-            : {}),
+          storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || data.success === false) {
-        console.error(`Action [${action}] failed:`, res.status, data);
+      if (res.ok && data.success) {
+        const nextStatus =
+          data.status ||
+          (action === 'accept' ? 'Processing' : action === 'ready' ? 'Ready for Pickup' : 'Cancelled');
+        setLiveOrders((prev) =>
+          (prev || []).map((o) => {
+            const anyO = o as any;
+            const matches =
+              o.id === targetOrderId ||
+              anyO.orderId === targetOrderId ||
+              anyO.uber_order_id === targetOrderId;
+            return matches ? { ...o, status: nextStatus } : o;
+          })
+        );
+
+        console.log(`Action [${action}] success for ${targetOrderId}:`, data);
         setOrderActionToast({
-          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-          isError: true,
+          message: data.message || `Order successfully ${action}ed!`,
+          isError: false,
         });
-        setTimeout(() => setOrderActionToast(null), 5000);
+        setTimeout(() => setOrderActionToast(null), 4000);
+        if (typeof window !== 'undefined') {
+          fetch('/api/sync/live').catch(() => {});
+          await fetchOrders(); // අලුත් status ("Processing" / "Ready" / "Cancelled") එක වහාම ගන්න
+        }
         return;
       }
 
-      console.log(`Action [${action}] success for ${targetOrderId}:`, data);
+      console.error(`Action [${action}] failed:`, res.status, data);
       setOrderActionToast({
-        message: data.message || `Order successfully ${action}ed!`,
-        isError: false,
+        message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
+        isError: true,
       });
-      setTimeout(() => setOrderActionToast(null), 4000);
-      if (typeof window !== 'undefined') {
-        fetch('/api/sync/live').catch(() => {});
-        await fetchOrders();
-      }
+      setTimeout(() => setOrderActionToast(null), 5000);
     } catch (err) {
       console.error('Network/Client error on action:', err);
       setOrderActionToast({

@@ -1,10 +1,7 @@
 {
   "/api/orders/route": "app/api/orders/route.js",
-  "/sms/page": "app/sms/page.js",
-  "/page": "app/page.js",
-  "/sms-marketing/page": "app/sms-marketing/page.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/sms/history/route": "app/api/sms/history/route.js",
+  "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
   "/api/sync/live/route": "app/api/sync/live/route.js",
-  "/api/health/database/route": "app/api/health/database/route.js"
+  "/page": "app/page.js",
+  "/api/orders/action/route": "app/api/orders/action/route.js"
 }

@@ -196,6 +196,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
       id?: string;
       display_id?: string;
       storeId?: string;
+      externalStoreId?: string;
     }
   ) => {
     const targetOrderId = String(
@@ -219,19 +220,19 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
         body: JSON.stringify({
           action,
           order_id: targetOrderId,
-          ...(order.storeId ? { storeId: order.storeId } : {}),
+          storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.success === false) {
-        console.error(`Action [${action}] failed:`, response.status, data);
-        setOrderActionMsg({ message: `Failed (${response.status}): ${data.error || 'Action failed'}`, isError: true });
+      if (response.ok && data.success) {
+        setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
         setTimeout(() => setOrderActionMsg(null), 5000);
         return;
       }
 
-      setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
+      console.error(`Action [${action}] failed:`, response.status, data);
+      setOrderActionMsg({ message: `Failed (${response.status}): ${data.error || 'Action failed'}`, isError: true });
       setTimeout(() => setOrderActionMsg(null), 5000);
     } catch (err) {
       console.error('Network/Client error on action:', err);
