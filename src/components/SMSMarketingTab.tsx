@@ -18,8 +18,14 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Tag,
+  History,
+  CheckCheck,
+  RotateCcw,
 } from 'lucide-react';
+import type { SmsCampaignLog, SmsDeliveryStatus } from '@/lib/serverStore';
 import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
 import {
   parseCustomerCsv,
@@ -67,6 +73,14 @@ export function SMSMarketingTab() {
   const [varMenuOpen, setVarMenuOpen] = useState(false);
   const [varHighlightIdx, setVarHighlightIdx] = useState(0);
 
+  // Sent SMS History States
+  const [smsHistory, setSmsHistory] = useState<SmsCampaignLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'ALL' | SmsDeliveryStatus>('ALL');
+  const [historySearch, setHistorySearch] = useState('');
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
   // Fetch Customers
   const fetchCustomers = React.useCallback(async () => {
     try {
@@ -83,9 +97,29 @@ export function SMSMarketingTab() {
     }
   }, [selectedPhone]);
 
+  // Fetch Sent SMS History
+  const fetchSmsHistory = React.useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const res = await fetch('/api/sms/history');
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load sent SMS history');
+      }
+      setSmsHistory(Array.isArray(data.logs) ? data.logs : []);
+    } catch (err: any) {
+      console.error('Error loading SMS history:', err);
+      setHistoryError(err?.message || 'Unable to load sent SMS history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCustomers();
-  }, [fetchCustomers]);
+    fetchSmsHistory();
+  }, [fetchCustomers, fetchSmsHistory]);
 
   // Checkbox Selection Logic
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -505,6 +539,10 @@ export function SMSMarketingTab() {
       });
 
       const data = await res.json();
+      if (data.campaignLog) {
+        const newLog = data.campaignLog as SmsCampaignLog;
+        setSmsHistory((prev) => [newLog, ...prev.filter((item) => item.id !== newLog.id)]);
+      }
       if (data.success) {
         const count =
           data.recipientsCount ??
@@ -524,12 +562,75 @@ export function SMSMarketingTab() {
       } else {
         setNotification({ type: 'error', message: 'Error: ' + (data.message || 'Failed to dispatch SMS') });
       }
+      fetchSmsHistory();
     } catch (error: any) {
       console.error(error);
       setNotification({ type: 'error', message: 'Network error sending SMS: ' + (error?.message || 'Check connection') });
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatHistoryTimestamp = (iso: string): string => {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso || '-';
+      return d.toLocaleString('en-GB', {
+        timeZone: 'Asia/Colombo',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return iso || '-';
+    }
+  };
+
+  const historyStatusCounts = useMemo(() => {
+    return {
+      total: smsHistory.length,
+      sent: smsHistory.filter((l) => l.status === 'Sent').length,
+      delivered: smsHistory.filter((l) => l.status === 'Delivered').length,
+      failed: smsHistory.filter((l) => l.status === 'Failed').length,
+    };
+  }, [smsHistory]);
+
+  const filteredSmsHistory = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    return smsHistory.filter((log) => {
+      if (historyStatusFilter !== 'ALL' && log.status !== historyStatusFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const recipientMatch = Array.isArray(log.recipients)
+        ? log.recipients.some(
+            (r) =>
+              r.name?.toLowerCase().includes(q) ||
+              r.phone?.toLowerCase().includes(q) ||
+              r.renderedMessage?.toLowerCase().includes(q)
+          )
+        : false;
+      return (
+        log.messageTemplate?.toLowerCase().includes(q) ||
+        log.previewMessage?.toLowerCase().includes(q) ||
+        log.campaignType?.toLowerCase().includes(q) ||
+        log.senderId?.toLowerCase().includes(q) ||
+        recipientMatch
+      );
+    });
+  }, [smsHistory, historyStatusFilter, historySearch]);
+
+  const handleReuseHistoryTemplate = (templateText: string) => {
+    setMessage(templateText);
+    setVarMenuOpen(false);
+    setVarTriggerRange(null);
+    requestAnimationFrame(() => {
+      messageTextareaRef.current?.focus();
+      messageTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   };
 
   const filteredCustomers = customers.filter(
@@ -1175,6 +1276,311 @@ export function SMSMarketingTab() {
           </div>
         </div>
       </div>
+
+      {/* SENT SMS HISTORY & CAMPAIGN DELIVERY LOG */}
+      <section className="bg-slate-900/70 border border-slate-800/80 rounded-2xl p-5 shadow-xl shadow-purple-950/10 backdrop-blur-xl space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <History className="w-4 h-4 text-purple-400" />
+              <span>Sent SMS History</span>
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-mono tabular-nums">
+              <span>{historyStatusCounts.total} Campaigns</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-indigo-300">{historyStatusCounts.sent} Sent</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-emerald-400">{historyStatusCounts.delivered} Delivered</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-rose-400">{historyStatusCounts.failed} Failed</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status Segmented Filter */}
+            <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px]">
+              {(['ALL', 'Sent', 'Delivered', 'Failed'] as const).map((statusOption) => (
+                <button
+                  key={statusOption}
+                  type="button"
+                  onClick={() => setHistoryStatusFilter(statusOption)}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    historyStatusFilter === statusOption
+                      ? 'bg-purple-600/80 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {statusOption === 'ALL' ? 'All' : statusOption}
+                </button>
+              ))}
+            </div>
+
+            {/* History Search */}
+            <div className="relative w-52 sm:w-60">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search message or phone..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchSmsHistory}
+              disabled={historyLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${historyLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {historyError && (
+          <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-500/40 text-rose-200 text-xs flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{historyError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchSmsHistory}
+              className="px-3 py-1 rounded-lg bg-rose-600/30 hover:bg-rose-600/50 text-rose-100 font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {historyLoading && smsHistory.length === 0 ? (
+          <div className="space-y-2 py-2" aria-label="Loading sent SMS history">
+            {[0, 1, 2].map((skeletonIdx) => (
+              <div
+                key={skeletonIdx}
+                className="h-11 rounded-xl bg-slate-950/60 border border-slate-800/60 animate-pulse"
+              />
+            ))}
+          </div>
+        ) : filteredSmsHistory.length === 0 ? (
+          <div className="py-12 px-4 text-center border border-slate-800/70 rounded-xl bg-slate-950/40 space-y-3">
+            <p className="text-xs text-slate-400">
+              {smsHistory.length === 0
+                ? 'No SMS campaigns have been dispatched yet. Sent, Delivered, and Failed campaign logs will appear here with timestamps.'
+                : 'No campaign logs match the selected status filter or search query.'}
+            </p>
+            <div>
+              {smsHistory.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    messageTextareaRef.current?.focus();
+                    messageTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="px-4 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Compose First Campaign
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryStatusFilter('ALL');
+                    setHistorySearch('');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-xl border border-slate-800/80">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="border-b border-slate-800 bg-slate-950/95 sticky top-0 text-slate-400 text-[11px] font-semibold">
+                <tr>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap">Timestamp</th>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap">Campaign</th>
+                  <th className="py-2.5 px-3.5">Message</th>
+                  <th className="py-2.5 px-3.5 whitespace-nowrap">Delivery Status</th>
+                  <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filteredSmsHistory.map((log) => {
+                  const isExpanded = expandedLogId === log.id;
+                  const campaignLabel =
+                    log.campaignType === 'bulk'
+                      ? 'Bulk Broadcast'
+                      : log.campaignType === 'selected'
+                      ? 'Selected Batch'
+                      : 'Single Recipient';
+
+                  return (
+                    <React.Fragment key={log.id}>
+                      <tr
+                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                        className="hover:bg-slate-850/60 transition-colors cursor-pointer"
+                      >
+                        <td className="py-3 px-3.5 font-mono tabular-nums text-slate-300 whitespace-nowrap">
+                          {formatHistoryTimestamp(log.timestamp)}
+                        </td>
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <div className="text-slate-100 font-medium">{campaignLabel}</div>
+                          <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5">
+                            {log.recipientsCount} {log.recipientsCount === 1 ? 'recipient' : 'recipients'} · {log.senderId}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3.5 max-w-md">
+                          <div className="text-slate-100 truncate">{log.previewMessage || log.messageTemplate}</div>
+                          {log.messageTemplate && log.messageTemplate !== log.previewMessage && (
+                            <div className="text-[11px] text-slate-500 font-mono truncate mt-0.5">
+                              Template: {log.messageTemplate}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5 font-medium">
+                            {log.status === 'Delivered' ? (
+                              <>
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <span className="text-emerald-400">Delivered</span>
+                              </>
+                            ) : log.status === 'Failed' ? (
+                              <>
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                <span className="text-rose-400">Failed</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                <span className="text-indigo-300">Sent</span>
+                              </>
+                            )}
+                          </div>
+                          {log.recipientsCount > 1 && (
+                            <div className="text-[10px] font-mono tabular-nums text-slate-400 mt-0.5">
+                              {log.deliveredCount > 0 ? `${log.deliveredCount} delivered` : `${log.sentCount} sent`}
+                              {log.failedCount > 0 ? ` · ${log.failedCount} failed` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 text-right whitespace-nowrap">
+                          <div
+                            className="inline-flex items-center gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleReuseHistoryTemplate(log.messageTemplate || log.previewMessage)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition-colors cursor-pointer"
+                              title="Load this message into composer"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              <span>Reuse</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[11px] transition-colors cursor-pointer"
+                              aria-expanded={isExpanded}
+                            >
+                              <span>{isExpanded ? 'Hide' : 'Details'}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr className="bg-slate-950/75">
+                          <td colSpan={5} className="px-4 py-3.5 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-800/70 text-[11px]">
+                              <div className="text-slate-300">
+                                <span className="text-slate-500 mr-1.5">Template:</span>
+                                <span className="text-slate-100">{log.messageTemplate}</span>
+                              </div>
+                              <span className="font-mono tabular-nums text-slate-500 shrink-0">
+                                ID: {log.id}
+                              </span>
+                            </div>
+
+                            {Array.isArray(log.recipients) && log.recipients.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-[11px] text-slate-300">
+                                  <thead className="text-slate-500 border-b border-slate-800/70">
+                                    <tr>
+                                      <th className="py-1.5 pr-3 font-medium">Recipient</th>
+                                      <th className="py-1.5 px-3 font-medium">Phone</th>
+                                      <th className="py-1.5 px-3 font-medium">Status</th>
+                                      <th className="py-1.5 pl-3 font-medium">Personalized Message</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-800/40">
+                                    {log.recipients.map((rec, recIdx) => (
+                                      <tr key={`${log.id}-${rec.phone}-${recIdx}`}>
+                                        <td className="py-2 pr-3 font-medium text-slate-200 whitespace-nowrap">
+                                          {rec.name || 'Valued Customer'}
+                                        </td>
+                                        <td className="py-2 px-3 font-mono tabular-nums text-purple-300 whitespace-nowrap">
+                                          {rec.phone}
+                                        </td>
+                                        <td className="py-2 px-3 whitespace-nowrap">
+                                          <span
+                                            className={`inline-flex items-center gap-1 font-medium ${
+                                              rec.status === 'Delivered'
+                                                ? 'text-emerald-400'
+                                                : rec.status === 'Failed'
+                                                ? 'text-rose-400'
+                                                : 'text-indigo-300'
+                                            }`}
+                                          >
+                                            {rec.status === 'Delivered' ? (
+                                              <CheckCheck className="w-3 h-3" />
+                                            ) : rec.status === 'Failed' ? (
+                                              <AlertCircle className="w-3 h-3" />
+                                            ) : (
+                                              <CheckCircle2 className="w-3 h-3" />
+                                            )}
+                                            <span>{rec.status}</span>
+                                          </span>
+                                        </td>
+                                        <td className="py-2 pl-3 text-slate-300">
+                                          <div>{rec.renderedMessage}</div>
+                                          {rec.gatewayMessage && rec.status === 'Failed' && (
+                                            <div className="text-[10px] text-rose-400 mt-0.5">
+                                              {rec.gatewayMessage}
+                                            </div>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-slate-500">
+                                No individual recipient records captured for this entry.
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* BULK CSV IMPORT MODAL WITH SRI LANKAN PHONE VALIDATION */}
       {showBulkImportModal && (

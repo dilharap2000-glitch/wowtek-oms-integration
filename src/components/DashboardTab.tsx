@@ -629,16 +629,20 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
                 {/* Live Pending Uber Eats Action Items */}
                 {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING_ACCEPTANCE' || o?.status === 'Processing').slice(0, 4).map((order, idx) => {
-                  const uberOriginalUuid = (order as any).uber_order_id || (order as any).orderId || order.id;
-                  const rawDisplayId = (order as any).display_id || (order as any).short_display_id || order.invoiceNumber || '';
-                  const cleanDisplayId = String(rawDisplayId).replace('UBER-', '');
+                  const uberOrder = order as any;
+                  const uberOriginalUuid = uberOrder.uber_order_id || uberOrder.orderId || order.id;
+                  const displayOrderCode = uberOrder.display_id
+                    ? String(uberOrder.display_id).replace(/^UBER-/i, '').toUpperCase()
+                    : String(uberOrder.order_number || uberOrder.short_display_id || order.invoiceNumber || '')
+                        .replace(/^UBER-/i, '')
+                        .toUpperCase();
 
                   return (
                     <div key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`} className="mt-3 pt-3 border-t border-slate-800 order-card">
                       <div className="flex justify-between items-center text-[11px]">
-                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම (උදා: UBER-95CF3) */}
+                        {/* 1. ඩිවයිස් එකේ පේන කෙටි අංකය UI එකේ පෙන්වීම ("UBER-" නැතුව, උදා: 95CF3) */}
                         <h3 className="font-mono text-purple-300 font-bold text-xs">
-                          UBER-{(order as any).display_id ? String((order as any).display_id).replace('UBER-', '').toUpperCase() : cleanDisplayId.toUpperCase()}
+                          {displayOrderCode}
                         </h3>
                         <span className="text-emerald-400 font-mono font-semibold">Rs. {Number(order.grossTotal || 0).toLocaleString()}</span>
                       </div>
@@ -762,7 +766,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       <td className="py-3 px-3.5 font-mono font-medium text-white">
                         <div className="font-bold text-purple-400">
                           {order.channel === 'ubereats'
-                            ? `UBER-${String((order as any).display_id || order.invoiceNumber || '').replace('UBER-', '').toUpperCase()}`
+                            ? String(
+                                (order as any).display_id ||
+                                  (order as any).order_number ||
+                                  (order as any).short_display_id ||
+                                  order.invoiceNumber ||
+                                  ''
+                              )
+                                .replace(/^UBER-/i, '')
+                                .toUpperCase()
                             : order.invoiceNumber}
                         </div>
                         {order.waybillNumber ? (
@@ -989,7 +1001,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 <span className="text-slate-400">Order ID:</span>
                 <span className="font-mono font-bold text-purple-400">
                   {selectedUberOrder.channel === 'ubereats'
-                    ? `UBER-${String((selectedUberOrder as any).display_id || selectedUberOrder.invoiceNumber || selectedUberOrder.id).replace('UBER-', '').toUpperCase()}`
+                    ? String(
+                        (selectedUberOrder as any).display_id ||
+                          (selectedUberOrder as any).order_number ||
+                          (selectedUberOrder as any).short_display_id ||
+                          selectedUberOrder.invoiceNumber ||
+                          selectedUberOrder.id ||
+                          ''
+                      )
+                        .replace(/^UBER-/i, '')
+                        .toUpperCase()
                     : (selectedUberOrder.invoiceNumber || selectedUberOrder.id)}
                 </span>
               </div>
@@ -1143,7 +1164,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 <h4 className="text-sm font-semibold text-white">
-                  Uber Eats Order: <span className="font-mono text-emerald-300">{selectedUberOrder.invoiceNumber || selectedUberOrder.id}</span>
+                  Uber Eats Order:{' '}
+                  <span className="font-mono text-emerald-300">
+                    {String(
+                      (selectedUberOrder as any).display_id ||
+                        (selectedUberOrder as any).order_number ||
+                        selectedUberOrder.invoiceNumber ||
+                        selectedUberOrder.id ||
+                        ''
+                    )
+                      .replace(/^UBER-/i, '')
+                      .toUpperCase()}
+                  </span>
                 </h4>
               </div>
               <button

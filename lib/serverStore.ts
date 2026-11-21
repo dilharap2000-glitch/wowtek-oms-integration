@@ -13,11 +13,38 @@ export interface ServerCustomer {
   updatedAt: string;
 }
 
+export type SmsDeliveryStatus = 'Sent' | 'Failed' | 'Delivered';
+
+export interface SmsRecipientLog {
+  name: string;
+  phone: string;
+  source?: string;
+  renderedMessage: string;
+  status: SmsDeliveryStatus;
+  gatewayMessage?: string;
+}
+
+export interface SmsCampaignLog {
+  id: string;
+  campaignType: 'single' | 'selected' | 'bulk';
+  senderId: string;
+  messageTemplate: string;
+  previewMessage: string;
+  recipientsCount: number;
+  sentCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  status: SmsDeliveryStatus;
+  timestamp: string;
+  recipients: SmsRecipientLog[];
+}
+
 interface ServerStoreData {
   orders: Order[];
   waybills: TransExpressWaybill[];
   webhookEvents: WebhookEvent[];
   customers: ServerCustomer[];
+  smsLogs?: SmsCampaignLog[];
   lastUpdated: string;
 }
 
@@ -75,6 +102,7 @@ function readFromDisk(): ServerStoreData {
             waybills: Array.isArray(data.waybills) ? data.waybills : [],
             webhookEvents: Array.isArray(data.webhookEvents) ? data.webhookEvents : [],
             customers: Array.isArray(data.customers) ? data.customers : [],
+            smsLogs: Array.isArray(data.smsLogs) ? data.smsLogs : [],
             lastUpdated: data.lastUpdated || new Date().toISOString(),
           };
         }
@@ -89,6 +117,7 @@ function readFromDisk(): ServerStoreData {
     waybills: [],
     webhookEvents: [],
     customers: [],
+    smsLogs: [],
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -304,5 +333,35 @@ export function deleteServerCustomers(phones: string[]): number {
   writeToDisk(store);
 
   return prevLen - store.customers.length;
+}
+
+export function getServerSmsLogs(): SmsCampaignLog[] {
+  const store = getServerStore();
+  if (!Array.isArray(store.smsLogs)) {
+    store.smsLogs = [];
+  }
+  return store.smsLogs;
+}
+
+export function saveServerSmsLog(log: SmsCampaignLog): SmsCampaignLog {
+  const store = getServerStore();
+  if (!Array.isArray(store.smsLogs)) {
+    store.smsLogs = [];
+  }
+
+  const existingIdx = store.smsLogs.findIndex((item) => item.id === log.id);
+  if (existingIdx !== -1) {
+    store.smsLogs[existingIdx] = { ...store.smsLogs[existingIdx], ...log };
+  } else {
+    store.smsLogs.unshift(log);
+    if (store.smsLogs.length > 200) {
+      store.smsLogs = store.smsLogs.slice(0, 200);
+    }
+  }
+
+  store.lastUpdated = new Date().toISOString();
+  writeToDisk(store);
+
+  return log;
 }
 

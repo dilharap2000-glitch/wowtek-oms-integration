@@ -362,7 +362,9 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                         <div className="font-mono font-bold text-white flex items-center gap-1">
                           <span>
                             {evt.source === 'ubereats'
-                              ? `UBER-${String((evt as any).display_id || evt.invoiceNumber).replace('UBER-', '').toUpperCase()}`
+                              ? String((evt as any).display_id || (evt as any).order_number || evt.invoiceNumber || '')
+                                  .replace(/^UBER-/i, '')
+                                  .toUpperCase()
                               : evt.invoiceNumber}
                           </span>
                         </div>

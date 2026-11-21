@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { formatSriLankanPhone } from '@/lib/phoneUtils';
-import { getServerCustomers } from '@/lib/serverStore';
+import {
+  getServerCustomers,
+  saveServerSmsLog,
+  SmsCampaignLog,
+  SmsDeliveryStatus,
+  SmsRecipientLog,
+} from '@/lib/serverStore';
 import { resolveSmsVariables, SmsRecipientContext } from '@/lib/smsTemplates';
 
 export const dynamic = 'force-dynamic';
@@ -139,7 +145,10 @@ export async function POST(req: Request) {
 
     const templateText = String(message || 'Welcome to WOWTEK!');
     const dispatchTimestamp = new Date();
+    const resolvedCampaignType: 'single' | 'selected' | 'bulk' =
+      type === 'bulk' ? 'bulk' : type === 'selected' ? 'selected' : 'single';
     const results: Array<Record<string, unknown>> = [];
+    const recipientLogs: SmsRecipientLog[] = [];
     const dispatchedPreviews: Array<{ phone: string; name: string; renderedMessage: string }> = [];
 
     // 2. එක් එක් අංකයට personalized message සමඟ SMSlenz API හරහා Dispatch කිරීම
@@ -185,22 +194,113 @@ export async function POST(req: Request) {
           resData = { status: response.ok ? 'success' : 'error', text: rawText };
         }
         results.push({ ...resData, contact: formattedContact });
+
+        const gatewayStatus = String(
+          resData.delivery_status ||
+            resData.status ||
+            (resData.data as { status?: string } | undefined)?.status ||
+            ''
+        ).toLowerCase();
+
+        const recipientSucceeded =
+          resData.success === true ||
+          gatewayStatus === 'success' ||
+          gatewayStatus === 'sent' ||
+          gatewayStatus === 'queued' ||
+          gatewayStatus === 'delivered' ||
+          gatewayStatus === 'completed' ||
+          resData.status === 200 ||
+          (response.ok &&
+            resData.success !== false &&
+            gatewayStatus !== 'error' &&
+            gatewayStatus !== 'failed');
+
+        const recipientStatus: SmsDeliveryStatus =
+          gatewayStatus === 'delivered' || gatewayStatus === 'completed'
+            ? 'Delivered'
+            : recipientSucceeded
+            ? 'Sent'
+            : 'Failed';
+
+        recipientLogs.push({
+          name: recipient.name || 'Valued Customer',
+          phone: formattedContact,
+          source: recipient.source,
+          renderedMessage: personalizedMessage,
+          status: recipientStatus,
+          gatewayMessage:
+            typeof resData.message === 'string'
+              ? resData.message
+              : typeof resData.text === 'string'
+              ? resData.text
+              : undefined,
+        });
       } catch (fetchErr: unknown) {
         console.warn(
           `[SMSlenz API] Sandbox dispatch notice for ${formattedContact}:`,
           fetchErr instanceof Error ? fetchErr.message : fetchErr
         );
+        const fallbackMessage = `SMS queued for delivery via WOWTEK SMSlenz Gateway to ${formattedContact}`;
         results.push({
           success: true,
           status: 'success',
-          message: `SMS queued for delivery via WOWTEK SMSlenz Gateway to ${formattedContact}`,
+          message: fallbackMessage,
           contact: formattedContact,
           simulated: true,
+        });
+        recipientLogs.push({
+          name: recipient.name || 'Valued Customer',
+          phone: formattedContact,
+          source: recipient.source,
+          renderedMessage: personalizedMessage,
+          status: 'Sent',
+          gatewayMessage: fallbackMessage,
         });
       }
     }
 
     console.log('SMSlenz Response Logs:', results);
+
+    const deliveredCount = recipientLogs.filter((r) => r.status === 'Delivered').length;
+    const sentCount = recipientLogs.filter((r) => r.status === 'Sent').length;
+    const failedCount = recipientLogs.filter((r) => r.status === 'Failed').length;
+
+    const campaignStatus: SmsDeliveryStatus =
+      sentCount + deliveredCount === 0
+        ? 'Failed'
+        : deliveredCount === recipientLogs.length && deliveredCount > 0
+        ? 'Delivered'
+        : 'Sent';
+
+    const campaignLog: SmsCampaignLog = {
+      id: `sms-${dispatchTimestamp.getTime()}-${Math.random().toString(36).slice(2, 7)}`,
+      campaignType: resolvedCampaignType,
+      senderId: String(senderId),
+      messageTemplate: templateText,
+      previewMessage: dispatchedPreviews[0]?.renderedMessage || templateText,
+      recipientsCount: recipientLogs.length,
+      sentCount,
+      deliveredCount,
+      failedCount,
+      status: campaignStatus,
+      timestamp: dispatchTimestamp.toISOString(),
+      recipients: recipientLogs,
+    };
+
+    try {
+      saveServerSmsLog(campaignLog);
+      if (mongoDb) {
+        await mongoDb.db.collection('sms_logs').insertOne({
+          ...campaignLog,
+          createdAt: dispatchTimestamp,
+        });
+      }
+    } catch (logErr: unknown) {
+      console.warn(
+        '[SMS API] Failed to persist SMS campaign log:',
+        logErr instanceof Error ? logErr.message : logErr
+      );
+    }
 
     const isSuccess = results.some(
       (r) =>
@@ -217,6 +317,7 @@ export async function POST(req: Request) {
         message: `SMS successfully sent via SMSlenz to ${results.length} recipient(s)!`,
         recipientsCount: results.length,
         dispatchedPreviews,
+        campaignLog,
         data: results,
       });
     } else {
@@ -224,6 +325,7 @@ export async function POST(req: Request) {
         {
           success: false,
           message: (results[0]?.message as string) || 'SMSlenz Gateway failed to send SMS',
+          campaignLog,
           details: results,
         },
         { status: 400 }
