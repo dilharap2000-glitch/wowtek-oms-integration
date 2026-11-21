@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  getUberAccessToken,
+  getUberBaseUrl,
+  hasUberCredentialsConfigured,
+} from '@/lib/uberToken';
 
 export type UberSandboxTestResult = {
   feature: string;
@@ -11,25 +16,24 @@ export type UberSandboxTestResult = {
 };
 
 export async function getUberSandboxStatus() {
-  const baseUrl = process.env.UBER_SANDBOX_BASE_URL || 'https://sandbox-api.uber.com';
-  const accessToken = process.env.UBER_SANDBOX_ACCESS_TOKEN || process.env.UBER_ACCESS_TOKEN;
+  const baseUrl = getUberBaseUrl(true);
   const defaultStoreId = process.env.UBER_SANDBOX_STORE_ID || '';
 
   return NextResponse.json({
     environment: baseUrl,
-    tokenConfigured: Boolean(accessToken && !accessToken.includes('your_uber')),
+    tokenConfigured: hasUberCredentialsConfigured(true),
     defaultStoreIdConfigured: Boolean(defaultStoreId),
     defaultStoreId: defaultStoreId || undefined,
   });
 }
 
 export async function runUberSandboxValidation(req: NextRequest) {
-  const baseUrl = process.env.UBER_SANDBOX_BASE_URL || 'https://sandbox-api.uber.com';
-  const accessToken = process.env.UBER_SANDBOX_ACCESS_TOKEN || process.env.UBER_ACCESS_TOKEN;
+  const baseUrl = getUberBaseUrl(true);
+  const accessToken = await getUberAccessToken(true);
 
   if (!accessToken) {
     return NextResponse.json(
-      { error: 'UBER_SANDBOX_ACCESS_TOKEN හෝ UBER_ACCESS_TOKEN environment variable එක සෙට් කර නැත.' },
+      { error: 'Uber Sandbox OAuth credentials හෝ access token එක සෙට් කර නැත.' },
       { status: 400 }
     );
   }

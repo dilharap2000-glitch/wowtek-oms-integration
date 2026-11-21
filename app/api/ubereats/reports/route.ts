@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
+import { getUberAccessToken, getUberBaseUrl, isUberSandboxMode } from '@/lib/uberToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,11 +13,13 @@ export async function POST(req: NextRequest) {
     const formattedEnd = endDate || today.toISOString().split('T')[0];
     const formattedStart = startDate || thirtyDaysAgo.toISOString().split('T')[0];
 
-    const accessToken = process.env.UBER_ACCESS_TOKEN || process.env.UBER_EATS_ACCESS_TOKEN;
+    const isSandbox = isUberSandboxMode();
+    const baseUrl = getUberBaseUrl(isSandbox);
+    const accessToken = await getUberAccessToken(isSandbox);
 
     // Valid report types: PAYMENT_DETAILS_REPORT, FINANCE_SUMMARY_REPORT, etc.
-    if (accessToken && accessToken !== 'YOUR_UBER_ACCESS_TOKEN') {
-      const response = await fetch('https://api.uber.com/v1/eats/report', {
+    if (accessToken) {
+      const response = await fetch(`${baseUrl}/v1/eats/report`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,

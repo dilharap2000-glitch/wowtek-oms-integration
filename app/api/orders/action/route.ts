@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerStore, saveServerOrder, broadcastLiveUpdate } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
+import {
+  clearUberAccessTokenCache,
+  getUberAccessToken,
+  getUberBaseUrl,
+  isUberSandboxMode,
+} from '@/lib/uberToken';
 
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
@@ -23,24 +29,18 @@ export async function POST(req: NextRequest) {
     const order_id = String(rawOrderId).trim();
     const cleanInputId = order_id.replace(/^UBER-/i, '');
 
-    // 1. Environment & Token හරියට ගන්න (Sandbox vs Production)
-    const isSandbox = process.env.UBER_ENV === 'sandbox' || !process.env.UBER_PROD_TOKEN;
-    const baseUrl = isSandbox
-      ? process.env.UBER_SANDBOX_BASE_URL || 'https://sandbox-api.uber.com'
-      : process.env.UBER_PROD_BASE_URL || 'https://api.uber.com';
-
-    const accessToken = isSandbox
-      ? process.env.UBER_SANDBOX_ACCESS_TOKEN ||
-        process.env.UBER_ACCESS_TOKEN ||
-        process.env.UBER_EATS_ACCESS_TOKEN
-      : process.env.UBER_PROD_TOKEN ||
-        process.env.UBER_ACCESS_TOKEN ||
-        process.env.UBER_EATS_ACCESS_TOKEN;
+    // 1. Environment & Token හරියට ගන්න (Sandbox vs Production + OAuth auto-refresh)
+    const isSandbox = isUberSandboxMode();
+    const baseUrl = getUberBaseUrl(isSandbox);
+    let accessToken = await getUberAccessToken(isSandbox);
 
     if (!accessToken) {
-      console.error('[Uber Action] Missing access token');
+      console.error('[Uber Action] Missing access token or OAuth credentials');
       return NextResponse.json(
-        { success: false, error: 'Uber Access Token සෙට් කර නැත' },
+        {
+          success: false,
+          error: 'Uber OAuth credentials (Client ID/Secret) හෝ Access Token සෙට් කර නැත',
+        },
         { status: 500 }
       );
     }
@@ -112,23 +112,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Uber Eats API එකට ඇත්තම Call එක යවන්න
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    // 3. Uber Eats API එකට ඇත්තම Call එක යවන්න (401 නම් cache clear කර එක් වරක් retry කරන්න)
+    const callUberAction = async (token: string): Promise<Response> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        return await fetch(`${baseUrl}${uberPath}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
 
-    let uberRes: Response;
-    try {
-      uberRes = await fetch(`${baseUrl}${uberPath}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
+    let uberRes = await callUberAction(accessToken);
+    if (uberRes.status === 401) {
+      clearUberAccessTokenCache(isSandbox);
+      const refreshedToken = await getUberAccessToken(isSandbox);
+      if (refreshedToken && refreshedToken !== accessToken) {
+        accessToken = refreshedToken;
+        uberRes = await callUberAction(accessToken);
+      }
     }
 
     const rawText = await uberRes.text();
