@@ -520,31 +520,50 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         {/* Feed Row එක ඇතුළේ Action column එකට මේ කොටස දාන්න */}
-                        {item.source === 'ubereats' && (
-                          <div className="flex gap-1.5 justify-end items-center">
-                            <button
-                              onClick={() => handleOrderAction('accept', item as any)}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
-                              title="Accept on Uber"
-                            >
-                              Accept
-                            </button>
-                            <button
-                              onClick={() => handleOrderAction('ready', item as any)}
-                              className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
-                              title="Mark Order Ready for Delivery"
-                            >
-                              Ready
-                            </button>
-                            <button
-                              onClick={() => handleOrderAction('cancel', item as any)}
-                              className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
-                              title="Cancel Order"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        )}
+                        {item.source === 'ubereats' && (() => {
+                          const uberStatus = item.orderStatus || (item as any).state;
+                          if (!uberStatus || uberStatus === 'PENDING_ACCEPTANCE' || uberStatus === 'Pending' || uberStatus === 'PENDING') {
+                            return (
+                              <div className="flex gap-1.5 justify-end items-center">
+                                <button
+                                  onClick={() => handleOrderAction('accept', item as any)}
+                                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  title="Accept on Uber"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => handleOrderAction('cancel', item as any)}
+                                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  title="Cancel Order"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (uberStatus === 'Processing' || uberStatus === 'ACCEPTED') {
+                            return (
+                              <div className="flex gap-1.5 justify-end items-center">
+                                <button
+                                  onClick={() => handleOrderAction('ready', item as any)}
+                                  className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  title="Mark Order Ready for Delivery"
+                                >
+                                  Ready
+                                </button>
+                                <button
+                                  onClick={() => handleOrderAction('cancel', item as any)}
+                                  className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-1.5 rounded font-medium transition cursor-pointer"
+                                  title="Cancel Order"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
 
                         <button
                           onClick={() => setSelectedEventForPayload(evt)}

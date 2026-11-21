@@ -65,7 +65,9 @@ export interface StoreMapping {
 
 export type OrderStatus =
   | 'Pending'
+  | 'PENDING'
   | 'PENDING_ACCEPTANCE'
+  | 'ACCEPTED'
   | 'Processing'
   | 'Ready for Pickup'
   | 'Completed'
