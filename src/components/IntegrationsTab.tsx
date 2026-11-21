@@ -188,25 +188,54 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     }
   };
 
-  const handleOrderAction = async (orderId: string, action: 'accept' | 'cancel' | 'ready', storeId: string) => {
+  const handleOrderAction = async (
+    action: 'accept' | 'ready' | 'cancel',
+    order: {
+      uber_order_id?: string;
+      orderId?: string;
+      id?: string;
+      display_id?: string;
+      storeId?: string;
+    }
+  ) => {
+    const targetOrderId = String(
+      order?.uber_order_id ||
+      order?.orderId ||
+      order?.id ||
+      ''
+    ).trim();
+
+    if (!targetOrderId) {
+      console.error('Missing uber_order_id for order:', order);
+      setOrderActionMsg({ message: 'මෙම order එකට valid Uber Order UUID එකක් නැත.', isError: true });
+      setTimeout(() => setOrderActionMsg(null), 5000);
+      return;
+    }
+
     try {
       const response = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, action, storeId }),
+        body: JSON.stringify({
+          action,
+          order_id: targetOrderId,
+          ...(order.storeId ? { storeId: order.storeId } : {}),
+        }),
       });
 
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) {
+        console.error(`Action [${action}] failed:`, response.status, data);
+        setOrderActionMsg({ message: `Failed (${response.status}): ${data.error || 'Action failed'}`, isError: true });
         setTimeout(() => setOrderActionMsg(null), 5000);
-      } else {
-        setOrderActionMsg({ message: `Failed: ${data.error || 'Action failed'}`, isError: true });
-        setTimeout(() => setOrderActionMsg(null), 5000);
+        return;
       }
-    } catch (err: any) {
-      console.error('Action failed', err);
-      setOrderActionMsg({ message: 'Something went wrong!', isError: true });
+
+      setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
+      setTimeout(() => setOrderActionMsg(null), 5000);
+    } catch (err) {
+      console.error('Network/Client error on action:', err);
+      setOrderActionMsg({ message: 'Server එකට connect වීමට නොහැකි විය.', isError: true });
       setTimeout(() => setOrderActionMsg(null), 5000);
     }
   };
@@ -1552,21 +1581,24 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
               {simStoreResponse.data?.order && (
                 (() => {
                   const order = {
-                    orderId: simStoreResponse.data.order.id || simStoreResponse.data.order.orderId || simStoreResponse.data.order.invoiceNumber,
+                    uber_order_id: simStoreResponse.data.order.uber_order_id,
+                    orderId: simStoreResponse.data.order.orderId || simStoreResponse.data.order.id || simStoreResponse.data.order.invoiceNumber,
+                    id: simStoreResponse.data.order.id,
+                    display_id: simStoreResponse.data.order.display_id,
                     storeId: simStoreResponse.data.order.externalStoreId || simStoreResponse.data.order.storeId || 'eats-store-01',
                   };
                   return (
                     <div className="pt-2 border-t border-neutral-800">
                       <div className="flex gap-2 mt-4">
                         <button 
-                          onClick={() => handleOrderAction(order.orderId, 'accept', order.storeId)}
+                          onClick={() => handleOrderAction('accept', order)}
                           className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 cursor-pointer transition-colors"
                         >
                           Accept on Uber
                         </button>
                         
                         <button 
-                          onClick={() => handleOrderAction(order.orderId, 'cancel', order.storeId)}
+                          onClick={() => handleOrderAction('cancel', order)}
                           className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 cursor-pointer transition-colors"
                         >
                           Cancel Order

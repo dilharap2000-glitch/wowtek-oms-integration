@@ -6,7 +6,10 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['mongodb'],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      config.cache = { type: 'memory' };
+    }
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
