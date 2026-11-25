@@ -24,6 +24,7 @@ import {
   Key,
 } from 'lucide-react';
 import { WebhookEvent } from '@/types';
+import { OrderActionCell, type OrderActionType } from './OrderActionCell';
 
 interface WebhookAuditLogSectionProps {
   events: WebhookEvent[];
@@ -53,10 +54,11 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
+  const [orderActionLoadingId, setOrderActionLoadingId] = useState<string | null>(null);
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
-    action: 'accept' | 'ready' | 'cancel',
+    action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: {
       uber_order_id?: string;
       orderId?: string;
@@ -64,7 +66,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       display_id?: string;
       storeId?: string;
       externalStoreId?: string;
-    }
+    },
+    reason?: string
   ) => {
     // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
     const targetOrderId = String(
@@ -73,6 +76,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       order?.id ||
       ''
     ).trim();
+    const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
     if (!targetOrderId) {
       console.error('Missing uber_order_id for order:', order);
@@ -84,36 +88,41 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       return;
     }
 
+    setOrderActionLoadingId(targetOrderId);
     try {
       const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action,
-          order_id: targetOrderId,
+          orderId: targetOrderId,
+          action: normalizedAction,
+          reason,
           storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (res.ok && data.success) {
-        console.log(`Action [${action}] success for ${targetOrderId}:`, data);
+      if (!res.ok || !(data.ok ?? data.success)) {
+        console.error(`Action [${normalizedAction}] failed:`, res.status, data);
         setOrderActionFeedback({
-          message: data.message || `Order successfully ${action}ed!`,
-          isError: false,
+          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
+          isError: true,
         });
-        setTimeout(() => setOrderActionFeedback(null), 4000);
-        if (onRefreshEvents) await onRefreshEvents();
+        setTimeout(() => setOrderActionFeedback(null), 5000);
         return;
       }
 
-      console.error(`Action [${action}] failed:`, res.status, data);
+      const nextStatus = data.nextStatus || data.status;
+      console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
       setOrderActionFeedback({
-        message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-        isError: true,
+        message:
+          data.message ||
+          `Order successfully ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+        isError: false,
       });
-      setTimeout(() => setOrderActionFeedback(null), 5000);
+      setTimeout(() => setOrderActionFeedback(null), 4000);
+      if (onRefreshEvents) await onRefreshEvents();
     } catch (err) {
       console.error('Network/Client error on action:', err);
       setOrderActionFeedback({
@@ -121,6 +130,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         isError: true,
       });
       setTimeout(() => setOrderActionFeedback(null), 5000);
+    } finally {
+      setOrderActionLoadingId(null);
     }
   };
 
@@ -298,7 +309,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       </div>
 
       {/* Events Table / Feed */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto lg:overflow-visible">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
@@ -308,7 +319,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
               <th className="py-2.5 px-4 text-right">Order Amount</th>
               <th className="py-2.5 px-4 text-center">Trans Express Waybill</th>
               <th className="py-2.5 px-4 text-center">SMSlenz Confirmation</th>
-              <th className="py-2.5 px-4 text-center">Raw Payload</th>
+              <th className="py-2.5 px-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
@@ -513,66 +524,34 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     </td>
 
                     {/* Action Column */}
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {item.source === 'ubereats' && (() => {
-                          const uberStatus = item.orderStatus || (item as any).state;
-                          if (!uberStatus || uberStatus === 'PENDING_ACCEPTANCE' || uberStatus === 'Pending' || uberStatus === 'PENDING') {
-                            return (
-                              <div className="flex gap-1.5 justify-end items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOrderAction('accept', item as any)}
-                                  className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer"
-                                  title="Accept on Uber"
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOrderAction('cancel', item as any)}
-                                  className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer"
-                                  title="Cancel Order"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            );
-                          }
-                          if (uberStatus === 'Processing' || uberStatus === 'ACCEPTED') {
-                            return (
-                              <div className="flex gap-1.5 justify-end items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOrderAction('ready', item as any)}
-                                  className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white text-xs px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer"
-                                  title="Mark Order Ready for Delivery"
-                                >
-                                  Ready
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOrderAction('cancel', item as any)}
-                                  className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer"
-                                  title="Cancel Order"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-
-                        <button
-                          onClick={() => setSelectedEventForPayload(evt)}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg text-[11px] font-mono transition-colors cursor-pointer"
-                          title="Inspect Raw JSON Payload"
-                        >
-                          <Code className="w-3 h-3 text-[var(--accent-primary)]" />
-                          <span>View JSON</span>
-                        </button>
-                      </div>
+                    <td className="py-3 px-4 text-right">
+                      {(() => {
+                        const targetId = String(
+                          (item as any).uber_order_id ||
+                            (item as any).orderId ||
+                            item.id ||
+                            ''
+                        ).trim();
+                        const uberStatus = String(
+                          item.orderStatus || (item as any).state || (item.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
+                        );
+                        return (
+                          <OrderActionCell
+                            orderId={targetId || evt.id}
+                            status={uberStatus}
+                            loading={Boolean(targetId && orderActionLoadingId === targetId)}
+                            isUberOrder={item.source === 'ubereats'}
+                            onAction={(_, actionType: OrderActionType, reason) =>
+                              handleOrderAction(
+                                actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                                item as any,
+                                reason
+                              )
+                            }
+                            onViewJson={() => setSelectedEventForPayload(evt)}
+                          />
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

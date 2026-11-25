@@ -75,7 +75,8 @@ export type OrderStatus =
   | 'Delivered'
   | 'Returned'
   | 'Partially Returned'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'CANCELLED';
 
 export interface Order {
   id: string;

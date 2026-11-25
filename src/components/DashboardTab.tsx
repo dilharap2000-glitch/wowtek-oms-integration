@@ -13,9 +13,6 @@ import {
   Database,
   Building2,
   Clock,
-  RotateCcw,
-  FileText,
-  Printer,
   PlusCircle,
   CheckCircle2,
   X,
@@ -26,6 +23,7 @@ import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
 import { RestockGRNForm } from '@/components/GRNForms';
+import { OrderActionCell, type OrderActionType } from './OrderActionCell';
 
 interface DashboardTabProps {
   orders: Order[];
@@ -85,7 +83,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   const [orderActionLoading, setOrderActionLoading] = React.useState<string | null>(null);
   const [orderActionToast, setOrderActionToast] = React.useState<{ message: string; isError: boolean } | null>(null);
-  const [confirmingReturnOrderId, setConfirmingReturnOrderId] = React.useState<string | null>(null);
+  const [orderFilterTab, setOrderFilterTab] = React.useState<'ALL' | 'NEW' | 'PREPARING' | 'READY' | 'DONE'>('ALL');
+  const [orderSearch, setOrderSearch] = React.useState('');
 
   // Auto-refresh orders polling (15-second interval with rate-limit backoff)
   const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
@@ -154,11 +153,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
-    action: 'accept' | 'ready' | 'cancel',
-    order: UberOrderActionTarget
+    action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
+    order: UberOrderActionTarget,
+    reason?: string
   ) => {
     // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
     const targetOrderId = getUberTargetOrderId(order);
+    const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
     if (!targetOrderId) {
       console.error('Missing uber_order_id for order:', order);
@@ -170,53 +171,63 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       return;
     }
 
-    setOrderActionLoading(`${targetOrderId}-${action}`);
+    setOrderActionLoading(`${targetOrderId}-${action.toLowerCase()}`);
     try {
       const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action,
-          order_id: targetOrderId,
+          orderId: targetOrderId,
+          action: normalizedAction,
+          reason,
           storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (res.ok && data.success) {
-        const nextStatus =
-          data.status ||
-          (action === 'accept' ? 'Processing' : action === 'ready' ? 'READY_FOR_PICKUP' : 'Cancelled');
-        setLiveOrders((prev) =>
-          (prev || []).map((o) => {
-            const anyO = o as any;
-            const matches =
-              o.id === targetOrderId ||
-              anyO.orderId === targetOrderId ||
-              anyO.uber_order_id === targetOrderId;
-            return matches ? { ...o, status: nextStatus } : o;
-          })
-        );
-
-        console.log(`Action [${action}] success for ${targetOrderId}:`, data);
+      if (!res.ok || !(data.ok ?? data.success)) {
+        console.error(`Action [${normalizedAction}] failed:`, res.status, data);
         setOrderActionToast({
-          message: data.message || `Order successfully ${action}ed!`,
-          isError: false,
+          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
+          isError: true,
         });
-        setTimeout(() => setOrderActionToast(null), 4000);
-        if (typeof window !== 'undefined') {
-          await fetchOrders(true); // අලුත් status ("Processing" / "Ready" / "Cancelled") එක වහාම ගන්න
-        }
+        setTimeout(() => setOrderActionToast(null), 5000);
         return;
       }
 
-      console.error(`Action [${action}] failed:`, res.status, data);
+      const nextStatus =
+        data.nextStatus ||
+        data.status ||
+        (normalizedAction === 'ACCEPT'
+          ? 'ACCEPTED'
+          : normalizedAction === 'READY'
+          ? 'READY_FOR_PICKUP'
+          : 'CANCELLED');
+
+      console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
+
+      setLiveOrders((prev) =>
+        (prev || []).map((o) => {
+          const anyO = o as any;
+          const matches =
+            o.id === targetOrderId ||
+            anyO.orderId === targetOrderId ||
+            anyO.uber_order_id === targetOrderId;
+          return matches ? { ...o, status: nextStatus } : o;
+        })
+      );
+
       setOrderActionToast({
-        message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-        isError: true,
+        message:
+          data.message ||
+          `Order successfully ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+        isError: false,
       });
-      setTimeout(() => setOrderActionToast(null), 5000);
+      setTimeout(() => setOrderActionToast(null), 4000);
+      if (typeof window !== 'undefined') {
+        await fetchOrders(true);
+      }
     } catch (err) {
       console.error('Network/Client error on action:', err);
       setOrderActionToast({
@@ -239,7 +250,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        setConfirmingReturnOrderId(null);
         setOrderActionToast({
           message: 'Return successful and store stock updated!',
           isError: false,
@@ -738,60 +748,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {order.status === 'PENDING_ACCEPTANCE' || order.status === 'Pending' || order.status === 'PENDING' ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleOrderAction('accept', uberOrder)}
-                              disabled={orderActionLoading === `${uberOriginalUuid}-accept`}
-                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>{orderActionLoading === `${uberOriginalUuid}-accept` ? '...' : 'Accept'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOrderAction('cancel', uberOrder)}
-                              disabled={orderActionLoading === `${uberOriginalUuid}-cancel`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer disabled:opacity-50"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>{orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}</span>
-                            </button>
-                          </>
-                        ) : order.status === 'Processing' || order.status === 'ACCEPTED' ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => handleOrderAction('ready', uberOrder)}
-                              disabled={orderActionLoading === `${uberOriginalUuid}-ready`}
-                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] px-3 py-1.5 text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>{orderActionLoading === `${uberOriginalUuid}-ready` ? '...' : 'Ready'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOrderAction('cancel', uberOrder)}
-                              disabled={orderActionLoading === `${uberOriginalUuid}-cancel`}
-                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 cursor-pointer disabled:opacity-50"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>{orderActionLoading === `${uberOriginalUuid}-cancel` ? '...' : 'Cancel'}</span>
-                            </button>
-                          </>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrderForThermalPrint(order)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-primary)] transition hover:opacity-90 cursor-pointer"
-                          title="Print 4x6 Thermal Label"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>4x6 Label</span>
-                        </button>
-                      </div>
+                      <OrderActionCell
+                        orderId={uberOriginalUuid}
+                        status={order.status}
+                        loading={Boolean(
+                          orderActionLoading && orderActionLoading.startsWith(`${uberOriginalUuid}-`)
+                        )}
+                        isUberOrder
+                        onAction={(_, actionType: OrderActionType, reason) =>
+                          handleOrderAction(
+                            actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                            uberOrder,
+                            reason
+                          )
+                        }
+                        onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
+                      />
                     </div>
                   );
                 })}
@@ -825,8 +797,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Live Invoices Table */}
-        <div className="lg:col-span-2 p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm">
-          <div className="flex items-center justify-between mb-4">
+        <div className="lg:col-span-2 p-5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent Transactions & Invoices</h3>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
@@ -834,6 +806,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               </p>
             </div>
             <button
+              type="button"
               onClick={() => onNavigateTab('pos')}
               className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium cursor-pointer"
             >
@@ -841,234 +814,230 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
-                <tr>
-                  <th className="py-3 px-3.5">Invoice No</th>
-                  <th className="py-3 px-3.5">Channel & Gateway</th>
-                  <th className="py-3 px-3.5">Customer</th>
-                  <th className="py-3 px-3.5 text-center">Status</th>
-                  <th className="py-3 px-3.5 text-right">Net Profit</th>
-                  <th className="py-3 px-3.5 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
-                {safeOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-[var(--text-secondary)]">
-                      <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                        <ShoppingCart className="w-8 h-8 text-[var(--text-secondary)] opacity-60" />
-                        <p className="font-semibold text-[var(--text-primary)] text-xs">No Recent Invoices or Orders</p>
-                        <p className="text-[11px] text-[var(--text-secondary)]">
-                          Create sales orders in the POS terminal or connect external store webhooks to populate real-time analytics.
-                        </p>
+          {/* Clean Orders Filter Tabs + Search */}
+          {(() => {
+            const matchesTab = (order: Order, tab: typeof orderFilterTab) => {
+              const s = String(order.status || '').toUpperCase();
+              if (tab === 'ALL') return true;
+              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'PENDING';
+              if (tab === 'PREPARING') return s === 'PROCESSING' || s === 'ACCEPTED' || s === 'PREPARING';
+              if (tab === 'READY') return s === 'READY_FOR_PICKUP' || s === 'READY FOR PICKUP' || s === 'READY';
+              return s === 'COMPLETED' || s === 'DELIVERED' || s === 'CANCELLED' || s === 'RETURNED';
+            };
+            const q = orderSearch.trim().toLowerCase();
+            const filteredTableOrders = safeOrders.filter((o) => {
+              if (!matchesTab(o, orderFilterTab)) return false;
+              if (!q) return true;
+              return (
+                String(o.invoiceNumber || '').toLowerCase().includes(q) ||
+                String((o as any).display_id || '').toLowerCase().includes(q) ||
+                String(o.customerName || '').toLowerCase().includes(q) ||
+                String(o.channelName || '').toLowerCase().includes(q)
+              );
+            });
+
+            return (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[
+                      { key: 'ALL', label: `All Orders (${safeOrders.length})` },
+                      { key: 'NEW', label: `New (${safeOrders.filter((o) => matchesTab(o, 'NEW')).length})` },
+                      { key: 'PREPARING', label: `Preparing (${safeOrders.filter((o) => matchesTab(o, 'PREPARING')).length})` },
+                      { key: 'READY', label: `Ready (${safeOrders.filter((o) => matchesTab(o, 'READY')).length})` },
+                      { key: 'DONE', label: 'Completed / Cancelled' },
+                    ].map((tab) => {
+                      const active = orderFilterTab === tab.key;
+                      return (
                         <button
-                          onClick={() => onNavigateTab('pos')}
-                          className="mt-1 px-3.5 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                        >
-                          Open POS Terminal
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  (safeOrders || []).slice(0, 5).map((order, idx) => (
-                    <tr key={`${order.id || order.invoiceNumber || 'ord'}-${idx}`} className="hover:bg-[var(--bg-subtle)]/50 transition-colors duration-150">
-                      <td className="py-3 px-3.5 font-mono font-medium text-[var(--text-primary)]">
-                        <div className="font-bold text-[var(--accent-primary)]">
-                          {order.channel === 'ubereats'
-                            ? String(
-                                (order as any).display_id ||
-                                  (order as any).order_number ||
-                                  (order as any).short_display_id ||
-                                  order.invoiceNumber ||
-                                  ''
-                              )
-                                .replace(/^UBER-/i, '')
-                                .toUpperCase()
-                            : order.invoiceNumber}
-                        </div>
-                        {order.waybillNumber ? (
-                          <div className="text-[10px] text-cyan-700 dark:text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
-                            <Truck className="w-2.5 h-2.5" />
-                            <span>TX: {order.waybillNumber}</span>
-                          </div>
-                        ) : order.waybillError ? (
-                          <div
-                            className="text-[10px] text-rose-700 dark:text-rose-400 font-mono flex items-center gap-1 mt-0.5 truncate max-w-[120px]"
-                            title={order.waybillError}
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
-                            <span className="truncate">Courier Error</span>
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="py-3 px-3.5">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[var(--text-primary)] font-medium">{order.channelName}</span>
-                          {order.branchName && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                              📍 {order.branchName}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
-                          <span className="text-[var(--accent-primary)]">
-                            {order.paymentGatewayName} ({order.gatewayFeePercent}%)
-                          </span>
-                          {order.externalStoreId && (
-                            <span className="text-[var(--text-secondary)]">
-                              · {order.externalStoreId}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3 px-3.5">
-                        <div className="text-[var(--text-primary)] font-medium">{order.customerName}</div>
-                        <div className="text-[var(--text-secondary)] text-[11px]">{order.city}</div>
-                      </td>
-                      <td className="py-3 px-3.5 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
-                            order.status === 'Completed' || order.status === 'Delivered' || order.status === 'READY_FOR_PICKUP' || order.status === 'Ready for Pickup'
-                              ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
-                              : order.status === 'Returned' || order.status === 'Cancelled'
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
-                              : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setOrderFilterTab(tab.key as typeof orderFilterTab)}
+                          className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                            active
+                              ? 'bg-[var(--accent-primary)] text-white shadow-sm'
+                              : 'border border-[var(--border-subtle)] bg-[var(--bg-app)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)]'
                           }`}
                         >
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3.5 text-right font-mono tabular-nums font-semibold">
-                        {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] whitespace-nowrap">
-                            Pending Valuation
-                          </span>
-                        ) : (
-                          <span className="text-emerald-700 dark:text-emerald-400">
-                            Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* Uber Eats Real-Time API Accept / Ready / Cancel Controls */}
-                          {order.channel === 'ubereats' && (
-                            <div className="flex items-center gap-1">
-                              {order.status === 'PENDING_ACCEPTANCE' || order.status === 'Pending' || order.status === 'PENDING' ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOrderAction('accept', order as any)}
-                                    disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-accept`}
-                                    className="px-2.5 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
-                                    title="Accept Uber Eats Order"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-accept` ? '...' : 'Accept'}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOrderAction('cancel', order as any)}
-                                    disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel`}
-                                    className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
-                                    title="Cancel Uber Eats Order"
-                                  >
-                                    <X className="w-3 h-3" />
-                                    <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel` ? '...' : 'Cancel'}</span>
-                                  </button>
-                                </>
-                              ) : order.status === 'Processing' || order.status === 'ACCEPTED' ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOrderAction('ready', order as any)}
-                                    disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-ready`}
-                                    className="px-2.5 py-1 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer shadow-sm disabled:opacity-50"
-                                    title="Mark Ready on Uber Eats"
-                                  >
-                                    <CheckCircle2 className="w-3 h-3" />
-                                    <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-ready` ? '...' : 'Ready'}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOrderAction('cancel', order as any)}
-                                    disabled={orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel`}
-                                    className="px-2.5 py-1 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 transition-all inline-flex items-center gap-1 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
-                                    title="Cancel Uber Eats Order"
-                                  >
-                                    <X className="w-3 h-3" />
-                                    <span>{orderActionLoading === `${getUberTargetOrderId(order as any)}-cancel` ? '...' : 'Cancel'}</span>
-                                  </button>
-                                </>
-                              ) : null}
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    placeholder="Search order #, customer, channel..."
+                    className="w-full sm:w-56 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-app)] px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:border-[var(--accent-primary)] focus:outline-none"
+                  />
+                </div>
+
+                <div className="overflow-x-auto lg:overflow-visible rounded-xl border border-[var(--border-subtle)]">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
+                      <tr>
+                        <th className="py-3 px-3.5">Invoice No</th>
+                        <th className="py-3 px-3.5">Channel &amp; Gateway</th>
+                        <th className="py-3 px-3.5">Customer</th>
+                        <th className="py-3 px-3.5 text-center">Status</th>
+                        <th className="py-3 px-3.5 text-right">Net Profit</th>
+                        <th className="py-3 px-3.5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-subtle)] font-sans text-[var(--text-primary)]">
+                      {filteredTableOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-[var(--text-secondary)]">
+                            <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                              <ShoppingCart className="w-8 h-8 text-[var(--text-secondary)] opacity-60" />
+                              <p className="font-semibold text-[var(--text-primary)] text-xs">
+                                {safeOrders.length === 0 ? 'No Recent Invoices or Orders' : 'Orders හමු වුණේ නැහැ.'}
+                              </p>
+                              <p className="text-[11px] text-[var(--text-secondary)]">
+                                {safeOrders.length === 0
+                                  ? 'Create sales orders in the POS terminal or connect external store webhooks to populate real-time analytics.'
+                                  : 'Try clearing the search filter or selecting another order tab.'}
+                              </p>
+                              {safeOrders.length === 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateTab('pos')}
+                                  className="mt-1 px-3.5 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                                >
+                                  Open POS Terminal
+                                </button>
+                              )}
                             </div>
-                          )}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTableOrders.slice(0, 8).map((order, idx) => {
+                          const targetUberId = getUberTargetOrderId(order as any);
+                          const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
+                          const isUberBusy = Boolean(
+                            targetUberId && orderActionLoading && orderActionLoading.startsWith(`${targetUberId}-`)
+                          );
+                          const isReturning = orderActionLoading === `${idToPass}-return`;
 
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrderForInvoice(order)}
-                            className="px-2.5 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
-                            title="View & Print A4 Warranty Invoice"
-                          >
-                            <FileText className="w-3 h-3" />
-                            <span>A4</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedOrderForThermalPrint(order)}
-                            className="px-2.5 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-90 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
-                            title="Print 100mm x 150mm Daraz-Style 4x6 Thermal Shipping Waybill"
-                          >
-                            <Printer className="w-3 h-3" />
-                            <span>4x6 Label</span>
-                          </button>
-
-                          {order.status !== 'Returned' && (() => {
-                            const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
-                            const isConfirming = confirmingReturnOrderId === idToPass;
-                            const isReturning = orderActionLoading === `${idToPass}-return`;
-                            return isConfirming ? (
-                              <div className="inline-flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleReturnOrder(idToPass)}
-                                  disabled={isReturning}
-                                  className="px-2 py-1 text-white bg-amber-600 hover:bg-amber-500 rounded-lg text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                          return (
+                            <tr
+                              key={`${order.id || order.invoiceNumber || 'ord'}-${idx}`}
+                              className="hover:bg-[var(--bg-subtle)]/50 transition-colors duration-150"
+                            >
+                              <td className="py-3 px-3.5 font-mono font-medium text-[var(--text-primary)]">
+                                <div className="font-bold text-[var(--accent-primary)]">
+                                  {order.channel === 'ubereats'
+                                    ? String(
+                                        (order as any).display_id ||
+                                          (order as any).order_number ||
+                                          (order as any).short_display_id ||
+                                          order.invoiceNumber ||
+                                          ''
+                                      )
+                                        .replace(/^UBER-/i, '')
+                                        .toUpperCase()
+                                    : order.invoiceNumber}
+                                </div>
+                                {order.waybillNumber ? (
+                                  <div className="text-[10px] text-cyan-700 dark:text-cyan-400 font-mono flex items-center gap-1 mt-0.5">
+                                    <Truck className="w-2.5 h-2.5" />
+                                    <span>TX: {order.waybillNumber}</span>
+                                  </div>
+                                ) : order.waybillError ? (
+                                  <div
+                                    className="text-[10px] text-rose-700 dark:text-rose-400 font-mono flex items-center gap-1 mt-0.5 truncate max-w-[120px]"
+                                    title={order.waybillError}
+                                  >
+                                    <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" />
+                                    <span className="truncate">Courier Error</span>
+                                  </div>
+                                ) : null}
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[var(--text-primary)] font-medium">{order.channelName}</span>
+                                  {order.branchName && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                                      📍 {order.branchName}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
+                                  <span className="text-[var(--accent-primary)]">
+                                    {order.paymentGatewayName} ({order.gatewayFeePercent}%)
+                                  </span>
+                                  {order.externalStoreId && (
+                                    <span className="text-[var(--text-secondary)]">· {order.externalStoreId}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3.5">
+                                <div className="text-[var(--text-primary)] font-medium">{order.customerName}</div>
+                                <div className="text-[var(--text-secondary)] text-[11px]">{order.city}</div>
+                              </td>
+                              <td className="py-3 px-3.5 text-center">
+                                <span
+                                  className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                                    order.status === 'Completed' ||
+                                    order.status === 'Delivered' ||
+                                    order.status === 'READY_FOR_PICKUP' ||
+                                    order.status === 'Ready for Pickup'
+                                      ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                                      : order.status === 'Returned' ||
+                                        order.status === 'Cancelled' ||
+                                        order.status === 'CANCELLED'
+                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
+                                      : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                                  }`}
                                 >
-                                  {isReturning ? '...' : 'Confirm'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmingReturnOrderId(null)}
-                                  className="px-2 py-1 text-[var(--text-primary)] bg-[var(--bg-subtle)] hover:opacity-80 rounded-lg text-[11px] cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setConfirmingReturnOrderId(idToPass)}
-                                className="px-2.5 py-1 text-[var(--badge-pending-text)] hover:text-white bg-[var(--badge-pending-bg)] hover:bg-amber-600 border border-[var(--border-subtle)] rounded-lg transition-all inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
-                                title="Process Customer Return & Restore Stock"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>Return</span>
-                              </button>
-                            );
-                          })()}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-mono tabular-nums font-semibold">
+                                {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
+                                  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)] whitespace-nowrap">
+                                    Pending Valuation
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 dark:text-emerald-400">
+                                    Rs. {Number(order.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3.5 text-right">
+                                <OrderActionCell
+                                  orderId={targetUberId || idToPass}
+                                  status={order.status}
+                                  loading={isUberBusy}
+                                  isUberOrder={order.channel === 'ubereats'}
+                                  readyLabel="Mark Ready"
+                                  onAction={(_, actionType: OrderActionType, reason) =>
+                                    handleOrderAction(
+                                      actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                                      order as any,
+                                      reason
+                                    )
+                                  }
+                                  onPrintInvoice={() => setSelectedOrderForInvoice(order)}
+                                  onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
+                                  onReturnOrder={
+                                    order.status !== 'Returned' ? () => handleReturnOrder(idToPass) : undefined
+                                  }
+                                  returning={isReturning}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
 

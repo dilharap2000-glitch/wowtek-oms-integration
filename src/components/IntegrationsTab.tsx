@@ -189,7 +189,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   };
 
   const handleOrderAction = async (
-    action: 'accept' | 'ready' | 'cancel',
+    action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: {
       uber_order_id?: string;
       orderId?: string;
@@ -197,7 +197,8 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
       display_id?: string;
       storeId?: string;
       externalStoreId?: string;
-    }
+    },
+    reason?: string
   ) => {
     const targetOrderId = String(
       order?.uber_order_id ||
@@ -205,6 +206,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
       order?.id ||
       ''
     ).trim();
+    const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
     if (!targetOrderId) {
       console.error('Missing uber_order_id for order:', order);
@@ -218,21 +220,28 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action,
-          order_id: targetOrderId,
+          orderId: targetOrderId,
+          action: normalizedAction,
+          reason,
           storeId: order.storeId || order.externalStoreId,
         }),
       });
 
       const data = await response.json().catch(() => ({}));
-      if (response.ok && data.success) {
-        setOrderActionMsg({ message: data.message || `Order successfully ${action}ed on Uber Eats!`, isError: false });
+      if (!response.ok || !(data.ok ?? data.success)) {
+        console.error(`Action [${normalizedAction}] failed:`, response.status, data);
+        setOrderActionMsg({ message: `Failed (${response.status}): ${data.error || 'Action failed'}`, isError: true });
         setTimeout(() => setOrderActionMsg(null), 5000);
         return;
       }
 
-      console.error(`Action [${action}] failed:`, response.status, data);
-      setOrderActionMsg({ message: `Failed (${response.status}): ${data.error || 'Action failed'}`, isError: true });
+      console.log('Updated order:', data.orderId || targetOrderId, '->', data.nextStatus || data.status);
+      setOrderActionMsg({
+        message:
+          data.message ||
+          `Order successfully ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`} on Uber Eats!`,
+        isError: false,
+      });
       setTimeout(() => setOrderActionMsg(null), 5000);
     } catch (err) {
       console.error('Network/Client error on action:', err);

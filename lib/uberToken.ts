@@ -1,3 +1,5 @@
+import type { OrderStatus } from '@/types';
+
 type CachedToken = {
   token: string;
   expiresAt: number;
@@ -11,6 +13,8 @@ const cachedTokens: {
   production: null,
 };
 
+export type UberOrderAction = 'ACCEPT' | 'READY' | 'CANCEL';
+
 function isUsableToken(token?: string | null): token is string {
   if (!token) return false;
   const trimmed = token.trim();
@@ -21,9 +25,9 @@ function isUsableToken(token?: string | null): token is string {
 }
 
 export function isUberSandboxMode(): boolean {
-  const envMode = process.env.UBER_ENV?.trim().toLowerCase();
-  if (envMode === 'sandbox') return true;
-  if (envMode === 'production' || envMode === 'prod') return false;
+  const envMode = (process.env.UBER_ENV || '').trim().toLowerCase();
+  if (envMode.includes('sandbox') || envMode.includes('test')) return true;
+  if (envMode.includes('prod')) return false;
   return !(
     isUsableToken(process.env.UBER_PROD_TOKEN) ||
     Boolean(process.env.UBER_PROD_CLIENT_ID && process.env.UBER_PROD_CLIENT_SECRET)
@@ -84,7 +88,54 @@ export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
   return isUsableToken(staticToken);
 }
 
-export async function getUberAccessToken(isSandbox: boolean): Promise<string | null> {
+async function fetchOAuthToken(
+  clientId: string,
+  clientSecret: string,
+  scope: string
+): Promise<{ ok: boolean; status: number; accessToken?: string; expiresIn?: number; rawText: string; parsed: any }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+      scope,
+    });
+
+    const res = await fetch('https://login.uber.com/oauth/v2/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body.toString(),
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    const rawText = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = null;
+    }
+
+    return {
+      ok: res.ok && Boolean(parsed?.access_token),
+      status: res.status,
+      accessToken: parsed?.access_token,
+      expiresIn: Number(parsed?.expires_in) || 2592000,
+      rawText,
+      parsed,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
   const cacheKey = isSandbox ? 'sandbox' : 'production';
   const existing = cachedTokens[cacheKey];
 
@@ -93,47 +144,40 @@ export async function getUberAccessToken(isSandbox: boolean): Promise<string | n
     return existing.token;
   }
 
-  // 2. Vercel env variables වලින් Client ID & Secret ගන්න (ClientID / ClientSecret fallback එක්ක)
+  // 2. Client ID + Client Secret වලින් OAuth token එක auto fetch කරන්න
   const { clientId, clientSecret } = getUberClientCredentials(isSandbox);
-  const scope = (process.env.UBER_OAUTH_SCOPE || 'eats.order eats.store.orders.read').trim();
+  const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
+  const primaryScope = configuredScope || 'eats.order eats.store.orders.read eats.pos_provisioning';
 
   if (clientId && clientSecret) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     try {
-      const params = new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: 'client_credentials',
-        scope,
-      });
+      let oauthResult = await fetchOAuthToken(clientId, clientSecret, primaryScope);
 
-      const res = await fetch('https://login.uber.com/oauth/v2/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString(),
-        signal: controller.signal,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.access_token) {
-          const expiresInSec = Number(data.expires_in) || 2592000; // default ~30 days
-          cachedTokens[cacheKey] = {
-            token: data.access_token,
-            expiresAt: Date.now() + expiresInSec * 1000,
-          };
-          return cachedTokens[cacheKey]!.token;
-        }
-      } else {
-        const errText = await res.text();
-        console.error('[Uber OAuth Refresh Failed]:', res.status, errText);
+      // If default scope includes eats.pos_provisioning and the Uber app hasn't enabled it, fall back cleanly
+      if (
+        !oauthResult.ok &&
+        !configuredScope &&
+        oauthResult.status === 400 &&
+        oauthResult.rawText.toLowerCase().includes('invalid_scope')
+      ) {
+        oauthResult = await fetchOAuthToken(clientId, clientSecret, 'eats.order eats.store.orders.read');
       }
+
+      if (oauthResult.ok && oauthResult.accessToken) {
+        cachedTokens[cacheKey] = {
+          token: oauthResult.accessToken,
+          expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
+        };
+        return cachedTokens[cacheKey]!.token;
+      }
+
+      console.error(
+        '[Uber OAuth Refresh Failed]:',
+        oauthResult.status,
+        oauthResult.parsed?.error_description || oauthResult.parsed?.error || oauthResult.rawText
+      );
     } catch (oauthErr) {
       console.error('[Uber OAuth Fetch Error]:', oauthErr);
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 
@@ -147,4 +191,116 @@ export async function getUberAccessToken(isSandbox: boolean): Promise<string | n
       process.env.UBER_EATS_ACCESS_TOKEN;
 
   return isUsableToken(fallbackToken) ? fallbackToken.trim() : null;
+}
+
+export async function executeUberOrderAction(params: {
+  orderId: string;
+  action: UberOrderAction;
+  reason?: string;
+  isSandbox?: boolean;
+}) {
+  const isSandbox = params.isSandbox ?? isUberSandboxMode();
+  const baseUrl = getUberBaseUrl(isSandbox);
+  const cleanOrderId = encodeURIComponent(params.orderId.trim());
+
+  let token = await getUberAccessToken(isSandbox);
+  if (!token) {
+    throw new Error(
+      'Uber OAuth credentials (UBER_CLIENT_ID / UBER_CLIENT_SECRET හෝ ClientID / ClientSecret) හෝ Access Token සෙට් කර නැත'
+    );
+  }
+
+  let path = '';
+  let payload: Record<string, unknown> = {};
+  let nextStatus: OrderStatus = 'ACCEPTED';
+
+  switch (params.action) {
+    case 'ACCEPT':
+      path = `/v1/eats/orders/${cleanOrderId}/accept_pos_order`;
+      payload = {
+        reason: params.reason || 'POS_ACCEPTED',
+      };
+      nextStatus = 'ACCEPTED';
+      break;
+
+    case 'READY':
+      path = `/v1/eats/orders/${cleanOrderId}/restaurant_order_ready`;
+      payload = {};
+      nextStatus = 'READY_FOR_PICKUP';
+      break;
+
+    case 'CANCEL':
+      path = `/v1/eats/orders/${cleanOrderId}/deny_pos_order`;
+      payload = {
+        reason: {
+          code: params.reason || 'POS_NOT_READY',
+          explanation: 'Order cancelled from WOW TEK OMS',
+        },
+      };
+      nextStatus = 'CANCELLED';
+      break;
+  }
+
+  const url = `${baseUrl}${path}`;
+
+  const invokeUberEndpoint = async (authToken: string) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  let response = await invokeUberEndpoint(token);
+
+  // Token expire වෙලා 401 ආවොත් cache clear කරලා එක පාරක් retry කරන්න
+  if (response.status === 401) {
+    clearUberAccessTokenCache(isSandbox);
+    const refreshedToken = await getUberAccessToken(isSandbox);
+    if (refreshedToken && refreshedToken !== token) {
+      token = refreshedToken;
+      response = await invokeUberEndpoint(token);
+    }
+  }
+
+  const text = await response.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearUberAccessTokenCache(isSandbox);
+    }
+    return {
+      ok: false,
+      status: response.status,
+      url,
+      error: data?.message || data?.error || `Uber API error (${response.status})`,
+      uberResponse: data,
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    url,
+    nextStatus,
+    uberResponse: data,
+  };
 }
