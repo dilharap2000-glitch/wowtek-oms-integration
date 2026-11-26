@@ -10,6 +10,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Search,
   X,
 } from 'lucide-react';
 import { formatSriLankanPhone, handleLivePhoneInput, isValidSriLankanPhone } from '@/lib/phoneUtils';
@@ -60,6 +61,9 @@ export default function SmsMarketingPage() {
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Search Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Inline Banner & Delete Confirmation States (iframe-safe, no window.alert/confirm)
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -90,13 +94,44 @@ export default function SmsMarketingPage() {
     fetchCustomers();
   }, []);
 
+  // Filtered Customers by Name or Phone Number (supports local 07X and +947X queries)
+  const filteredCustomers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return customers;
+
+    const cleanDigits = q.replace(/[\s\-()+]/g, '');
+    const intlDigits = cleanDigits.startsWith('0') && cleanDigits.length > 1
+      ? `94${cleanDigits.slice(1)}`
+      : cleanDigits;
+
+    return customers.filter((c) => {
+      const nameMatch = (c.name || '').toLowerCase().includes(q);
+      const rawPhone = (c.phone || '').toLowerCase();
+      const phoneDigits = rawPhone.replace(/[\s\-()+]/g, '');
+      const phoneMatch =
+        rawPhone.includes(q) ||
+        (cleanDigits.length > 0 &&
+          (phoneDigits.includes(cleanDigits) || phoneDigits.includes(intlDigits)));
+      return nameMatch || phoneMatch;
+    });
+  }, [customers, searchQuery]);
+
+  const allFilteredSelected =
+    filteredCustomers.length > 0 &&
+    filteredCustomers.every((c) => selectedCustomers.includes(c.phone));
+
   // Checkbox Selection Logic
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const visiblePhones = filteredCustomers.map((c) => c.phone);
     if (e.target.checked) {
-      setSelectedCustomers(customers.map((c) => c.phone));
+      setSelectedCustomers((prev) => Array.from(new Set([...prev, ...visiblePhones])));
     } else {
-      setSelectedCustomers([]);
-      setConfirmingDelete(false);
+      const visibleSet = new Set(visiblePhones);
+      setSelectedCustomers((prev) => {
+        const next = prev.filter((p) => !visibleSet.has(p));
+        if (next.length === 0) setConfirmingDelete(false);
+        return next;
+      });
     }
   };
 
@@ -515,7 +550,9 @@ export default function SmsMarketingPage() {
           <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-5 rounded-xl flex flex-col justify-between shadow-sm">
             <div>
               <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-                <h2 className="text-lg font-semibold text-purple-600 dark:text-purple-400">Saved Customers ({customers.length})</h2>
+                <h2 className="text-lg font-semibold text-purple-600 dark:text-purple-400">
+                  Saved Customers ({searchQuery.trim() ? `${filteredCustomers.length} / ${customers.length}` : customers.length})
+                </h2>
                 {selectedCustomers.length > 0 && !confirmingDelete && (
                   <button
                     type="button"
@@ -547,15 +584,46 @@ export default function SmsMarketingPage() {
                 )}
               </div>
 
-              {/* Select All Checkbox */}
-              <div className="flex items-center space-x-2 mb-2 pb-2 border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+              {/* Search Bar */}
+              <div className="relative mb-3">
+                <Search className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  type="checkbox"
-                  onChange={handleSelectAll}
-                  checked={customers.length > 0 && selectedCustomers.length === customers.length}
-                  className="rounded border-[var(--border-subtle)] accent-purple-600 cursor-pointer"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search customers by name or phone number..."
+                  aria-label="Search customers by name or phone number"
+                  className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg pl-9 pr-9 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 focus:outline-none focus:border-[var(--accent-primary)] transition"
                 />
-                <span>Select All</span>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-0.5 rounded cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Select All Checkbox */}
+              <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    onChange={handleSelectAll}
+                    checked={allFilteredSelected}
+                    disabled={filteredCustomers.length === 0}
+                    className="rounded border-[var(--border-subtle)] accent-purple-600 cursor-pointer disabled:opacity-50"
+                  />
+                  <span>Select All{searchQuery.trim() ? ` (${filteredCustomers.length})` : ''}</span>
+                </label>
+                {searchQuery.trim() && (
+                  <span>
+                    Showing {filteredCustomers.length} of {customers.length}
+                  </span>
+                )}
               </div>
 
               {/* Customer List */}
@@ -564,8 +632,19 @@ export default function SmsMarketingPage() {
                   <div className="p-6 text-center text-[var(--text-secondary)] text-sm">
                     No customers found. Add your first customer using the form or bulk CSV import below.
                   </div>
+                ) : filteredCustomers.length === 0 ? (
+                  <div className="p-6 text-center text-[var(--text-secondary)] text-sm space-y-2">
+                    <p>No customers match &ldquo;{searchQuery.trim()}&rdquo;.</p>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                    >
+                      Clear search
+                    </button>
+                  </div>
                 ) : (
-                  customers.map((c, idx) => (
+                  filteredCustomers.map((c, idx) => (
                     <div
                       key={c._id || c.phone || idx}
                       className="flex items-center justify-between bg-[var(--bg-app)] p-2.5 rounded border border-[var(--border-subtle)] text-sm hover:bg-[var(--bg-subtle)] transition"

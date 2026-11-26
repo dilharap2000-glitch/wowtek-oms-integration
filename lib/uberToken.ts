@@ -3,6 +3,7 @@ import { connectToMongoDB } from '@/lib/mongodb';
 
 type CachedToken = {
   token: string;
+  baseUrl: string;
   expiresAt: number;
 };
 
@@ -178,6 +179,7 @@ export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
 }
 
 async function fetchOAuthToken(
+  tokenUrl: string,
   clientId: string,
   clientSecret: string,
   scope: string
@@ -197,10 +199,10 @@ async function fetchOAuthToken(
       client_id: clientId,
       client_secret: clientSecret,
       grant_type: 'client_credentials',
-      scope,
+      ...(scope ? { scope } : {}),
     });
 
-    const res = await fetch('https://login.uber.com/oauth/v2/token', {
+    const res = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -233,14 +235,16 @@ async function fetchOAuthToken(
 
 async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<{
   token: string | null;
+  baseUrl: string;
   oauthError?: string;
 }> {
+  const defaultBaseUrl = getUberBaseUrl(isSandbox);
   const cacheKey = isSandbox ? 'sandbox' : 'production';
   const existing = cachedTokens[cacheKey];
 
   // 1. Cache එකේ valid token එකක් තියෙනවා නම් (expiry එකට තත්පර 60කට වඩා තියෙනවා නම්) ඒක දෙන්න
   if (existing && Date.now() < existing.expiresAt - 60_000) {
-    return { token: existing.token };
+    return { token: existing.token, baseUrl: existing.baseUrl };
   }
 
   // 2. Env variables + MongoDB settings fallback වලින් Client ID & Secret ගන්න
@@ -257,44 +261,74 @@ async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<
   }
 
   const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
-  const primaryScope = configuredScope || 'eats.order eats.store.orders.read eats.pos_provisioning';
+  const scopeCandidates = configuredScope
+    ? [configuredScope]
+    : [
+        'eats.order eats.store.orders.read eats.pos_provisioning',
+        'eats.order eats.store.orders.read',
+        'eats.order',
+      ];
+
+  const prodEndpoint = {
+    tokenUrl: 'https://login.uber.com/oauth/v2/token',
+    apiBase: getUberBaseUrl(false),
+  };
+  const sandboxEndpoint = {
+    tokenUrl: 'https://sandbox-login.uber.com/oauth/v2/token',
+    apiBase: getUberBaseUrl(true),
+  };
+  const tokenEndpoints = isSandbox
+    ? [sandboxEndpoint, prodEndpoint]
+    : [prodEndpoint, sandboxEndpoint];
+
   let oauthError: string | undefined;
 
   if (clientId && clientSecret) {
-    try {
-      let oauthResult = await fetchOAuthToken(clientId, clientSecret, primaryScope);
+    const endpointErrors: string[] = [];
 
-      // If default scope includes eats.pos_provisioning and the Uber app hasn't enabled it, fall back cleanly
-      if (
-        !oauthResult.ok &&
-        !configuredScope &&
-        oauthResult.status === 400 &&
-        oauthResult.rawText.toLowerCase().includes('invalid_scope')
-      ) {
-        oauthResult = await fetchOAuthToken(clientId, clientSecret, 'eats.order eats.store.orders.read');
+    for (const ep of tokenEndpoints) {
+      for (let i = 0; i < scopeCandidates.length; i++) {
+        const scope = scopeCandidates[i];
+        try {
+          const oauthResult = await fetchOAuthToken(ep.tokenUrl, clientId, clientSecret, scope);
+
+          if (oauthResult.ok && oauthResult.accessToken) {
+            cachedTokens[cacheKey] = {
+              token: oauthResult.accessToken,
+              baseUrl: ep.apiBase,
+              expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
+            };
+            return {
+              token: cachedTokens[cacheKey]!.token,
+              baseUrl: ep.apiBase,
+            };
+          }
+
+          const isInvalidScope =
+            oauthResult.status === 400 &&
+            oauthResult.rawText.toLowerCase().includes('invalid_scope');
+          if (isInvalidScope && i < scopeCandidates.length - 1) {
+            continue;
+          }
+
+          const detail =
+            oauthResult.parsed?.error_description ||
+            oauthResult.parsed?.error ||
+            oauthResult.rawText ||
+            'Unauthorized';
+          endpointErrors.push(`${ep.tokenUrl} -> (${oauthResult.status}) ${detail}`);
+          break;
+        } catch (oauthErr) {
+          const msg = oauthErr instanceof Error ? oauthErr.message : 'Network error';
+          endpointErrors.push(`${ep.tokenUrl} -> ${msg}`);
+          break;
+        }
       }
+    }
 
-      if (oauthResult.ok && oauthResult.accessToken) {
-        cachedTokens[cacheKey] = {
-          token: oauthResult.accessToken,
-          expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
-        };
-        return { token: cachedTokens[cacheKey]!.token };
-      }
-
-      const detail =
-        oauthResult.parsed?.error_description ||
-        oauthResult.parsed?.error ||
-        oauthResult.rawText ||
-        'Failed to get token';
-      oauthError = `Uber OAuth Error (${oauthResult.status}): ${detail}`;
-      console.error('[Uber OAuth Refresh Failed]:', oauthResult.status, detail);
-    } catch (oauthErr) {
-      oauthError =
-        oauthErr instanceof Error
-          ? `Uber OAuth Fetch Error: ${oauthErr.message}`
-          : 'Uber OAuth Fetch Error';
-      console.error('[Uber OAuth Fetch Error]:', oauthErr);
+    if (endpointErrors.length > 0) {
+      oauthError = `Uber OAuth failed on both endpoints: ${endpointErrors.join(' | ')}`;
+      console.error('[Uber OAuth Refresh Failed]:', oauthError);
     }
   }
 
@@ -311,6 +345,7 @@ async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<
 
   return {
     token: isUsableToken(fallbackToken) ? fallbackToken.trim() : null,
+    baseUrl: defaultBaseUrl,
     oauthError,
   };
 }
@@ -327,11 +362,11 @@ export async function executeUberOrderAction(params: {
   isSandbox?: boolean;
 }) {
   const isSandbox = params.isSandbox ?? isUberSandboxMode();
-  const baseUrl = getUberBaseUrl(isSandbox);
   const cleanOrderId = encodeURIComponent(params.orderId.trim());
 
   const resolved = await resolveUberAccessToken(isSandbox);
   let token = resolved.token;
+  let baseUrl = resolved.baseUrl || getUberBaseUrl(isSandbox);
   if (!token) {
     throw new Error(
       resolved.oauthError ||
@@ -370,13 +405,12 @@ export async function executeUberOrderAction(params: {
       break;
   }
 
-  const url = `${baseUrl}${path}`;
-
-  const invokeUberEndpoint = async (authToken: string) => {
+  const invokeUberEndpoint = async (authToken: string, apiBase: string) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const endpointUrl = `${apiBase}${path}`;
     try {
-      return await fetch(url, {
+      const res = await fetch(endpointUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -387,20 +421,24 @@ export async function executeUberOrderAction(params: {
         cache: 'no-store',
         signal: controller.signal,
       });
+      return { res, endpointUrl };
     } finally {
       clearTimeout(timeoutId);
     }
   };
 
-  let response = await invokeUberEndpoint(token);
+  let { res: response, endpointUrl: url } = await invokeUberEndpoint(token, baseUrl);
 
   // Token expire වෙලා 401 ආවොත් cache clear කරලා එක පාරක් retry කරන්න
   if (response.status === 401) {
     clearUberAccessTokenCache(isSandbox);
-    const refreshedToken = await getUberAccessToken(isSandbox);
-    if (refreshedToken && refreshedToken !== token) {
-      token = refreshedToken;
-      response = await invokeUberEndpoint(token);
+    const refreshed = await resolveUberAccessToken(isSandbox);
+    if (refreshed.token && (refreshed.token !== token || refreshed.baseUrl !== baseUrl)) {
+      token = refreshed.token;
+      baseUrl = refreshed.baseUrl || baseUrl;
+      const retried = await invokeUberEndpoint(token, baseUrl);
+      response = retried.res;
+      url = retried.endpointUrl;
     }
   }
 

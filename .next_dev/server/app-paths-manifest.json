@@ -1,4 +1,4 @@
 {
-  "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
-  "/api/orders/action/route": "app/api/orders/action/route.js"
+  "/sms-marketing/page": "app/sms-marketing/page.js",
+  "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js"
 }
