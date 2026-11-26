@@ -35,9 +35,10 @@ export function isUberSandboxMode(): boolean {
   const envMode = (process.env.UBER_ENV || '').trim().toLowerCase();
   if (envMode.includes('sandbox') || envMode.includes('test')) return true;
   if (envMode.includes('prod')) return false;
-  return !(
-    isUsableToken(process.env.UBER_PROD_TOKEN) ||
-    Boolean(process.env.UBER_PROD_CLIENT_ID && process.env.UBER_PROD_CLIENT_SECRET)
+  return Boolean(
+    isUsableToken(process.env.UBER_SANDBOX_ACCESS_TOKEN) ||
+      isUsableToken(process.env.UBER_SANDBOX_CLIENT_ID) ||
+      process.env.UBER_SANDBOX_BASE_URL?.trim()
   );
 }
 
