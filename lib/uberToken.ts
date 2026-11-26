@@ -231,13 +231,16 @@ async function fetchOAuthToken(
   }
 }
 
-export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
+async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<{
+  token: string | null;
+  oauthError?: string;
+}> {
   const cacheKey = isSandbox ? 'sandbox' : 'production';
   const existing = cachedTokens[cacheKey];
 
   // 1. Cache එකේ valid token එකක් තියෙනවා නම් (expiry එකට තත්පර 60කට වඩා තියෙනවා නම්) ඒක දෙන්න
   if (existing && Date.now() < existing.expiresAt - 60_000) {
-    return existing.token;
+    return { token: existing.token };
   }
 
   // 2. Env variables + MongoDB settings fallback වලින් Client ID & Secret ගන්න
@@ -255,6 +258,7 @@ export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promi
 
   const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
   const primaryScope = configuredScope || 'eats.order eats.store.orders.read eats.pos_provisioning';
+  let oauthError: string | undefined;
 
   if (clientId && clientSecret) {
     try {
@@ -275,15 +279,21 @@ export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promi
           token: oauthResult.accessToken,
           expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
         };
-        return cachedTokens[cacheKey]!.token;
+        return { token: cachedTokens[cacheKey]!.token };
       }
 
-      console.error(
-        '[Uber OAuth Refresh Failed]:',
-        oauthResult.status,
-        oauthResult.parsed?.error_description || oauthResult.parsed?.error || oauthResult.rawText
-      );
+      const detail =
+        oauthResult.parsed?.error_description ||
+        oauthResult.parsed?.error ||
+        oauthResult.rawText ||
+        'Failed to get token';
+      oauthError = `Uber OAuth Error (${oauthResult.status}): ${detail}`;
+      console.error('[Uber OAuth Refresh Failed]:', oauthResult.status, detail);
     } catch (oauthErr) {
+      oauthError =
+        oauthErr instanceof Error
+          ? `Uber OAuth Fetch Error: ${oauthErr.message}`
+          : 'Uber OAuth Fetch Error';
       console.error('[Uber OAuth Fetch Error]:', oauthErr);
     }
   }
@@ -299,7 +309,15 @@ export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promi
       process.env.UBER_EATS_ACCESS_TOKEN ||
       mongoAccessToken;
 
-  return isUsableToken(fallbackToken) ? fallbackToken.trim() : null;
+  return {
+    token: isUsableToken(fallbackToken) ? fallbackToken.trim() : null,
+    oauthError,
+  };
+}
+
+export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
+  const { token } = await resolveUberAccessToken(isSandbox);
+  return token;
 }
 
 export async function executeUberOrderAction(params: {
@@ -312,10 +330,12 @@ export async function executeUberOrderAction(params: {
   const baseUrl = getUberBaseUrl(isSandbox);
   const cleanOrderId = encodeURIComponent(params.orderId.trim());
 
-  let token = await getUberAccessToken(isSandbox);
+  const resolved = await resolveUberAccessToken(isSandbox);
+  let token = resolved.token;
   if (!token) {
     throw new Error(
-      'Missing Client ID / Client Secret in both Vercel Env and MongoDB settings'
+      resolved.oauthError ||
+        'Missing Uber Client ID / Client Secret in environment variables (UBER_CLIENT_ID / UBER_CLIENT_SECRET) and MongoDB settings'
     );
   }
 

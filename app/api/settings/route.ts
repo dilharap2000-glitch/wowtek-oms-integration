@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { DEFAULT_PLATFORMS, DEFAULT_GATEWAYS } from '@/lib/db';
+import { clearUberAccessTokenCache } from '@/lib/uberToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
           { $set: updatePayload },
           { upsert: true }
         );
+        if (apiConfig) {
+          clearUberAccessTokenCache();
+        }
       }
     } catch (err: any) {
       console.warn('[Settings API POST] MongoDB write error:', err.message);
