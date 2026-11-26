@@ -3,7 +3,6 @@ import { getServerStore, saveServerOrder, broadcastLiveUpdate } from '@/lib/serv
 import { connectToMongoDB } from '@/lib/mongodb';
 import {
   executeUberOrderAction,
-  hasUberCredentialsConfigured,
   isUberSandboxMode,
   type UberOrderAction,
 } from '@/lib/uberClient';
@@ -55,17 +54,6 @@ export async function POST(req: NextRequest) {
     const cleanInputId = order_id.replace(/^UBER-/i, '');
 
     const isSandbox = isUberSandboxMode();
-    if (!hasUberCredentialsConfigured(isSandbox)) {
-      console.error('[Uber Action] Missing OAuth credentials or access token');
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          error: 'Uber OAuth credentials (Client ID/Secret) හෝ Access Token සෙට් කර නැත',
-        },
-        { status: 500 }
-      );
-    }
 
     // Resolve Uber Order UUID if a short ID was passed (never mutate an already-valid UUID)
     let uberOrderUuid = order_id;

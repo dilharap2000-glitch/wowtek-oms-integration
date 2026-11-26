@@ -1,4 +1,5 @@
 import type { OrderStatus } from '@/types';
+import { connectToMongoDB } from '@/lib/mongodb';
 
 type CachedToken = {
   token: string;
@@ -15,12 +16,18 @@ const cachedTokens: {
 
 export type UberOrderAction = 'ACCEPT' | 'READY' | 'CANCEL';
 
+const DUMMY_CREDENTIAL_VALUES = new Set([
+  'YOUR_UBER_ACCESS_TOKEN',
+  'uber_client_id_lk_881920',
+  'ubr_sec_9941a87b003',
+]);
+
 function isUsableToken(token?: string | null): token is string {
   if (!token) return false;
   const trimmed = token.trim();
   if (!trimmed) return false;
-  if (trimmed === 'YOUR_UBER_ACCESS_TOKEN') return false;
-  if (trimmed.startsWith('your_uber_')) return false;
+  if (DUMMY_CREDENTIAL_VALUES.has(trimmed)) return false;
+  if (trimmed.toLowerCase().startsWith('your_uber_')) return false;
   return true;
 }
 
@@ -51,20 +58,32 @@ export function clearUberAccessTokenCache(isSandbox?: boolean): void {
   }
 }
 
-function getUberClientCredentials(isSandbox: boolean): {
+function getUberClientCredentialsFromEnv(isSandbox: boolean): {
   clientId?: string;
   clientSecret?: string;
 } {
   const clientId = (
     isSandbox
-      ? process.env.UBER_SANDBOX_CLIENT_ID || process.env.UBER_CLIENT_ID || process.env.ClientID
-      : process.env.UBER_PROD_CLIENT_ID || process.env.UBER_CLIENT_ID || process.env.ClientID
+      ? process.env.UBER_SANDBOX_CLIENT_ID ||
+        process.env.UBER_CLIENT_ID ||
+        process.env.ClientID ||
+        process.env.OAuth_ClientID
+      : process.env.UBER_PROD_CLIENT_ID ||
+        process.env.UBER_CLIENT_ID ||
+        process.env.ClientID ||
+        process.env.OAuth_ClientID
   )?.trim();
 
   const clientSecret = (
     isSandbox
-      ? process.env.UBER_SANDBOX_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET || process.env.ClientSecret
-      : process.env.UBER_PROD_CLIENT_SECRET || process.env.UBER_CLIENT_SECRET || process.env.ClientSecret
+      ? process.env.UBER_SANDBOX_CLIENT_SECRET ||
+        process.env.UBER_CLIENT_SECRET ||
+        process.env.ClientSecret ||
+        process.env.OAuth_ClientSecret
+      : process.env.UBER_PROD_CLIENT_SECRET ||
+        process.env.UBER_CLIENT_SECRET ||
+        process.env.ClientSecret ||
+        process.env.OAuth_ClientSecret
   )?.trim();
 
   return {
@@ -73,8 +92,77 @@ function getUberClientCredentials(isSandbox: boolean): {
   };
 }
 
+async function getCredentialsFromMongo(): Promise<{
+  clientId?: string;
+  clientSecret?: string;
+  accessToken?: string;
+}> {
+  if (!process.env.MONGODB_URI) return {};
+
+  try {
+    const conn = await connectToMongoDB(1);
+    if (!conn) return {};
+    const { db } = conn;
+
+    const appSettingsDoc = await db.collection('settings').findOne({ id: 'app_settings' });
+    const apiConfig = (appSettingsDoc?.apiConfig || {}) as Record<string, unknown>;
+
+    const uberDoc =
+      (await db.collection('settings').findOne({ type: 'uber' })) ||
+      (await db.collection('settings').findOne({ key: 'uber_eats' })) ||
+      (await db.collection('uber_settings').findOne({}));
+
+    const pickString = (...candidates: unknown[]): string | undefined => {
+      for (const value of candidates) {
+        if (typeof value === 'string' && isUsableToken(value)) {
+          return value.trim();
+        }
+      }
+      return undefined;
+    };
+
+    const clientId = pickString(
+      uberDoc?.clientId,
+      uberDoc?.ClientID,
+      uberDoc?.OAuth_ClientID,
+      uberDoc?.oauthClientId,
+      uberDoc?.uberEatsClientId,
+      apiConfig.uberEatsClientId,
+      apiConfig.oauthClientId,
+      apiConfig.OAuth_ClientID,
+      apiConfig.ClientID,
+      apiConfig.clientId
+    );
+
+    const clientSecret = pickString(
+      uberDoc?.clientSecret,
+      uberDoc?.ClientSecret,
+      uberDoc?.OAuth_ClientSecret,
+      uberDoc?.oauthClientSecret,
+      uberDoc?.uberEatsClientSecret,
+      apiConfig.uberEatsClientSecret,
+      apiConfig.oauthClientSecret,
+      apiConfig.OAuth_ClientSecret,
+      apiConfig.ClientSecret,
+      apiConfig.clientSecret
+    );
+
+    const accessToken = pickString(
+      uberDoc?.accessToken,
+      uberDoc?.access_token,
+      apiConfig.uberEatsAccessToken,
+      apiConfig.uberAccessToken
+    );
+
+    return { clientId, clientSecret, accessToken };
+  } catch (err) {
+    console.warn('[Uber Mongo Credentials Fallback Notice]:', err);
+    return {};
+  }
+}
+
 export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
-  const { clientId, clientSecret } = getUberClientCredentials(isSandbox);
+  const { clientId, clientSecret } = getUberClientCredentialsFromEnv(isSandbox);
   if (clientId && clientSecret) return true;
 
   const staticToken = isSandbox
@@ -92,7 +180,14 @@ async function fetchOAuthToken(
   clientId: string,
   clientSecret: string,
   scope: string
-): Promise<{ ok: boolean; status: number; accessToken?: string; expiresIn?: number; rawText: string; parsed: any }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  accessToken?: string;
+  expiresIn?: number;
+  rawText: string;
+  parsed: any;
+}> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -144,8 +239,19 @@ export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promi
     return existing.token;
   }
 
-  // 2. Client ID + Client Secret වලින් OAuth token එක auto fetch කරන්න
-  const { clientId, clientSecret } = getUberClientCredentials(isSandbox);
+  // 2. Env variables + MongoDB settings fallback වලින් Client ID & Secret ගන්න
+  const envCreds = getUberClientCredentialsFromEnv(isSandbox);
+  let clientId = envCreds.clientId;
+  let clientSecret = envCreds.clientSecret;
+  let mongoAccessToken: string | undefined;
+
+  if (!clientId || !clientSecret) {
+    const fromDb = await getCredentialsFromMongo();
+    clientId = clientId || fromDb.clientId;
+    clientSecret = clientSecret || fromDb.clientSecret;
+    mongoAccessToken = fromDb.accessToken;
+  }
+
   const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
   const primaryScope = configuredScope || 'eats.order eats.store.orders.read eats.pos_provisioning';
 
@@ -181,14 +287,16 @@ export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promi
     }
   }
 
-  // 3. Fallback: Environment variable එකේ තියෙන static token එක
+  // 3. Fallback: Static token from Env or MongoDB settings
   const fallbackToken = isSandbox
     ? process.env.UBER_SANDBOX_ACCESS_TOKEN ||
       process.env.UBER_ACCESS_TOKEN ||
-      process.env.UBER_EATS_ACCESS_TOKEN
+      process.env.UBER_EATS_ACCESS_TOKEN ||
+      mongoAccessToken
     : process.env.UBER_PROD_TOKEN ||
       process.env.UBER_ACCESS_TOKEN ||
-      process.env.UBER_EATS_ACCESS_TOKEN;
+      process.env.UBER_EATS_ACCESS_TOKEN ||
+      mongoAccessToken;
 
   return isUsableToken(fallbackToken) ? fallbackToken.trim() : null;
 }
@@ -206,7 +314,7 @@ export async function executeUberOrderAction(params: {
   let token = await getUberAccessToken(isSandbox);
   if (!token) {
     throw new Error(
-      'Uber OAuth credentials (UBER_CLIENT_ID / UBER_CLIENT_SECRET හෝ ClientID / ClientSecret) හෝ Access Token සෙට් කර නැත'
+      'Missing Client ID / Client Secret in both Vercel Env and MongoDB settings'
     );
   }
 
