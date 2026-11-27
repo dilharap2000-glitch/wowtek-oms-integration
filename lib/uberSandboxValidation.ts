@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getUberAccessToken,
-  getUberAccessTokenWithMeta,
+  getUberAccessTokenAttempt,
   getUberBaseUrl,
   hasUberCredentialsConfigured,
 } from '@/lib/uberToken';
@@ -50,10 +50,16 @@ async function runSingleFeatureValidation(body: {
     .trim()
     .replace(/\/+$/, '');
 
-  const auth = await getUberAccessTokenWithMeta(true);
-  if (!auth?.token) {
+  const auth = await getUberAccessTokenAttempt(true);
+  if (!auth.ok || !auth.token) {
     return NextResponse.json(
-      { ok: false, error: 'Failed to get Uber OAuth token' },
+      {
+        ok: false,
+        error: 'Failed to get Uber OAuth token',
+        reason: auth.error,
+        hasCredentials: auth.hasCredentials,
+        details: auth.details,
+      },
       { status: 401 }
     );
   }

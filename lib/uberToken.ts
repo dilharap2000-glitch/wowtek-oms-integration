@@ -384,21 +384,62 @@ async function getTokenForSpecificEnv(
   };
 }
 
-export async function getUberAccessTokenWithMeta(
+export interface UberTokenAttempt {
+  ok: boolean;
+  token?: string;
+  tokenUrl?: string;
+  baseUrl?: string;
+  status?: number;
+  error?: string;
+  details?: unknown;
+  hasCredentials: boolean;
+}
+
+export async function getUberAccessTokenAttempt(
   isSandbox = isUberSandboxMode()
-): Promise<{ token: string; tokenUrl: string; baseUrl: string } | null> {
+): Promise<UberTokenAttempt> {
   const order = isSandbox ? [true, false] : [false, true];
+  let lastFailure: UberTokenAttempt = {
+    ok: false,
+    status: 401,
+    error:
+      'Missing Uber Client ID / Client Secret in environment variables (UBER_CLIENT_ID / UBER_CLIENT_SECRET) and MongoDB settings',
+    hasCredentials: false,
+  };
+
   for (const targetSandbox of order) {
     const res = await getTokenForSpecificEnv(targetSandbox);
     if (res.ok && res.token) {
       return {
+        ok: true,
         token: res.token,
         tokenUrl: res.tokenUrl || 'https://auth.uber.com/oauth/v2/token',
         baseUrl: res.baseUrl || getUberBaseUrl(targetSandbox),
+        hasCredentials: true,
       };
     }
+    lastFailure = {
+      ok: false,
+      status: res.status || 401,
+      error: res.error || lastFailure.error,
+      details: res.details,
+      hasCredentials: Boolean(res.hasCredentials),
+    };
   }
-  return null;
+  return lastFailure;
+}
+
+export async function getUberAccessTokenWithMeta(
+  isSandbox = isUberSandboxMode()
+): Promise<{ token: string; tokenUrl: string; baseUrl: string } | null> {
+  const attempt = await getUberAccessTokenAttempt(isSandbox);
+  return attempt.ok && attempt.token
+    ? {
+        token: attempt.token,
+        tokenUrl: attempt.tokenUrl || 'https://auth.uber.com/oauth/v2/token',
+        baseUrl: attempt.baseUrl || getUberBaseUrl(isSandbox),
+      }
+    : null;
 }
 
 export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {

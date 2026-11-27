@@ -158,6 +158,38 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     }>;
   } | null>(null);
 
+  const [uberSingleFeatureLoading, setUberSingleFeatureLoading] = useState<string | null>(null);
+  const [uberSingleFeatureResult, setUberSingleFeatureResult] = useState<any | null>(null);
+
+  const handleRunUberSingleFeature = async (
+    feature: 'store_status' | 'stores_list' | 'set_store_online' | 'activate_integration' | 'get_order'
+  ) => {
+    setUberSingleFeatureLoading(feature);
+    setUberSandboxError(null);
+    setUberSingleFeatureResult(null);
+
+    try {
+      const res = await fetch('/api/ubereats/validation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature,
+          storeId: uberSandboxStoreId.trim() || undefined,
+          orderId: uberSandboxOrderId.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      setUberSingleFeatureResult(data);
+      if (!res.ok || data?.ok === false) {
+        setUberSandboxError(data?.reason || data?.error || `Request failed (${res.status})`);
+      }
+    } catch (err: any) {
+      setUberSandboxError(err?.message || 'Network error running Uber validation');
+    } finally {
+      setUberSingleFeatureLoading(null);
+    }
+  };
+
   const handleRunUberSandboxValidation = async (e: React.FormEvent) => {
     e.preventDefault();
     setUberSandboxLoading(true);
@@ -787,7 +819,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                 <div className="relative">
                   <input
                     type={showSecrets['ubrSec'] ? 'text' : 'password'}
-                    value={config.uberEatsClientSecret}
+                    value={config.uberEatsClientSecret ?? ''}
                     onChange={(e) => setConfig({ ...config, uberEatsClientSecret: e.target.value })}
                     className="w-full px-3 py-1.5 pr-9 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
@@ -1722,12 +1754,51 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
               )}
             </button>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
+            <span className="text-[11px] font-medium text-[var(--text-secondary)] mr-1">
+              Quick Single Endpoint Check:
+            </span>
+            {(
+              [
+                { key: 'activate_integration', label: 'Activate Integration (POS)' },
+                { key: 'store_status', label: 'Store Status' },
+                { key: 'stores_list', label: 'Stores List' },
+                { key: 'set_store_online', label: 'Set Store Online' },
+                { key: 'get_order', label: 'Get Order' },
+              ] as const
+            ).map((btn) => (
+              <button
+                key={btn.key}
+                type="button"
+                disabled={Boolean(uberSingleFeatureLoading)}
+                onClick={() => handleRunUberSingleFeature(btn.key)}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-[var(--bg-subtle)] hover:bg-[var(--bg-app)] text-[var(--text-primary)] border border-[var(--border-subtle)] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {uberSingleFeatureLoading === btn.key ? 'Running...' : btn.label}
+              </button>
+            ))}
+          </div>
         </form>
 
         {uberSandboxError && (
           <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-500/40 text-rose-700 dark:text-rose-200 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
             <span>{uberSandboxError}</span>
+          </div>
+        )}
+
+        {uberSingleFeatureResult && (
+          <div className="p-3.5 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono text-[var(--text-secondary)]">
+              <span>Single Endpoint Response (/api/ubereats/validation)</span>
+              <span className={uberSingleFeatureResult.ok ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}>
+                {uberSingleFeatureResult.ok ? `OK (${uberSingleFeatureResult.status})` : `FAILED (${uberSingleFeatureResult.status || 401})`}
+              </span>
+            </div>
+            <pre className="text-[11px] font-mono text-[var(--text-primary)] overflow-x-auto max-h-56">
+              {JSON.stringify(uberSingleFeatureResult, null, 2)}
+            </pre>
           </div>
         )}
 
