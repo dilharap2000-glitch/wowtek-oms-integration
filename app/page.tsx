@@ -724,6 +724,74 @@ export default function WowtekProApp() {
     }
   };
 
+  const handleSyncOrderStatus = (rawOrder: any, nextStatus: Order['status']) => {
+    const normalizeId = (val: unknown): string =>
+      String(val || '')
+        .replace(/^#/, '')
+        .trim()
+        .toLowerCase();
+
+    const extractKeys = (item: any): string[] => {
+      const rawVals = [
+        item?.id,
+        item?._id,
+        item?.orderId,
+        item?.order_id,
+        item?.uberOrderId,
+        item?.uber_order_id,
+        item?.orderNumber,
+        item?.invoiceNumber,
+        item?.invoiceRef,
+        item?.reference,
+        item?.display_id,
+        item?.eventId,
+      ];
+      const keys: string[] = [];
+      for (const val of rawVals) {
+        const norm = normalizeId(val);
+        if (!norm) continue;
+        keys.push(norm);
+        const strippedUber = norm.replace(/^uber-/i, '');
+        if (strippedUber && strippedUber !== norm) keys.push(strippedUber);
+      }
+      return keys;
+    };
+
+    const targetKeys = extractKeys(rawOrder);
+    if (targetKeys.length === 0) return;
+
+    const matchesTarget = (item: any) => {
+      if (item === rawOrder) return true;
+      const itemKeys = extractKeys(item);
+      return itemKeys.some((k) => targetKeys.includes(k));
+    };
+
+    setOrders((prev) =>
+      prev.map((item) =>
+        matchesTarget(item)
+          ? ({
+              ...item,
+              status: nextStatus,
+              uberStatus: nextStatus,
+              orderStatus: nextStatus,
+            } as Order)
+          : item
+      )
+    );
+
+    setWebhookEvents((prev) =>
+      prev.map((item) =>
+        matchesTarget(item)
+          ? ({
+              ...item,
+              orderStatus: nextStatus,
+              uberStatus: nextStatus,
+            } as WebhookEvent)
+          : item
+      )
+    );
+  };
+
   const handleClearWebhookEvents = async () => {
     try {
       await fetch('/api/sync/live', {
@@ -980,6 +1048,7 @@ export default function WowtekProApp() {
                 onClearWebhookEvents={handleClearWebhookEvents}
                 onTriggerTestOrder={handleTriggerTestOrder}
                 onRestockProduct={handleRestockProduct}
+                onOrderStatusSync={handleSyncOrderStatus}
               />
             )}
 
@@ -1043,6 +1112,7 @@ export default function WowtekProApp() {
                 onClearWebhookEvents={handleClearWebhookEvents}
                 onTriggerTestOrder={handleTriggerTestOrder}
                 onDeleteWaybill={handleDeleteWaybill}
+                onOrderStatusSync={handleSyncOrderStatus}
               />
             )}
 

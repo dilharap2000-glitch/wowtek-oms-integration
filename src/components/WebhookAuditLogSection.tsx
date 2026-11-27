@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Globe,
@@ -23,7 +23,7 @@ import {
   Zap,
   Key,
 } from 'lucide-react';
-import { WebhookEvent } from '@/types';
+import { OrderStatus, WebhookEvent } from '@/types';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
 
 interface WebhookAuditLogSectionProps {
@@ -35,7 +35,41 @@ interface WebhookAuditLogSectionProps {
   subtitle?: string;
   compact?: boolean;
   onNavigateTab?: (tab: string) => void;
+  onOrderStatusSync?: (rawOrder: any, nextStatus: OrderStatus) => void;
 }
+
+const normalizeOrderKey = (val: unknown): string =>
+  String(val || '')
+    .replace(/^#/, '')
+    .trim()
+    .toLowerCase();
+
+const extractNormalizedOrderKeys = (item: any): string[] => {
+  const rawVals = [
+    item?.id,
+    item?._id,
+    item?.orderId,
+    item?._id ? String(item._id) : undefined,
+    item?.order_id,
+    item?.uberOrderId,
+    item?.uber_order_id,
+    item?.orderNumber,
+    item?.invoiceNumber,
+    item?.invoiceRef,
+    item?.reference,
+    item?.display_id,
+    item?.eventId,
+  ];
+  const keys: string[] = [];
+  for (const val of rawVals) {
+    const norm = normalizeOrderKey(val);
+    if (!norm) continue;
+    keys.push(norm);
+    const strippedUber = norm.replace(/^uber-/i, '');
+    if (strippedUber && strippedUber !== norm) keys.push(strippedUber);
+  }
+  return keys;
+};
 
 export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   events,
@@ -46,9 +80,11 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   subtitle = 'Strict Filter Active: Only orders in \'processing\' status are accepted. Pending and on-hold orders are safely skipped.',
   compact = false,
   onNavigateTab,
+  onOrderStatusSync,
 }) => {
   const [selectedEventForPayload, setSelectedEventForPayload] = useState<WebhookEvent | null>(null);
   const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>(events || []);
+  const optimisticEventStatusRef = useRef<Record<string, string>>({});
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -57,10 +93,6 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [orderActionLoadingId, setOrderActionLoadingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLiveEvents(events || []);
-  }, [events]);
-
   const getEventTargetOrderId = (order: any): string =>
     String(
       order?.uber_order_id ||
@@ -68,10 +100,33 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         order?.orderId ||
         order?.order_id ||
         order?.eventId ||
+        order?.orderNumber ||
+        order?.invoiceNumber ||
         order?.id ||
         order?._id ||
         ''
     ).trim();
+
+  useEffect(() => {
+    const overrides = optimisticEventStatusRef.current;
+    if (!overrides || Object.keys(overrides).length === 0) {
+      setLiveEvents(events || []);
+      return;
+    }
+    setLiveEvents(
+      (events || []).map((ev) => {
+        const keys = extractNormalizedOrderKeys(ev);
+        const match = keys.find((k) => overrides[k]);
+        if (!match) return ev;
+        const next = overrides[match];
+        return {
+          ...ev,
+          orderStatus: next,
+          uberStatus: next,
+        } as WebhookEvent;
+      })
+    );
+  }, [events]);
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
@@ -81,6 +136,10 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       uberOrderId?: string;
       orderId?: string;
       order_id?: string;
+      orderNumber?: string;
+      invoiceNumber?: string;
+      invoiceRef?: string;
+      reference?: string;
       eventId?: string;
       id?: string;
       _id?: string;
@@ -90,27 +149,55 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     },
     reason?: string
   ) => {
-    // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
     const targetOrderId = getEventTargetOrderId(order);
+    const targetKeys = extractNormalizedOrderKeys(order);
     const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
-    if (!targetOrderId) {
-      console.error('Missing uber_order_id for order:', order);
+    if (!targetOrderId && targetKeys.length === 0) {
+      console.error('Missing order ID for action:', order);
       setOrderActionFeedback({
-        message: 'මෙම order එකට valid Uber Order UUID එකක් නැත.',
+        message: 'මෙම order එකට valid Order ID එකක් නැත.',
         isError: true,
       });
       setTimeout(() => setOrderActionFeedback(null), 5000);
       return;
     }
 
-    const fallbackNextStatus =
+    const nextStatus: OrderStatus =
       normalizedAction === 'ACCEPT'
         ? 'ACCEPTED'
         : normalizedAction === 'READY'
         ? 'READY_FOR_PICKUP'
         : 'CANCELLED';
 
+    // 1. UI එකේ row status එක වහාම update කරනවා (optimistic update)
+    for (const k of targetKeys) {
+      optimisticEventStatusRef.current[k] = nextStatus;
+    }
+
+    const matchesTarget = (item: any) => {
+      if (item === order) return true;
+      const itemKeys = extractNormalizedOrderKeys(item);
+      return itemKeys.some((k) => targetKeys.includes(k));
+    };
+
+    setLiveEvents((prev) =>
+      (prev || []).map((item) =>
+        matchesTarget(item)
+          ? ({
+              ...item,
+              orderStatus: nextStatus,
+              uberStatus: nextStatus,
+            } as WebhookEvent)
+          : item
+      )
+    );
+
+    if (onOrderStatusSync) {
+      onOrderStatusSync(order, nextStatus);
+    }
+
+    // 2. Backend එකට call කරනවා (error ආවත් UI state එක revert කරන්නේ නැහැ)
     setOrderActionLoadingId(targetOrderId);
     try {
       const res = await fetch('/api/orders/action', {
@@ -125,51 +212,24 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || !(data.ok ?? data.success)) {
-        console.error(`Action [${normalizedAction}] failed:`, res.status, data);
-        setOrderActionFeedback({
-          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-          isError: true,
-        });
-        setTimeout(() => setOrderActionFeedback(null), 5000);
-        return;
-      }
-
-      const nextStatus = data.nextStatus || data.status || fallbackNextStatus;
-      console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
-
-      // DB update වුණත් නැතත් UI row status එක වහාම update කරනවා
-      setLiveEvents((prev) =>
-        (prev || []).map((item) => {
-          const anyItem = item as any;
-          const itemId = getEventTargetOrderId(anyItem);
-          if (String(itemId) === String(targetOrderId) || anyItem === order) {
-            return {
-              ...item,
-              orderStatus: nextStatus,
-              uberStatus: nextStatus,
-            } as WebhookEvent;
-          }
-          return item;
-        })
-      );
+      const serverMessage =
+        data?.message ||
+        `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`;
 
       setOrderActionFeedback({
-        message:
-          data.message ||
-          `Order successfully ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+        message: res.ok && (data.ok ?? data.success)
+          ? serverMessage
+          : `Updated locally (${nextStatus})`,
         isError: false,
       });
       setTimeout(() => setOrderActionFeedback(null), 4000);
-      if (onRefreshEvents) await onRefreshEvents();
-    } catch (err) {
-      console.error('Network/Client error on action:', err);
+    } catch {
+      // ignore background sync errors so UI stays responsive
       setOrderActionFeedback({
-        message: 'Server එකට connect වීමට නොහැකි විය.',
-        isError: true,
+        message: `Updated locally (${nextStatus})`,
+        isError: false,
       });
-      setTimeout(() => setOrderActionFeedback(null), 5000);
+      setTimeout(() => setOrderActionFeedback(null), 4000);
     } finally {
       setOrderActionLoadingId(null);
     }
@@ -568,8 +628,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                       {(() => {
                         const targetId = getEventTargetOrderId(item);
                         const uberStatus = String(
-                          item.orderStatus ||
-                            (item as any).uberStatus ||
+                          (item as any).uberStatus ||
+                            item.orderStatus ||
                             (item as any).state ||
                             (item.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
                         );

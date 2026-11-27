@@ -20,7 +20,7 @@ import {
   FileText,
   AlertTriangle,
 } from 'lucide-react';
-import { Order, Product, TransExpressWaybill, WebhookEvent } from '@/types';
+import { Order, OrderStatus, Product, TransExpressWaybill, WebhookEvent } from '@/types';
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
@@ -36,6 +36,7 @@ interface WaybillsTabProps {
   onClearWebhookEvents?: () => void;
   onTriggerTestOrder?: () => Promise<void>;
   onDeleteWaybill?: (id: string) => void;
+  onOrderStatusSync?: (rawOrder: any, nextStatus: OrderStatus) => void;
 }
 
 export const WaybillsTab: React.FC<WaybillsTabProps> = ({
@@ -49,6 +50,7 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
   onClearWebhookEvents,
   onTriggerTestOrder,
   onDeleteWaybill,
+  onOrderStatusSync,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
@@ -421,6 +423,7 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
         onRefreshEvents={onRefreshWebhookEvents}
         onClearEvents={onClearWebhookEvents}
         onTriggerTestOrder={onTriggerTestOrder}
+        onOrderStatusSync={onOrderStatusSync}
         title="Live WooCommerce Webhook Events & Logistics Stream"
         subtitle="Real-time incoming orders from connected WooCommerce store with automatic Trans Express Waybill generation (TE-XXXX)."
       />

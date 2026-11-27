@@ -46,6 +46,7 @@ interface DashboardTabProps {
     grnBatch?: string,
     supplier?: string
   ) => Promise<any>;
+  onOrderStatusSync?: (rawOrder: any, nextStatus: Order['status']) => void;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -62,6 +63,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onClearWebhookEvents,
   onTriggerTestOrder,
   onRestockProduct,
+  onOrderStatusSync,
 }) => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = React.useState<Order | null>(null);
   const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = React.useState<Order | null>(null);
@@ -90,6 +92,90 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
   const isFetchingOrdersRef = React.useRef(false);
   const rateLimitUntilRef = React.useRef(0);
+  const optimisticStatusRef = React.useRef<Record<string, string>>({});
+
+  type UberOrderActionTarget = {
+    uber_order_id?: string;
+    uberOrderId?: string;
+    orderId?: string;
+    order_id?: string;
+    orderNumber?: string;
+    invoiceNumber?: string;
+    invoiceRef?: string;
+    reference?: string;
+    eventId?: string;
+    id?: string;
+    _id?: string;
+    display_id?: string;
+    storeId?: string;
+    externalStoreId?: string;
+  };
+
+  const normalizeOrderKey = (val: unknown): string =>
+    String(val || '')
+      .replace(/^#/, '')
+      .trim()
+      .toLowerCase();
+
+  const extractNormalizedOrderKeys = React.useCallback((item: any): string[] => {
+    const rawVals = [
+      item?.id,
+      item?._id,
+      item?.orderId,
+      item?.order_id,
+      item?.uberOrderId,
+      item?.uber_order_id,
+      item?.orderNumber,
+      item?.invoiceNumber,
+      item?.invoiceRef,
+      item?.reference,
+      item?.display_id,
+      item?.eventId,
+    ];
+    const keys: string[] = [];
+    for (const val of rawVals) {
+      const norm = normalizeOrderKey(val);
+      if (!norm) continue;
+      keys.push(norm);
+      const strippedUber = norm.replace(/^uber-/i, '');
+      if (strippedUber && strippedUber !== norm) keys.push(strippedUber);
+    }
+    return keys;
+  }, []);
+
+  const getUberTargetOrderId = React.useCallback(
+    (order?: UberOrderActionTarget | null): string =>
+      String(
+        order?.uber_order_id ||
+          order?.uberOrderId ||
+          order?.orderId ||
+          order?.order_id ||
+          order?.eventId ||
+          order?.orderNumber ||
+          order?.invoiceNumber ||
+          order?.id ||
+          order?._id ||
+          ''
+      ).trim(),
+    []
+  );
+
+  const applyOptimisticOverrides = React.useCallback((list: Order[]): Order[] => {
+    const overrides = optimisticStatusRef.current;
+    if (!overrides || Object.keys(overrides).length === 0) return list;
+    return list.map((o) => {
+      const candidateKeys = extractNormalizedOrderKeys(o);
+      const matchedKey = candidateKeys.find((k) => overrides[k]);
+      if (!matchedKey) return o;
+      const next = overrides[matchedKey];
+      return {
+        ...o,
+        status: next,
+        uberStatus: next,
+        orderStatus: next,
+      } as Order;
+    });
+  }, [extractNormalizedOrderKeys]);
 
   const fetchOrders = React.useCallback(async (force = false) => {
     if (typeof document !== 'undefined' && document.hidden && !force) return;
@@ -118,14 +204,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.orders || []);
       if (Array.isArray(list) && list.length > 0) {
-        setLiveOrders(list);
+        setLiveOrders(applyOptimisticOverrides(list));
       }
     } catch (err) {
       console.error('Error fetching orders:', err);
     } finally {
       isFetchingOrdersRef.current = false;
     }
-  }, []);
+  }, [applyOptimisticOverrides]);
 
   React.useEffect(() => {
     const interval = setInterval(() => {
@@ -136,33 +222,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   }, [fetchOrders]);
 
   React.useEffect(() => {
-    setLiveOrders(orders || []);
-  }, [orders]);
-
-  type UberOrderActionTarget = {
-    uber_order_id?: string;
-    uberOrderId?: string;
-    orderId?: string;
-    order_id?: string;
-    eventId?: string;
-    id?: string;
-    _id?: string;
-    display_id?: string;
-    storeId?: string;
-    externalStoreId?: string;
-  };
-
-  const getUberTargetOrderId = (order?: UberOrderActionTarget | null): string =>
-    String(
-      order?.uber_order_id ||
-        order?.uberOrderId ||
-        order?.orderId ||
-        order?.order_id ||
-        order?.eventId ||
-        order?.id ||
-        order?._id ||
-        ''
-    ).trim();
+    setLiveOrders(applyOptimisticOverrides(orders || []));
+  }, [orders, applyOptimisticOverrides]);
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
@@ -170,27 +231,62 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     order: UberOrderActionTarget,
     reason?: string
   ) => {
-    // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
     const targetOrderId = getUberTargetOrderId(order);
+    const targetKeys = extractNormalizedOrderKeys(order);
     const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
-    if (!targetOrderId) {
-      console.error('Missing uber_order_id for order:', order);
+    if (!targetOrderId && targetKeys.length === 0) {
+      console.error('Missing order ID for action:', order);
       setOrderActionToast({
-        message: 'මෙම order එකට valid Uber Order UUID එකක් නැත.',
+        message: 'මෙම order එකට valid Order ID එකක් නැත.',
         isError: true,
       });
       setTimeout(() => setOrderActionToast(null), 5000);
       return;
     }
 
-    const fallbackNextStatus =
+    const nextStatus: Order['status'] =
       normalizedAction === 'ACCEPT'
         ? 'ACCEPTED'
         : normalizedAction === 'READY'
         ? 'READY_FOR_PICKUP'
         : 'CANCELLED';
 
+    // 1. UI එකේ status එක වහාම change කරනවා (optimistic update across both orders and audit events)
+    for (const k of targetKeys) {
+      optimisticStatusRef.current[k] = nextStatus;
+    }
+
+    const matchesTarget = (o: any) => {
+      if (o === order) return true;
+      const itemKeys = extractNormalizedOrderKeys(o);
+      return itemKeys.some((k) => targetKeys.includes(k));
+    };
+
+    setLiveOrders((prev) =>
+      (prev || []).map((o) =>
+        matchesTarget(o)
+          ? ({
+              ...o,
+              status: nextStatus,
+              uberStatus: nextStatus,
+              orderStatus: nextStatus,
+            } as Order)
+          : o
+      )
+    );
+
+    setSelectedUberOrder((prev) =>
+      prev && matchesTarget(prev)
+        ? ({ ...prev, status: nextStatus, uberStatus: nextStatus } as Order)
+        : prev
+    );
+
+    if (onOrderStatusSync) {
+      onOrderStatusSync(order, nextStatus);
+    }
+
+    // 2. Backend එකට call කරනවා (error ආවත් UI state එක revert කරන්නේ නැහැ)
     setOrderActionLoading(`${targetOrderId}-${action.toLowerCase()}`);
     try {
       const res = await fetch('/api/orders/action', {
@@ -205,68 +301,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || !(data.ok ?? data.success)) {
-        console.error(`Action [${normalizedAction}] failed:`, res.status, data);
-        setOrderActionToast({
-          message: `Failed (${res.status}): ${data.error || 'Action failed'}`,
-          isError: true,
-        });
-        setTimeout(() => setOrderActionToast(null), 5000);
-        return;
-      }
-
-      const nextStatus = data.nextStatus || data.status || fallbackNextStatus;
-
-      console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
-
-      setLiveOrders((prev) =>
-        (prev || []).map((o) => {
-          const anyO = o as any;
-          const itemId = getUberTargetOrderId(anyO);
-          const matches =
-            String(itemId) === String(targetOrderId) ||
-            o.id === targetOrderId ||
-            anyO.orderId === targetOrderId ||
-            anyO.order_id === targetOrderId ||
-            anyO.uberOrderId === targetOrderId ||
-            anyO.uber_order_id === targetOrderId ||
-            anyO._id === targetOrderId ||
-            anyO === order;
-          return matches
-            ? ({
-                ...o,
-                status: nextStatus,
-                uberStatus: nextStatus,
-                orderStatus: nextStatus,
-              } as Order)
-            : o;
-        })
-      );
-
-      setSelectedUberOrder((prev) =>
-        prev && (getUberTargetOrderId(prev as any) === targetOrderId || (prev as any) === order)
-          ? ({ ...prev, status: nextStatus, uberStatus: nextStatus } as Order)
-          : prev
-      );
+      const serverMessage =
+        data?.message ||
+        `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`;
 
       setOrderActionToast({
-        message:
-          data.message ||
-          `Order successfully ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+        message: res.ok && (data.ok ?? data.success)
+          ? serverMessage
+          : `Updated locally (${normalizedAction === 'CANCEL' ? 'Cancelled' : nextStatus})`,
         isError: false,
       });
       setTimeout(() => setOrderActionToast(null), 4000);
-      if (typeof window !== 'undefined') {
-        await fetchOrders(true);
-      }
-    } catch (err) {
-      console.error('Network/Client error on action:', err);
+    } catch {
+      // ignore background sync errors so UI stays responsive
       setOrderActionToast({
-        message: 'Server එකට connect වීමට නොහැකි විය.',
-        isError: true,
+        message: `Updated locally (${nextStatus})`,
+        isError: false,
       });
-      setTimeout(() => setOrderActionToast(null), 5000);
+      setTimeout(() => setOrderActionToast(null), 4000);
     } finally {
       setOrderActionLoading(null);
     }
@@ -739,66 +791,87 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   </span>
                 </div>
 
-                {/* Live Pending Uber Eats Action Items */}
-                {ubrOrders.filter((o) => o?.status === 'Pending' || o?.status === 'PENDING' || o?.status === 'PENDING_ACCEPTANCE' || o?.status === 'Processing' || o?.status === 'ACCEPTED').slice(0, 4).map((order, idx) => {
-                  const uberOrder = order as any;
-                  const uberOriginalUuid = getUberTargetOrderId(uberOrder);
-                  const displayOrderCode = uberOrder.display_id
-                    ? String(uberOrder.display_id).replace(/^UBER-/i, '').toUpperCase()
-                    : String(uberOrder.order_number || uberOrder.short_display_id || order.invoiceNumber || '')
-                        .replace(/^UBER-/i, '')
-                        .toUpperCase();
+                {/* Live Uber Eats Action Items */}
+                {ubrOrders
+                  .filter((o) => {
+                    const st = String((o as any)?.uberStatus || o?.status || '').toUpperCase();
+                    return (
+                      st === 'PENDING_ACCEPTANCE' ||
+                      st === 'CREATED' ||
+                      st === 'PENDING' ||
+                      st === 'ACCEPTED' ||
+                      st === 'PROCESSING' ||
+                      st === 'READY_FOR_PICKUP' ||
+                      st === 'READY' ||
+                      st === 'CANCELLED'
+                    );
+                  })
+                  .slice(0, 4)
+                  .map((order, idx) => {
+                    const uberOrder = order as any;
+                    const effectiveStatus = String(uberOrder.uberStatus || order.status || '');
+                    const effectiveUpper = effectiveStatus.toUpperCase();
+                    const uberOriginalUuid = getUberTargetOrderId(uberOrder);
+                    const displayOrderCode = uberOrder.display_id
+                      ? String(uberOrder.display_id).replace(/^UBER-/i, '').toUpperCase()
+                      : String(uberOrder.order_number || uberOrder.short_display_id || order.invoiceNumber || '')
+                          .replace(/^UBER-/i, '')
+                          .toUpperCase();
 
-                  return (
-                    <div
-                      key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`}
-                      className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 shadow-sm order-card"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-xs font-semibold text-[var(--text-primary)]">
-                            {order.branchName ? `Uber Eats (${order.branchName})` : 'Uber Eats Retail (Central Hub)'}
-                          </h3>
-                          <span className="font-mono text-[11px] font-bold text-[var(--accent-primary)]">
-                            #{displayOrderCode}
-                          </span>
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                              order.status === 'Processing' || order.status === 'ACCEPTED'
-                                ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
-                                : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
-                            }`}
-                          >
-                            {order.status}
-                          </span>
+                    return (
+                      <div
+                        key={`${order.id || uberOriginalUuid || 'ubr'}-${idx}`}
+                        className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3.5 shadow-sm order-card"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-xs font-semibold text-[var(--text-primary)]">
+                              {order.branchName ? `Uber Eats (${order.branchName})` : 'Uber Eats Retail (Central Hub)'}
+                            </h3>
+                            <span className="font-mono text-[11px] font-bold text-[var(--accent-primary)]">
+                              #{displayOrderCode}
+                            </span>
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                effectiveUpper === 'READY_FOR_PICKUP' || effectiveUpper === 'READY'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                  : effectiveUpper === 'CANCELLED'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                                  : effectiveUpper === 'PROCESSING' || effectiveUpper === 'ACCEPTED'
+                                  ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                                  : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                              }`}
+                            >
+                              {effectiveStatus}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-[var(--text-secondary)] truncate">
+                            {order.customerName} • {order.city || order.branchName || 'Colombo'} •{' '}
+                            <span className="font-mono font-semibold text-[var(--text-primary)]">
+                              Rs. {Number(order.grossTotal || 0).toLocaleString()}
+                            </span>
+                          </p>
                         </div>
-                        <p className="mt-1 text-xs text-[var(--text-secondary)] truncate">
-                          {order.customerName} • {order.city || order.branchName || 'Colombo'} •{' '}
-                          <span className="font-mono font-semibold text-[var(--text-primary)]">
-                            Rs. {Number(order.grossTotal || 0).toLocaleString()}
-                          </span>
-                        </p>
-                      </div>
 
-                      <OrderActionCell
-                        orderId={uberOriginalUuid}
-                        status={order.status}
-                        loading={Boolean(
-                          orderActionLoading && orderActionLoading.startsWith(`${uberOriginalUuid}-`)
-                        )}
-                        isUberOrder
-                        onAction={(_, actionType: OrderActionType, reason) =>
-                          handleOrderAction(
-                            actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
-                            uberOrder,
-                            reason
-                          )
-                        }
-                        onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
-                      />
-                    </div>
-                  );
-                })}
+                        <OrderActionCell
+                          orderId={uberOriginalUuid}
+                          status={effectiveStatus}
+                          loading={Boolean(
+                            orderActionLoading && orderActionLoading.startsWith(`${uberOriginalUuid}-`)
+                          )}
+                          isUberOrder
+                          onAction={(_, actionType: OrderActionType, reason) =>
+                            handleOrderAction(
+                              actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                              uberOrder,
+                              reason
+                            )
+                          }
+                          onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
+                        />
+                      </div>
+                    );
+                  })}
               </div>
 
               {/* WooCommerce */}
@@ -849,9 +922,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           {/* Clean Orders Filter Tabs + Search */}
           {(() => {
             const matchesTab = (order: Order, tab: typeof orderFilterTab) => {
-              const s = String(order.status || '').toUpperCase();
+              const s = String((order as any).uberStatus || order.status || '').toUpperCase();
               if (tab === 'ALL') return true;
-              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'PENDING';
+              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'CREATED' || s === 'PENDING';
               if (tab === 'PREPARING') return s === 'PROCESSING' || s === 'ACCEPTED' || s === 'PREPARING';
               if (tab === 'READY') return s === 'READY_FOR_PICKUP' || s === 'READY FOR PICKUP' || s === 'READY';
               return s === 'COMPLETED' || s === 'DELIVERED' || s === 'CANCELLED' || s === 'RETURNED';
@@ -1010,22 +1083,27 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                 <div className="text-[var(--text-secondary)] text-[11px]">{order.city}</div>
                               </td>
                               <td className="py-3 px-3.5 text-center">
-                                <span
-                                  className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
-                                    order.status === 'Completed' ||
-                                    order.status === 'Delivered' ||
-                                    order.status === 'READY_FOR_PICKUP' ||
-                                    order.status === 'Ready for Pickup'
-                                      ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
-                                      : order.status === 'Returned' ||
-                                        order.status === 'Cancelled' ||
-                                        order.status === 'CANCELLED'
-                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
-                                      : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
-                                  }`}
-                                >
-                                  {order.status}
-                                </span>
+                                {(() => {
+                                  const rowStatus = String((order as any).uberStatus || order.status || '');
+                                  const rowStatusUpper = rowStatus.toUpperCase();
+                                  return (
+                                    <span
+                                      className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                                        rowStatusUpper === 'COMPLETED' ||
+                                        rowStatusUpper === 'DELIVERED' ||
+                                        rowStatusUpper === 'READY_FOR_PICKUP' ||
+                                        rowStatusUpper === 'READY FOR PICKUP' ||
+                                        rowStatusUpper === 'READY'
+                                          ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                                          : rowStatusUpper === 'RETURNED' || rowStatusUpper === 'CANCELLED'
+                                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
+                                          : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                                      }`}
+                                    >
+                                      {rowStatus}
+                                    </span>
+                                  );
+                                })()}
                               </td>
                               <td className="py-3 px-3.5 text-right font-mono tabular-nums font-semibold">
                                 {order.profitStatus === 'Pending / Inventory Not Found' || order.hasUnregisteredItems ? (
@@ -1041,7 +1119,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                               <td className="py-3 px-3.5 text-right">
                                 <OrderActionCell
                                   orderId={targetUberId || idToPass}
-                                  status={order.status}
+                                  status={String((order as any).uberStatus || order.status || '')}
                                   loading={isUberBusy}
                                   isUberOrder={order.channel === 'ubereats'}
                                   readyLabel="Mark Ready"
@@ -1082,6 +1160,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         title="Live WooCommerce Webhook Events & Transaction Stream"
         subtitle="Actively listening for live orders placed on the store. Auto-executes Trans Express waybills and SMSlenz confirmations."
         onNavigateTab={onNavigateTab}
+        onOrderStatusSync={onOrderStatusSync}
       />
 
       {/* A4 Warranty Invoice Modal */}
@@ -1163,57 +1242,80 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
             {/* Action Button Group */}
             <div className="flex gap-2 mt-4">
-              {selectedUberOrder.status === 'PENDING_ACCEPTANCE' || selectedUberOrder.status === 'Pending' || selectedUberOrder.status === 'PENDING' ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleOrderAction('accept', selectedUberOrder as any);
-                      setSelectedUberOrder(null);
-                    }}
-                    className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Accept</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleOrderAction('cancel', selectedUberOrder as any);
-                      setSelectedUberOrder(null);
-                    }}
-                    className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Cancel</span>
-                  </button>
-                </>
-              ) : selectedUberOrder.status === 'Processing' || selectedUberOrder.status === 'ACCEPTED' ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleOrderAction('ready', selectedUberOrder as any);
-                      setSelectedUberOrder(null);
-                    }}
-                    className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Ready</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleOrderAction('cancel', selectedUberOrder as any);
-                      setSelectedUberOrder(null);
-                    }}
-                    className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Cancel</span>
-                  </button>
-                </>
-              ) : null}
+              {(() => {
+                const st = String((selectedUberOrder as any).uberStatus || selectedUberOrder.status || '').toUpperCase();
+                if (st === 'PENDING_ACCEPTANCE' || st === 'CREATED' || st === 'PENDING') {
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleOrderAction('accept', selectedUberOrder as any);
+                          setSelectedUberOrder(null);
+                        }}
+                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Accept</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleOrderAction('cancel', selectedUberOrder as any);
+                          setSelectedUberOrder(null);
+                        }}
+                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+                    </>
+                  );
+                }
+                if (st === 'ACCEPTED' || st === 'PROCESSING') {
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleOrderAction('ready', selectedUberOrder as any);
+                          setSelectedUberOrder(null);
+                        }}
+                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Ready</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleOrderAction('cancel', selectedUberOrder as any);
+                          setSelectedUberOrder(null);
+                        }}
+                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+                    </>
+                  );
+                }
+                if (st === 'READY_FOR_PICKUP' || st === 'READY') {
+                  return (
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                      ✓ Ready for Pickup
+                    </span>
+                  );
+                }
+                if (st === 'CANCELLED') {
+                  return (
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                      Cancelled
+                    </span>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
         </div>

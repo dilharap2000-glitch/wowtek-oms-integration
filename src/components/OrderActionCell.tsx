@@ -44,14 +44,23 @@ export function OrderActionCell({
   const [confirmingReturn, setConfirmingReturn] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const normalized = (status || '').toUpperCase();
-  const isPending = normalized.includes('PENDING');
+  const normalized = String(status || '').toUpperCase();
+  const isPending =
+    normalized === 'PENDING_ACCEPTANCE' ||
+    normalized === 'CREATED' ||
+    normalized === 'PENDING' ||
+    normalized.includes('PENDING');
   const isProcessing =
+    normalized === 'ACCEPTED' ||
+    normalized === 'PROCESSING' ||
     normalized.includes('PROCESSING') ||
     normalized.includes('PREPARING') ||
     normalized.includes('ACCEPTED');
+  const isReady = normalized === 'READY_FOR_PICKUP' || normalized === 'READY';
+  const isCancelled = normalized === 'CANCELLED' || normalized === 'CANCEL' || normalized.includes('CANCEL');
   const isDone =
-    normalized.includes('CANCEL') ||
+    isReady ||
+    isCancelled ||
     normalized.includes('RETURN') ||
     normalized.includes('COMPLETE') ||
     normalized.includes('DELIVERED');
@@ -75,8 +84,8 @@ export function OrderActionCell({
 
   return (
     <div ref={containerRef} className="relative flex items-center justify-end gap-2">
-      {/* 1. Primary Action Button Only */}
-      {isUberOrder && onAction && isPending && (
+      {/* 1. Primary Status Action or Completion Badge */}
+      {isUberOrder && onAction && isPending ? (
         <button
           type="button"
           disabled={loading}
@@ -92,9 +101,7 @@ export function OrderActionCell({
             </>
           )}
         </button>
-      )}
-
-      {isUberOrder && onAction && isProcessing && (
+      ) : isUberOrder && onAction && isProcessing ? (
         <button
           type="button"
           disabled={loading}
@@ -110,7 +117,15 @@ export function OrderActionCell({
             </>
           )}
         </button>
-      )}
+      ) : isUberOrder && isReady ? (
+        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 whitespace-nowrap">
+          ✓ Ready for Pickup
+        </span>
+      ) : isUberOrder && isCancelled ? (
+        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 whitespace-nowrap">
+          Cancelled
+        </span>
+      ) : null}
 
       {/* 2. Secondary Actions & Cancel -> Clean Dropdown */}
       {hasDropdownItems && (

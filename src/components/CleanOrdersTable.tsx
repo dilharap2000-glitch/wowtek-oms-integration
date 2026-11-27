@@ -67,6 +67,16 @@ export function CleanOrdersTable({
     [orders]
   );
 
+  const handleRowAction = async (
+    order: CleanOrder,
+    index: number,
+    action: OrderActionType,
+    reason?: string
+  ) => {
+    const rowKey = order.id || `${order.orderNumber}-${index}`;
+    await onAction({ ...order, id: rowKey }, action, reason);
+  };
+
   const renderStatusBadge = (status: CleanOrder['status']) => {
     switch (status) {
       case 'PENDING_ACCEPTANCE':
@@ -161,10 +171,11 @@ export function CleanOrdersTable({
                 </td>
               </tr>
             ) : (
-              filtered.map((order) => {
-                const isBusy = loadingId === order.id;
+              filtered.map((order, index) => {
+                const rowKey = order.id || `${order.orderNumber}-${index}`;
+                const isBusy = Boolean(loadingId && (loadingId === rowKey || loadingId === order.id));
                 return (
-                  <tr key={order.id} className="transition hover:bg-[var(--bg-subtle)]/50">
+                  <tr key={rowKey} className="transition hover:bg-[var(--bg-subtle)]/50">
                     <td className="px-4 py-3.5 align-middle">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-[var(--text-primary)]">#{order.orderNumber}</span>
@@ -188,12 +199,12 @@ export function CleanOrdersTable({
 
                     <td className="px-4 py-3.5 text-right align-middle">
                       <OrderActionCell
-                        orderId={order.id}
+                        orderId={rowKey}
                         status={order.status}
                         loading={isBusy}
                         isUberOrder={order.channel === 'Uber Eats'}
                         readyLabel="Mark Ready"
-                        onAction={(_, action, reason) => onAction(order, action, reason)}
+                        onAction={(_, action, reason) => handleRowAction(order, index, action, reason)}
                         onPrintLabel={onPrintLabel ? () => onPrintLabel(order) : undefined}
                         onPrintInvoice={onPrintInvoice ? () => onPrintInvoice(order) : undefined}
                         onViewJson={onViewJson ? () => onViewJson(order) : undefined}
