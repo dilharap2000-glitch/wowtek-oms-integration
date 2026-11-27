@@ -49,6 +49,7 @@ export function OrderActionCell({
     normalized === 'PENDING_ACCEPTANCE' ||
     normalized === 'CREATED' ||
     normalized === 'PENDING' ||
+    normalized === 'NEW' ||
     normalized.includes('PENDING');
   const isProcessing =
     normalized === 'ACCEPTED' ||

@@ -24,6 +24,7 @@ import { Order, OrderStatus, Product, TransExpressWaybill, WebhookEvent } from '
 import { WebhookAuditLogSection } from './WebhookAuditLogSection';
 import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
+import { isWooItem } from '@/lib/orderFilters';
 
 interface WaybillsTabProps {
   waybills: TransExpressWaybill[];
@@ -419,7 +420,7 @@ export const WaybillsTab: React.FC<WaybillsTabProps> = ({
 
       {/* Live WooCommerce Webhook Audit Log & Logistics Dispatch Stream */}
       <WebhookAuditLogSection
-        events={webhookEvents}
+        events={(webhookEvents || []).filter((evt) => isWooItem(evt))}
         onRefreshEvents={onRefreshWebhookEvents}
         onClearEvents={onClearWebhookEvents}
         onTriggerTestOrder={onTriggerTestOrder}

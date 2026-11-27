@@ -24,6 +24,7 @@ import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
 import { RestockGRNForm } from '@/components/GRNForms';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
+import { isPingRow, isUberItem, isWooItem } from '@/lib/orderFilters';
 
 interface DashboardTabProps {
   orders: Order[];
@@ -359,11 +360,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   };
 
   // Defensive array bindings
-  const safeOrders = (liveOrders && liveOrders.length > 0 ? liveOrders : orders) || [];
+  const safeOrders = React.useMemo(
+    () => (liveOrders && liveOrders.length > 0 ? liveOrders : orders) || [],
+    [liveOrders, orders]
+  );
   const safeWaybills = waybills || [];
   const safeWarranties = warranties || [];
   const safeExpenses = expenses || [];
-  const safeWebhookEvents = webhookEvents || [];
+  const safeWebhookEvents = React.useMemo(
+    () => webhookEvents || [],
+    [webhookEvents]
+  );
 
   // Financial computations (PREVENT FAKE PROFIT DISPLAY)
   const totalGrossRevenue = safeOrders
@@ -429,10 +436,62 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   );
 
   // Channel breakdown
-  const wcOrders = safeOrders.filter((o) => o?.channel === 'woocommerce');
-  const pkmOrders = safeOrders.filter((o) => o?.channel === 'pickme');
-  const ubrOrders = safeOrders.filter((o) => o?.channel === 'ubereats');
-  const posOrders = safeOrders.filter((o) => o?.channel === 'pos' || o?.isPosSale);
+  const wcOrders = safeOrders.filter((o) => isWooItem(o));
+  const pkmOrders = safeOrders.filter((o) => /pickme/i.test(String(o?.channel || (o as any)?.source || '')));
+  const ubrOrders = React.useMemo(() => {
+    const baseUberOrders = safeOrders.filter((o) => isUberItem(o));
+    const existingKeys = new Set<string>();
+    for (const o of baseUberOrders) {
+      for (const k of extractNormalizedOrderKeys(o)) {
+        existingKeys.add(k);
+      }
+    }
+    const extraUberFromWebhooks: Order[] = [];
+    for (const evt of safeWebhookEvents) {
+      if (!isUberItem(evt) || isPingRow(evt)) continue;
+      const evtKeys = extractNormalizedOrderKeys(evt);
+      if (evtKeys.some((k) => existingKeys.has(k))) continue;
+      for (const k of evtKeys) existingKeys.add(k);
+      const amt = Number(evt.amount || 0);
+      const fee = Math.round(amt * 0.154);
+      extraUberFromWebhooks.push({
+        id: evt.orderId || evt.id,
+        invoiceNumber: evt.invoiceNumber || evt.orderId || evt.id,
+        channel: 'ubereats',
+        channelName: `Uber Eats Retail (${evt.storeName || evt.branchName || 'Central Hub'})`,
+        storeId: evt.storeId || 'ubr-central',
+        storeName: evt.storeName || 'Uber Eats Store',
+        branchName: evt.branchName || 'Central Hub',
+        paymentGateway: 'card_online',
+        paymentGatewayName: 'Uber In-App Payment',
+        customerName: evt.customerName || 'Uber Customer',
+        customerPhone: evt.customerPhone || '',
+        deliveryAddress: 'Uber Eats Delivery',
+        city: evt.branchName || 'Colombo',
+        items: [],
+        grossTotal: amt,
+        platformFeePercent: 15.4,
+        platformFeeAmount: fee,
+        gatewayFeePercent: 0,
+        gatewayFeeAmount: 0,
+        courierFee: 0,
+        costOfGoods: 0,
+        netProfit: Math.max(0, amt - fee),
+        profitStatus: 'Calculated',
+        hasUnregisteredItems: false,
+        unregisteredItemsCount: 0,
+        status: ((evt as any).uberStatus || evt.orderStatus || 'PENDING_ACCEPTANCE') as Order['status'],
+        createdAt: evt.receivedAt,
+        updatedAt: evt.receivedAt,
+        waybillGenerated: false,
+        ...(evt as any),
+      } as Order);
+    }
+    return [...baseUberOrders, ...extraUberFromWebhooks];
+  }, [safeOrders, safeWebhookEvents, extractNormalizedOrderKeys]);
+  const posOrders = safeOrders.filter((o) => /pos/i.test(String(o?.channel || '')) || o?.isPosSale);
+  const invoiceTableOrders = safeOrders.filter((o) => !isPingRow(o));
+  const wooWebhookRows = safeWebhookEvents.filter((evt) => isWooItem(evt));
 
   const pendingWaybills = safeWaybills.filter((w) => w?.status === 'Queued' || w?.status === 'Manifested');
   const activeWarranties = safeWarranties.filter((w) => w?.status === 'Active');
@@ -792,21 +851,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 {/* Live Uber Eats Action Items */}
+                <div className="max-h-[420px] overflow-y-auto space-y-2.5 pr-0.5">
                 {ubrOrders
-                  .filter((o) => {
-                    const st = String((o as any)?.uberStatus || o?.status || '').toUpperCase();
-                    return (
-                      st === 'PENDING_ACCEPTANCE' ||
-                      st === 'CREATED' ||
-                      st === 'PENDING' ||
-                      st === 'ACCEPTED' ||
-                      st === 'PROCESSING' ||
-                      st === 'READY_FOR_PICKUP' ||
-                      st === 'READY' ||
-                      st === 'CANCELLED'
-                    );
-                  })
-                  .slice(0, 4)
                   .map((order, idx) => {
                     const uberOrder = order as any;
                     const effectiveStatus = String(uberOrder.uberStatus || order.status || '');
@@ -872,6 +918,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       </div>
                     );
                   })}
+                </div>
               </div>
 
               {/* WooCommerce */}
@@ -924,13 +971,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             const matchesTab = (order: Order, tab: typeof orderFilterTab) => {
               const s = String((order as any).uberStatus || order.status || '').toUpperCase();
               if (tab === 'ALL') return true;
-              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'CREATED' || s === 'PENDING';
+              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'CREATED' || s === 'PENDING' || s === 'NEW';
               if (tab === 'PREPARING') return s === 'PROCESSING' || s === 'ACCEPTED' || s === 'PREPARING';
               if (tab === 'READY') return s === 'READY_FOR_PICKUP' || s === 'READY FOR PICKUP' || s === 'READY';
               return s === 'COMPLETED' || s === 'DELIVERED' || s === 'CANCELLED' || s === 'RETURNED';
             };
             const q = orderSearch.trim().toLowerCase();
-            const filteredTableOrders = safeOrders.filter((o) => {
+            const filteredTableOrders = invoiceTableOrders.filter((o) => {
               if (!matchesTab(o, orderFilterTab)) return false;
               if (!q) return true;
               return (
@@ -946,10 +993,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {[
-                      { key: 'ALL', label: `All Orders (${safeOrders.length})` },
-                      { key: 'NEW', label: `New (${safeOrders.filter((o) => matchesTab(o, 'NEW')).length})` },
-                      { key: 'PREPARING', label: `Preparing (${safeOrders.filter((o) => matchesTab(o, 'PREPARING')).length})` },
-                      { key: 'READY', label: `Ready (${safeOrders.filter((o) => matchesTab(o, 'READY')).length})` },
+                      { key: 'ALL', label: `All Orders (${invoiceTableOrders.length})` },
+                      { key: 'NEW', label: `New (${invoiceTableOrders.filter((o) => matchesTab(o, 'NEW')).length})` },
+                      { key: 'PREPARING', label: `Preparing (${invoiceTableOrders.filter((o) => matchesTab(o, 'PREPARING')).length})` },
+                      { key: 'READY', label: `Ready (${invoiceTableOrders.filter((o) => matchesTab(o, 'READY')).length})` },
                       { key: 'DONE', label: 'Completed / Cancelled' },
                     ].map((tab) => {
                       const active = orderFilterTab === tab.key;
@@ -1018,7 +1065,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           </td>
                         </tr>
                       ) : (
-                        filteredTableOrders.slice(0, 8).map((order, idx) => {
+                        filteredTableOrders.slice(0, 20).map((order, idx) => {
                           const targetUberId = getUberTargetOrderId(order as any);
                           const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
                           const isUberBusy = Boolean(
@@ -1153,7 +1200,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
       {/* Live WooCommerce Webhook Audit Stream */}
       <WebhookAuditLogSection
-        events={webhookEvents}
+        events={wooWebhookRows}
         onRefreshEvents={onRefreshWebhookEvents}
         onClearEvents={onClearWebhookEvents}
         onTriggerTestOrder={onTriggerTestOrder}

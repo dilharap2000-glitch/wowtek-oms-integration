@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { OrderStatus, WebhookEvent } from '@/types';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
+import { isWooItem } from '@/lib/orderFilters';
 
 interface WebhookAuditLogSectionProps {
   events: WebhookEvent[];
@@ -264,7 +265,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     }
   };
 
-  const safeEvents = liveEvents || [];
+  const isWooFeed = /woo/i.test(title || '');
+  const safeEvents = (liveEvents || []).filter((e) => (isWooFeed ? isWooItem(e) : true));
 
   const filteredEvents = safeEvents.filter((e) => {
     if (!e) return false;
