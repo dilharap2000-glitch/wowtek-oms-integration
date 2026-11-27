@@ -288,11 +288,12 @@ async function saveUberWebhookEvent(payload: any) {
       const targetColName =
         collections.find((c) => /uber.*order|order/i.test(c.name))?.name || 'orders';
 
-      const orderDoc = {
+      const fullOrderDoc = {
         ...newOrder,
         ...extraOrderFields,
         updatedAt: now,
       };
+      const { createdAt: docCreatedAt, ...docWithoutCreatedAt } = fullOrderDoc;
 
       const upsertTarget = async (colName: string) => {
         if (fullOrderId) {
@@ -307,18 +308,18 @@ async function saveUberWebhookEvent(payload: any) {
             },
             {
               $set: {
-                ...orderDoc,
+                ...docWithoutCreatedAt,
                 orderId: fullOrderId,
                 uberOrderId: fullOrderId,
               },
-              $setOnInsert: { createdAt: now },
+              $setOnInsert: { createdAt: docCreatedAt || now },
             },
             { upsert: true }
           );
         } else {
           await db.collection(colName).insertOne({
-            ...orderDoc,
-            createdAt: now,
+            ...fullOrderDoc,
+            createdAt: docCreatedAt || now,
           });
         }
       };
