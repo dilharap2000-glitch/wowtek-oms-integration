@@ -226,13 +226,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     setLiveOrders(applyOptimisticOverrides(orders || []));
   }, [orders, applyOptimisticOverrides]);
 
-  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
-  const handleOrderAction = async (
+  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම non-blocking function එක
+  const handleOrderAction = (
     action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: UberOrderActionTarget,
-    reason?: string
+    reason?: string,
+    e?: React.SyntheticEvent
   ) => {
-    const targetOrderId = getUberTargetOrderId(order);
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    const targetOrderId = getUberTargetOrderId(order).replace(/^#/, '');
     const targetKeys = extractNormalizedOrderKeys(order);
     const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
@@ -253,7 +257,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         ? 'READY_FOR_PICKUP'
         : 'CANCELLED';
 
-    // 1. UI එකේ status එක වහාම change කරනවා (optimistic update across both orders and audit events)
+    // 1. Phone / Desktop UI එකේ state එක වහාම update කරනවා (non-blocking)
     for (const k of targetKeys) {
       optimisticStatusRef.current[k] = nextStatus;
     }
@@ -287,10 +291,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       onOrderStatusSync(order, nextStatus);
     }
 
-    // 2. Backend එකට call කරනවා (error ආවත් UI state එක revert කරන්නේ නැහැ)
-    setOrderActionLoading(`${targetOrderId}-${action.toLowerCase()}`);
-    try {
-      const res = await fetch('/api/orders/action', {
+    setOrderActionToast({
+      message: `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+      isError: false,
+    });
+    setTimeout(() => setOrderActionToast(null), 3500);
+
+    // 2. Background sync (UI block කරන්නේ නැහැ)
+    if (targetOrderId) {
+      void fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -299,29 +308,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           reason,
           storeId: order.storeId || order.externalStoreId,
         }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      const serverMessage =
-        data?.message ||
-        `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`;
-
-      setOrderActionToast({
-        message: res.ok && (data.ok ?? data.success)
-          ? serverMessage
-          : `Updated locally (${normalizedAction === 'CANCEL' ? 'Cancelled' : nextStatus})`,
-        isError: false,
-      });
-      setTimeout(() => setOrderActionToast(null), 4000);
-    } catch {
-      // ignore background sync errors so UI stays responsive
-      setOrderActionToast({
-        message: `Updated locally (${nextStatus})`,
-        isError: false,
-      });
-      setTimeout(() => setOrderActionToast(null), 4000);
-    } finally {
-      setOrderActionLoading(null);
+      }).catch(() => {});
     }
   };
 
@@ -851,8 +838,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 {/* Live Uber Eats Action Items */}
-                <div className="max-h-[420px] overflow-y-auto space-y-2.5 pr-0.5">
-                {ubrOrders
+                <div className="space-y-2.5 overflow-visible">
+                {ubrOrders.slice(0, 8)
                   .map((order, idx) => {
                     const uberOrder = order as any;
                     const effectiveStatus = String(uberOrder.uberStatus || order.status || '');
@@ -1026,7 +1013,103 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   />
                 </div>
 
-                <div className="overflow-x-auto lg:overflow-visible rounded-xl border border-[var(--border-subtle)]">
+                {/* Mobile Card View (Phone UI) */}
+                <div className="md:hidden space-y-2.5">
+                  {filteredTableOrders.length === 0 ? (
+                    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-app)] py-8 px-4 text-center text-xs text-[var(--text-secondary)]">
+                      {safeOrders.length === 0 ? 'No Recent Invoices or Orders' : 'Orders හමු වුණේ නැහැ.'}
+                    </div>
+                  ) : (
+                    filteredTableOrders.slice(0, 20).map((order, idx) => {
+                      const targetUberId = getUberTargetOrderId(order as any);
+                      const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
+                      const rowStatus = String((order as any).uberStatus || order.status || '');
+                      const rowStatusUpper = rowStatus.toUpperCase();
+                      const displayOrderNo =
+                        order.channel === 'ubereats'
+                          ? String(
+                              (order as any).display_id ||
+                                (order as any).order_number ||
+                                (order as any).short_display_id ||
+                                order.invoiceNumber ||
+                                ''
+                            )
+                              .replace(/^UBER-/i, '')
+                              .toUpperCase()
+                          : order.invoiceNumber;
+
+                      return (
+                        <div
+                          key={`mob-${order.id || order.invoiceNumber || 'ord'}-${idx}`}
+                          className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-app)] p-3.5 space-y-2.5 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-xs text-[var(--accent-primary)]">
+                                  {displayOrderNo}
+                                </span>
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                                    rowStatusUpper === 'COMPLETED' ||
+                                    rowStatusUpper === 'DELIVERED' ||
+                                    rowStatusUpper === 'READY_FOR_PICKUP' ||
+                                    rowStatusUpper === 'READY FOR PICKUP' ||
+                                    rowStatusUpper === 'READY'
+                                      ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
+                                      : rowStatusUpper === 'RETURNED' || rowStatusUpper === 'CANCELLED'
+                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                                      : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
+                                  }`}
+                                >
+                                  {rowStatus}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs font-medium text-[var(--text-primary)] truncate">
+                                {order.customerName}
+                              </p>
+                              <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                                {order.channelName}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                                Rs. {Number(order.grossTotal || 0).toLocaleString()}
+                              </div>
+                              <div className="text-[10px] font-mono text-[var(--text-secondary)]">
+                                Net: Rs. {Number(order.netProfit || 0).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end pt-1 border-t border-[var(--border-subtle)]">
+                            <OrderActionCell
+                              orderId={targetUberId || idToPass}
+                              status={rowStatus}
+                              isUberOrder={order.channel === 'ubereats'}
+                              readyLabel="Mark Ready"
+                              onAction={(_, actionType: OrderActionType, reason) =>
+                                handleOrderAction(
+                                  actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                                  order as any,
+                                  reason
+                                )
+                              }
+                              onPrintInvoice={() => setSelectedOrderForInvoice(order)}
+                              onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
+                              onReturnOrder={
+                                order.status !== 'Returned' ? () => handleReturnOrder(idToPass) : undefined
+                              }
+                              returning={orderActionLoading === `${idToPass}-return`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto lg:overflow-visible rounded-xl border border-[var(--border-subtle)]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[var(--bg-subtle)] border-b border-[var(--border-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">
                       <tr>

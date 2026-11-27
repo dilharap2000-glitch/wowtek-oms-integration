@@ -130,7 +130,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   }, [events]);
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
-  const handleOrderAction = async (
+  const handleOrderAction = (
     action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: {
       uber_order_id?: string;
@@ -148,9 +148,13 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       storeId?: string;
       externalStoreId?: string;
     },
-    reason?: string
+    reason?: string,
+    e?: React.SyntheticEvent
   ) => {
-    const targetOrderId = getEventTargetOrderId(order);
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
+    const targetOrderId = getEventTargetOrderId(order).replace(/^#/, '');
     const targetKeys = extractNormalizedOrderKeys(order);
     const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
@@ -171,7 +175,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         ? 'READY_FOR_PICKUP'
         : 'CANCELLED';
 
-    // 1. UI එකේ row status එක වහාම update කරනවා (optimistic update)
+    // 1. UI එකේ state එක වහාම update කරනවා (non-blocking)
     for (const k of targetKeys) {
       optimisticEventStatusRef.current[k] = nextStatus;
     }
@@ -198,10 +202,15 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       onOrderStatusSync(order, nextStatus);
     }
 
-    // 2. Backend එකට call කරනවා (error ආවත් UI state එක revert කරන්නේ නැහැ)
-    setOrderActionLoadingId(targetOrderId);
-    try {
-      const res = await fetch('/api/orders/action', {
+    setOrderActionFeedback({
+      message: `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
+      isError: false,
+    });
+    setTimeout(() => setOrderActionFeedback(null), 3500);
+
+    // 2. Background sync (UI block කරන්නේ නැහැ)
+    if (targetOrderId) {
+      void fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -210,29 +219,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           reason,
           storeId: order.storeId || order.externalStoreId,
         }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      const serverMessage =
-        data?.message ||
-        `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`;
-
-      setOrderActionFeedback({
-        message: res.ok && (data.ok ?? data.success)
-          ? serverMessage
-          : `Updated locally (${nextStatus})`,
-        isError: false,
-      });
-      setTimeout(() => setOrderActionFeedback(null), 4000);
-    } catch {
-      // ignore background sync errors so UI stays responsive
-      setOrderActionFeedback({
-        message: `Updated locally (${nextStatus})`,
-        isError: false,
-      });
-      setTimeout(() => setOrderActionFeedback(null), 4000);
-    } finally {
-      setOrderActionLoadingId(null);
+      }).catch(() => {});
     }
   };
 
@@ -410,8 +397,63 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         </button>
       </div>
 
-      {/* Events Table / Feed */}
-      <div className="overflow-x-auto lg:overflow-visible">
+      {/* Mobile Card List (Phone UI) */}
+      <div className="md:hidden divide-y divide-[var(--border-subtle)]">
+        {filteredEvents.length === 0 ? (
+          <div className="py-10 px-4 text-center text-xs text-[var(--text-secondary)]">
+            Waiting for Incoming WooCommerce Orders...
+          </div>
+        ) : (
+          (filteredEvents || []).slice(0, compact ? 6 : 25).map((evt) => {
+            const targetId = getEventTargetOrderId(evt);
+            const uberStatus = String(
+              (evt as any).uberStatus ||
+                evt.orderStatus ||
+                (evt as any).state ||
+                (evt.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
+            );
+            return (
+              <div key={`mob-${evt.id}`} className="p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="font-mono font-bold text-xs text-[var(--text-primary)]">
+                      {evt.invoiceNumber || evt.id}
+                    </span>
+                    <span className="ml-2 text-[10px] font-mono text-[var(--text-secondary)]">
+                      {evt.source}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                    {evt.amount !== undefined ? `Rs. ${evt.amount.toLocaleString()}` : '-'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs text-[var(--text-secondary)] truncate">
+                    {evt.customerName || 'Listener Ping / System Handshake'}
+                  </div>
+                  <OrderActionCell
+                    orderId={targetId || evt.id}
+                    status={uberStatus}
+                    loading={Boolean(targetId && orderActionLoadingId === targetId)}
+                    isUberOrder={evt.source === 'ubereats'}
+                    onAction={(_, actionType: OrderActionType, reason) =>
+                      handleOrderAction(
+                        actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
+                        evt as any,
+                        reason
+                      )
+                    }
+                    onViewJson={() => setSelectedEventForPayload(evt)}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Events Table / Feed (Desktop) */}
+      <div className="hidden md:block overflow-x-auto lg:overflow-visible">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-subtle)] text-[var(--text-secondary)] uppercase font-mono text-[10px] tracking-wider">

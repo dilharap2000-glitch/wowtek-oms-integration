@@ -148,6 +148,7 @@ export default function WowtekProApp() {
   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
   const [aliases, setAliases] = useState<ProductAlias[]>([]);
   const [stores, setStores] = useState<StoreMapping[]>([]);
+  const optimisticStatusMapRef = React.useRef<Record<string, Order['status']>>({});
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -354,8 +355,41 @@ export default function WowtekProApp() {
           const data = await res.json();
           const latency = Date.now() - start;
 
+          const applyStatusOverrides = <T extends Record<string, any>>(list: T[], isEvent = false): T[] => {
+            const map = optimisticStatusMapRef.current;
+            if (!map || Object.keys(map).length === 0) return list;
+            return list.map((item) => {
+              const vals = [
+                item?.id,
+                item?._id,
+                item?.orderId,
+                item?.order_id,
+                item?.uberOrderId,
+                item?.uber_order_id,
+                item?.orderNumber,
+                item?.invoiceNumber,
+                item?.invoiceRef,
+                item?.reference,
+                item?.display_id,
+                item?.eventId,
+              ];
+              for (const v of vals) {
+                const norm = String(v || '').replace(/^#/, '').trim().toLowerCase();
+                if (!norm) continue;
+                const stripped = norm.replace(/^uber-/i, '');
+                const next = map[norm] || map[stripped];
+                if (next) {
+                  return isEvent
+                    ? ({ ...item, orderStatus: next, uberStatus: next } as T)
+                    : ({ ...item, status: next, uberStatus: next, orderStatus: next } as T);
+                }
+              }
+              return item;
+            });
+          };
+
           if (Array.isArray(data.orders)) {
-            setOrders(data.orders);
+            setOrders(applyStatusOverrides(data.orders, false));
           }
 
           if (Array.isArray(data.products) && data.products.length > 0) {
@@ -371,7 +405,7 @@ export default function WowtekProApp() {
           }
 
           if (Array.isArray(data.webhookEvents)) {
-            setWebhookEvents(data.webhookEvents);
+            setWebhookEvents(applyStatusOverrides(data.webhookEvents, true));
           }
 
           if (data.dbStatus) {
@@ -759,6 +793,10 @@ export default function WowtekProApp() {
 
     const targetKeys = extractKeys(rawOrder);
     if (targetKeys.length === 0) return;
+
+    for (const k of targetKeys) {
+      optimisticStatusMapRef.current[k] = nextStatus;
+    }
 
     const matchesTarget = (item: any) => {
       if (item === rawOrder) return true;
