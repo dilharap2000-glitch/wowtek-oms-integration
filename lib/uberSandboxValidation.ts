@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getUberAccessToken,
+  getUberAccessTokenWithMeta,
   getUberBaseUrl,
   hasUberCredentialsConfigured,
 } from '@/lib/uberToken';
+
+const DEFAULT_STORE_ID = (
+  process.env.UBER_STORE_ID ||
+  process.env.UBER_SANDBOX_STORE_ID ||
+  'ba8761b9-5679-4bcd-845d-8b0baacf9e5d'
+).trim();
 
 export type UberSandboxTestResult = {
   feature: string;
@@ -17,7 +24,7 @@ export type UberSandboxTestResult = {
 
 export async function getUberSandboxStatus() {
   const baseUrl = getUberBaseUrl(true);
-  const defaultStoreId = process.env.UBER_SANDBOX_STORE_ID || '';
+  const defaultStoreId = DEFAULT_STORE_ID;
 
   return NextResponse.json({
     environment: baseUrl,
@@ -27,21 +34,121 @@ export async function getUberSandboxStatus() {
   });
 }
 
-export async function runUberSandboxValidation(req: NextRequest) {
-  const baseUrl = getUberBaseUrl(true);
-  const accessToken = await getUberAccessToken(true);
+async function runSingleFeatureValidation(body: {
+  feature: string;
+  storeId?: string;
+  store_id?: string;
+  orderId?: string;
+  order_id?: string;
+  host?: string;
+  integrator_store_id?: string;
+}) {
+  const feature = String(body.feature || 'store_status').trim();
+  const storeId = String(body.storeId || body.store_id || DEFAULT_STORE_ID).trim();
+  const orderId = String(body.orderId || body.order_id || '').trim();
+  const host = String(body.host || 'https://test-api.uber.com')
+    .trim()
+    .replace(/\/+$/, '');
 
-  if (!accessToken) {
+  const auth = await getUberAccessTokenWithMeta(true);
+  if (!auth?.token) {
     return NextResponse.json(
-      { error: 'Uber Sandbox OAuth credentials හෝ access token එක සෙට් කර නැත.' },
+      { ok: false, error: 'Failed to get Uber OAuth token' },
+      { status: 401 }
+    );
+  }
+
+  let endpoint = '';
+  let method = 'GET';
+  let payload: unknown = undefined;
+
+  if (feature === 'store_status') {
+    endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/status`;
+    method = 'GET';
+  } else if (feature === 'stores_list') {
+    endpoint = `${host}/v1/eats/stores`;
+    method = 'GET';
+  } else if (feature === 'set_store_online') {
+    endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/status`;
+    method = 'POST';
+    payload = { status: 'ONLINE' };
+  } else if (feature === 'activate_integration') {
+    endpoint = `${host}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
+    method = 'POST';
+    payload = {
+      store_id: storeId,
+      integrator_store_id: body.integrator_store_id || 'WOWTEK-CENTRAL-HUB',
+      is_order_manager_enabled: true,
+      is_menu_manager_enabled: false,
+    };
+  } else if (feature === 'get_order') {
+    if (!orderId) {
+      return NextResponse.json(
+        { ok: false, error: 'orderId is required for get_order' },
+        { status: 400 }
+      );
+    }
+    endpoint = `${host}/v2/eats/order/${encodeURIComponent(orderId)}`;
+    method = 'GET';
+  } else {
+    return NextResponse.json(
+      { ok: false, error: `Unknown feature: ${feature}` },
       { status: 400 }
     );
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const res = await fetch(endpoint, {
+      method,
+      headers: {
+        Authorization: `Bearer ${auth.token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: payload !== undefined ? JSON.stringify(payload) : undefined,
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+    let data: unknown = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+
+    return NextResponse.json({
+      ok: res.ok,
+      status: res.status,
+      feature,
+      endpoint,
+      tokenUrl: auth.tokenUrl,
+      data,
+    });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500 }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function runUberSandboxValidation(req: NextRequest) {
   let body: {
+    feature?: string;
+    storeId?: string;
     store_id?: string;
+    orderId?: string;
     order_id?: string;
     integration_id?: string;
+    integrator_store_id?: string;
+    host?: string;
     run_cancel?: boolean;
   } = {};
 
@@ -51,8 +158,30 @@ export async function runUberSandboxValidation(req: NextRequest) {
     body = {};
   }
 
-  const storeId = body.store_id?.trim() || process.env.UBER_SANDBOX_STORE_ID || '';
-  const orderId = body.order_id?.trim() || '';
+  if (body.feature) {
+    return runSingleFeatureValidation({
+      feature: body.feature,
+      storeId: body.storeId,
+      store_id: body.store_id,
+      orderId: body.orderId,
+      order_id: body.order_id,
+      host: body.host,
+      integrator_store_id: body.integrator_store_id,
+    });
+  }
+
+  const baseUrl = (body.host || getUberBaseUrl(true)).trim().replace(/\/+$/, '');
+  const accessToken = await getUberAccessToken(true);
+
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: 'Uber Sandbox OAuth credentials හෝ access token එක සෙට් කර නැත.' },
+      { status: 400 }
+    );
+  }
+
+  const storeId = (body.store_id || body.storeId || DEFAULT_STORE_ID).trim();
+  const orderId = (body.order_id || body.orderId || '').trim();
   const integrationId = body.integration_id?.trim() || storeId;
   const runCancel = Boolean(body.run_cancel);
 

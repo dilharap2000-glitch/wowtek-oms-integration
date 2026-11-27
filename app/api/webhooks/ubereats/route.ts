@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastLiveUpdate, saveServerWebhookEvent, saveServerOrder } from '@/lib/serverStore';
-import clientPromise, { connectToMongoDB } from '@/lib/mongodb';
+import { connectToMongoDB } from '@/lib/mongodb';
 import { WebhookEvent, Order, OrderItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +16,13 @@ export async function OPTIONS() {
   });
 }
 
-async function processBackgroundTasks(body: any) {
+async function saveUberWebhookEvent(payload: any) {
   try {
     const now = new Date().toISOString();
-    
+
     // Handle Uber Eats Financial Settlement Report Event
-    if (body.event_type === 'eats.report.success') {
-      const { report_type, report_metadata } = body;
+    if (payload?.event_type === 'eats.report.success') {
+      const { report_type, report_metadata } = payload;
       broadcastLiveUpdate({
         type: 'ubereats_report_processed',
         reportType: report_type,
@@ -32,119 +32,152 @@ async function processBackgroundTasks(body: any) {
       return;
     }
 
-    // 1. Extract details from Uber Eats Payload (handling both nested body.order and flat schemas)
-    const orderData = body.order || body;
-    const rawOrderId = orderData.id || body.order_id || body.meta?.resource_id || body.id || `UBER-${Date.now()}`;
-    const rawUberId = String(rawOrderId).trim();
+    const orderData = payload?.order || payload || {};
+    const fullOrderId = String(
+      payload?.meta?.resource_id ||
+        payload?.order?.id ||
+        payload?.order_id ||
+        payload?.event_id ||
+        payload?.id ||
+        ''
+    ).trim();
 
-    // uberUuid: දිග UUID එක (API actions සඳහා, e.g. "c7e05234-04ca-4460-...")
-    const uberUuid = rawUberId;
+    const rawDisplay = String(
+      payload?.order?.display_id ||
+        payload?.display_id ||
+        (fullOrderId ? fullOrderId.slice(-5).toUpperCase() : '')
+    )
+      .replace(/^#/, '')
+      .trim()
+      .toUpperCase();
 
-    // shortDisplayId: කෙටි අංකය (උදා: 06289 හෝ 95CF3 - UI එකේ පෙන්වීමට)
-    // මෙතැනදී .toUpperCase() දාලා හරියටම Capital කරගන්නවා
-    let shortDisplayId = orderData.display_id ? String(orderData.display_id).trim().toUpperCase() : '';
-    if (!shortDisplayId) {
-      if (rawUberId.toLowerCase().startsWith('c') && rawUberId.length > 5) {
-        shortDisplayId = rawUberId.substring(1).toUpperCase(); // 'c' එක ඉවත් කර Capital කරයි
-      } else if (rawUberId.length > 8) {
-        shortDisplayId = rawUberId.slice(-5).toUpperCase();
-      } else {
-        shortDisplayId = rawUberId.toUpperCase();
-      }
-    }
-    if (shortDisplayId.startsWith('UBER-')) {
-      shortDisplayId = shortDisplayId.replace('UBER-', '');
-    }
+    const shortDisplayId = rawDisplay.replace(/^UBER-/i, '') || `UBR${Date.now().toString().slice(-5)}`;
+    const displayId = `UBER-${shortDisplayId}`;
+    const eventType = String(
+      payload?.event_type || payload?.event || 'orders.notification'
+    ).trim();
 
-    const cleanOrderId = shortDisplayId;
-    const uberOriginalUuid = uberUuid; // API actions සඳහා යොදාගන්නා exact UUID එක
-    const displayId = `UBER-${shortDisplayId}`; // ඩෑෂ්බෝඩ් එකේ පෙන්වීමට "UBER-95CF3"
+    const storeId = String(
+      payload?.meta?.user_id ||
+        payload?.order?.store?.id ||
+        payload?.store_id ||
+        orderData?.store_id ||
+        'ba8761b9-5679-4bcd-845d-8b0baacf9e5d'
+    ).trim();
 
-    const orderId = cleanOrderId;
-    const storeId = body.store_id || orderData.store_id || body.meta?.user_id || 'uber-store';
-    const currentStatus = orderData.status || orderData.state || body.current_order_state?.status || 'PENDING';
-    
-    // Extracting item details & totals
-    const items = orderData.items || orderData.carts || orderData.cart?.items || body.current_order_state?.items || [];
-    const rawTotal = orderData.total || body.total || body.current_order_state?.total_price?.amount || 0;
-    const amount = typeof rawTotal === 'number' ? (rawTotal > 1000 ? rawTotal / 100 : rawTotal) : parseFloat(rawTotal) || 0;
-    
-    const invoiceNumber = displayId;
+    const resolvedStatus = String(
+      payload?.order?.current_state ||
+        payload?.meta?.status ||
+        orderData?.status ||
+        orderData?.state ||
+        payload?.current_order_state?.status ||
+        (eventType.includes('failure') ? 'FAILED' : 'PENDING_ACCEPTANCE')
+    ).trim();
 
-    // 2. Broadcast live update to OMS frontend
-    broadcastLiveUpdate({
-      type: 'webhook_ubereats_event',
-      data: {
-        orderId: uberOriginalUuid,
-        uber_order_id: uberOriginalUuid,
-        display_id: displayId,
-        storeId,
-        status: currentStatus,
-        items,
-        amount,
-        invoiceNumber: displayId,
-        rawPayload: body
-      },
-      timestamp: now
-    });
+    const resolvedUberStatus = String(
+      payload?.order?.current_state ||
+        payload?.meta?.status ||
+        orderData?.status ||
+        orderData?.state ||
+        'PENDING_ACCEPTANCE'
+    ).trim();
 
-    // 3. Construct WebhookEvent record for OMS state management
+    const rawCents = payload?.order?.payment?.charges?.total?.amount;
+    const rawFallbackTotal =
+      orderData?.total ??
+      payload?.total ??
+      payload?.current_order_state?.total_price?.amount ??
+      0;
+    const amount =
+      rawCents !== undefined && rawCents !== null
+        ? Number(rawCents) / 100 || 0
+        : typeof rawFallbackTotal === 'number'
+        ? rawFallbackTotal > 1000
+          ? rawFallbackTotal / 100
+          : rawFallbackTotal
+        : parseFloat(String(rawFallbackTotal)) || 0;
+
+    const customerName = String(
+      payload?.order?.eater?.first_name ||
+        payload?.customer_name ||
+        payload?.customer?.name ||
+        orderData?.customer?.name ||
+        'Uber Customer · Colombo'
+    ).trim();
+
+    const customerPhone = String(
+      payload?.order?.eater?.phone ||
+        payload?.customer_phone ||
+        payload?.customer?.phone ||
+        orderData?.customer?.phone ||
+        '+94 77 123 4567'
+    ).trim();
+
+    const items =
+      orderData?.items ||
+      orderData?.carts ||
+      orderData?.cart?.items ||
+      payload?.current_order_state?.items ||
+      [];
+
+    const orderItems: OrderItem[] =
+      Array.isArray(items) && items.length > 0
+        ? items.map((it: any) => ({
+            sku: it.sku || `WT-UBR-${it.id || 'ITEM'}`,
+            barcode: it.barcode || '4790000000000',
+            name: it.name || it.title || 'Uber Eats Item',
+            quantity: parseInt(String(it.quantity), 10) || 1,
+            unitPrice: parseFloat(String(it.price || it.unit_price || 0)) || 0,
+            costPrice: parseFloat(String(it.costPrice || 0)) || 0,
+            isRegistered: true,
+          }))
+        : [
+            {
+              sku: 'WT-UBR-ITEM',
+              barcode: '4790000000000',
+              name: payload?.item_name || 'Uber Eats Retail Order',
+              quantity: 1,
+              unitPrice: amount,
+              costPrice: 0,
+              isRegistered: false,
+            },
+          ];
+
+    const feeAmount = Math.round((amount * 15.4) / 100);
+    const effectiveOrderId = fullOrderId || shortDisplayId;
+
     const evt: WebhookEvent = {
       id: `evt-uber-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
       source: 'ubereats',
-      event: body.event_type || body.event || 'orders.notification',
-      orderId: orderId,
-      invoiceNumber: invoiceNumber,
-      storeId: storeId,
-      storeName: body.store_name || 'Uber Eats Store',
+      event: eventType,
+      orderId: effectiveOrderId,
+      invoiceNumber: displayId,
+      storeId,
+      storeName: payload?.order?.store?.name || payload?.store_name || 'Uber Eats Store',
       branchName: 'Central Hub',
-      amount: amount,
-      status: 'success',
-      orderStatus: currentStatus,
-      rawPayload: body,
+      amount,
+      status: eventType.includes('failure') ? 'failed' : 'success',
+      orderStatus: resolvedStatus,
+      customerName,
+      customerPhone,
+      rawPayload: payload,
       receivedAt: now,
     };
 
-    saveServerWebhookEvent(evt);
-
-    // Also construct OMS Order so it populates Recent Orders list
-    const orderItems: OrderItem[] = Array.isArray(items) && items.length > 0
-      ? items.map((it: any) => ({
-          sku: it.sku || `WT-UBR-${it.id || 'ITEM'}`,
-          barcode: it.barcode || '4790000000000',
-          name: it.name || it.title || 'Uber Eats Item',
-          quantity: parseInt(it.quantity) || 1,
-          unitPrice: parseFloat(it.price || it.unit_price || 0),
-          costPrice: parseFloat(it.costPrice || 0),
-          isRegistered: true,
-        }))
-      : [
-          {
-            sku: 'WT-UBR-ITEM',
-            barcode: '4790000000000',
-            name: body.item_name || 'Uber Eats Retail Order',
-            quantity: 1,
-            unitPrice: amount,
-            costPrice: 0,
-            isRegistered: false,
-          },
-        ];
-
-    const feeAmount = Math.round((amount * 15.4) / 100);
     const newOrder: Order = {
-      id: `ord-ubr-${orderId}`,
-      invoiceNumber: invoiceNumber,
+      id: `ord-ubr-${shortDisplayId}`,
+      invoiceNumber: displayId,
       channel: 'ubereats',
-      channelName: `Uber Eats Retail (${body.store_name || 'Central Hub'})`,
-      storeId: storeId,
-      storeName: body.store_name || 'Uber Eats Store',
+      channelName: `Uber Eats Retail (${payload?.order?.store?.name || payload?.store_name || 'Central Hub'})`,
+      storeId,
+      storeName: payload?.order?.store?.name || payload?.store_name || 'Uber Eats Store',
       branchName: 'Central Hub',
       externalStoreId: storeId,
       paymentGateway: 'card_online',
       paymentGatewayName: 'Uber In-App Payment',
-      customerName: body.customer_name || body.customer?.name || 'Uber Customer',
-      customerPhone: body.customer_phone || body.customer?.phone || '+94 77 123 4567',
-      deliveryAddress: body.delivery_address || 'Delivery Address',
+      customerName,
+      customerPhone,
+      deliveryAddress: payload?.delivery_address || orderData?.delivery_address || 'Delivery Address',
       city: 'Colombo',
       items: orderItems,
       grossTotal: amount,
@@ -158,96 +191,177 @@ async function processBackgroundTasks(body: any) {
       profitStatus: 'Calculated',
       hasUnregisteredItems: false,
       unregisteredItemsCount: 0,
-      status: (currentStatus === 'Processing' || currentStatus === 'Completed' || currentStatus === 'Cancelled') ? currentStatus : 'PENDING_ACCEPTANCE',
+      status: resolvedStatus as Order['status'],
       createdAt: now,
       updatedAt: now,
       waybillGenerated: false,
-      notes: `Uber Eats Live Order: ${invoiceNumber}`,
+      notes: `Uber Eats Live Order: ${displayId}`,
     };
 
-    saveServerOrder(newOrder);
-    broadcastLiveUpdate({ type: 'new_order_webhook', order: newOrder, event: evt, timestamp: now });
+    const extraOrderFields = {
+      channel: 'ubereats',
+      source: 'ubereats',
+      provider: 'ubereats',
+      eventType,
+      orderId: effectiveOrderId,
+      uberOrderId: fullOrderId || null,
+      uber_order_id: fullOrderId || null,
+      orderNumber: shortDisplayId,
+      displayId: shortDisplayId,
+      display_id: displayId,
+      formatted_display_id: displayId,
+      short_display_id: shortDisplayId,
+      clean_order_id: shortDisplayId,
+      uberStatus: resolvedUberStatus,
+      orderStatus: resolvedStatus,
+      amount,
+      rawPayload: payload,
+    };
 
-    // 4. Save/Update Order & Invoice in MongoDB for bi-directional sync
+    saveServerWebhookEvent(evt);
+    saveServerOrder({ ...newOrder, ...extraOrderFields } as Order);
+
+    broadcastLiveUpdate({
+      type: 'webhook_ubereats_event',
+      data: {
+        orderId: effectiveOrderId,
+        uber_order_id: fullOrderId || null,
+        display_id: displayId,
+        storeId,
+        status: resolvedStatus,
+        uberStatus: resolvedUberStatus,
+        items,
+        amount,
+        invoiceNumber: displayId,
+        rawPayload: payload,
+      },
+      timestamp: now,
+    });
+    broadcastLiveUpdate({
+      type: 'new_order_webhook',
+      order: { ...newOrder, ...extraOrderFields },
+      event: evt,
+      timestamp: now,
+    });
+
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
-      // Save or update webhook audit feed
-      await mongoConn.db.collection('webhook_events').updateOne(
-        { orderId: orderId },
-        { $set: evt },
+      const db = mongoConn.db;
+      const nowDate = new Date();
+
+      await db.collection('webhook_events').updateOne(
+        { $or: [{ orderId: effectiveOrderId }, { invoiceNumber: displayId }] },
+        { $set: { ...evt, ...extraOrderFields } },
         { upsert: true }
       );
 
-      // MongoDB එකේ upsert කිරීම (ඩේටා ඩබල් වෙන එක වළක්වයි)
-      const orderDocument = {
-        uber_order_id: uberUuid, // දිග UUID එක (API actions සඳහා)
-        display_id: shortDisplayId || (uberUuid ? uberUuid.slice(-5).toUpperCase() : ''), // දැන් ඩේටාබේස් එකේ "95CF3" වගේ Capital විදිහට සේව් වෙයි
-        formatted_display_id: displayId, // "UBER-95CF3"
-        short_display_id: shortDisplayId,
-        clean_order_id: cleanOrderId,
-        state: orderData.state || currentStatus,
-        status: orderData.status || currentStatus,
-        carts: orderData.carts || (orderData.cart ? [orderData.cart] : items),
+      const omsDoc = {
+        ...extraOrderFields,
+        state: orderData?.state || resolvedStatus,
+        status: resolvedStatus,
+        carts: orderData?.carts || (orderData?.cart ? [orderData.cart] : items),
         items: orderItems,
-        orderId: cleanOrderId,
         invoiceNumber: displayId,
         storeId,
-        source: 'ubereats',
-        amount,
-        customerName: body.customer_name || body.customer?.name || orderData.customer?.name || 'Uber Customer',
-        customerPhone: body.customer_phone || body.customer?.phone || orderData.customer?.phone || '+94 77 123 4567',
-        deliveryAddress: body.delivery_address || orderData.delivery_address || 'Delivery Address',
-        rawPayload: body,
-        updated_at: new Date(),
+        customerName,
+        customerPhone,
+        deliveryAddress: newOrder.deliveryAddress,
+        updated_at: nowDate,
         updatedAt: now,
       };
 
-      await mongoConn.db.collection('oms_orders').updateOne(
-        { $or: [{ uber_order_id: uberUuid }, { uber_order_id: cleanOrderId }, { orderId: cleanOrderId }] },
+      await db.collection('oms_orders').updateOne(
+        fullOrderId
+          ? { $or: [{ uberOrderId: fullOrderId }, { uber_order_id: fullOrderId }, { orderId: fullOrderId }] }
+          : { invoiceNumber: displayId },
         {
-          $set: orderDocument,
+          $set: omsDoc,
           $setOnInsert: {
-            created_at: new Date(),
+            created_at: nowDate,
             createdAt: now,
-          }
+          },
         },
         { upsert: true }
       );
 
-      // Also upsert in main orders collection
-      await mongoConn.db.collection('orders').updateOne(
-        { $or: [{ id: newOrder.id }, { invoiceNumber: newOrder.invoiceNumber }, { uber_order_id: uberUuid }, { uber_order_id: cleanOrderId }] },
-        { $set: { ...newOrder, uber_order_id: uberUuid, display_id: displayId } },
-        { upsert: true }
-      );
+      const collections = await db.listCollections().toArray().catch(() => []);
+      const targetColName =
+        collections.find((c) => /uber.*order|order/i.test(c.name))?.name || 'orders';
+
+      const orderDoc = {
+        ...newOrder,
+        ...extraOrderFields,
+        updatedAt: now,
+      };
+
+      const upsertTarget = async (colName: string) => {
+        if (fullOrderId) {
+          await db.collection(colName).updateOne(
+            {
+              $or: [
+                { uberOrderId: fullOrderId },
+                { uber_order_id: fullOrderId },
+                { orderId: fullOrderId },
+                { invoiceNumber: displayId },
+              ],
+            },
+            {
+              $set: {
+                ...orderDoc,
+                orderId: fullOrderId,
+                uberOrderId: fullOrderId,
+              },
+              $setOnInsert: { createdAt: now },
+            },
+            { upsert: true }
+          );
+        } else {
+          await db.collection(colName).insertOne({
+            ...orderDoc,
+            createdAt: now,
+          });
+        }
+      };
+
+      await upsertTarget(targetColName);
+      if (targetColName !== 'orders') {
+        await upsertTarget('orders');
+      }
     }
-  } catch (err: any) {
-    console.error('[UberEats Background Processing Error]:', err?.message);
+  } catch (err) {
+    console.error('Webhook DB save error:', err);
   }
 }
 
-export async function POST(req: NextRequest | Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    let payload: any = {};
+    try {
+      payload = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      payload = { raw: rawBody };
+    }
 
-    // Instantly respond 200 OK to prevent Vercel Timeout
-    const immediateResponse = NextResponse.json({ status: 'success', received: true }, { status: 200 });
+    await saveUberWebhookEvent(payload);
 
-    // Handle heavy database operations & broadcasting asynchronously in background
-    processBackgroundTasks(body).catch((err) => console.error('Background Task Execution Error:', err));
-
-    return immediateResponse;
-  } catch (error) {
-    console.error('UberEats Webhook Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    // Uber webhook validation සඳහා අනිවාර්ය 200 OK
+    return NextResponse.json({ ok: true, received: true }, { status: 200 });
+  } catch (err: any) {
+    console.error('Uber webhook handler error:', err);
+    return NextResponse.json({ ok: true, received: true }, { status: 200 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({
-    service: 'WOWTEK Pro Uber Eats Webhook Listener',
-    status: 'online',
-    platform: 'ubereats',
-    endpoint: '/api/webhooks/ubereats',
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      service: 'ubereats-webhook',
+      status: 'online',
+      platform: 'ubereats',
+      endpoint: '/api/webhooks/ubereats',
+    },
+    { status: 200 }
+  );
 }

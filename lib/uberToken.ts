@@ -4,6 +4,7 @@ import { connectToMongoDB } from '@/lib/mongodb';
 type CachedToken = {
   token: string;
   baseUrl: string;
+  tokenUrl: string;
   expiresAt: number;
 };
 
@@ -45,7 +46,7 @@ export function isUberSandboxMode(): boolean {
 
 export function getUberBaseUrl(isSandbox: boolean): string {
   return isSandbox
-    ? process.env.UBER_SANDBOX_BASE_URL || 'https://sandbox-api.uber.com'
+    ? process.env.UBER_SANDBOX_BASE_URL || 'https://test-api.uber.com'
     : process.env.UBER_PROD_BASE_URL || process.env.UBER_BASE_URL || 'https://api.uber.com';
 }
 
@@ -237,6 +238,7 @@ type EnvTokenResult = {
   ok: boolean;
   token?: string;
   baseUrl?: string;
+  tokenUrl?: string;
   fromCache?: boolean;
   status?: number;
   error?: string;
@@ -257,6 +259,7 @@ async function getTokenForSpecificEnv(
       ok: true,
       token: existing.token,
       baseUrl: existing.baseUrl,
+      tokenUrl: existing.tokenUrl,
       fromCache: true,
     };
   }
@@ -275,63 +278,77 @@ async function getTokenForSpecificEnv(
 
   const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
   const scopeCandidates = configuredScope
-    ? [configuredScope]
+    ? [configuredScope, 'eats.order', '']
     : [
-        'eats.order eats.store.orders.read eats.pos_provisioning',
-        'eats.order eats.store.orders.read',
+        'eats.order eats.store eats.store.orders.read eats.store.orders.write eats.store.status.write eats.pos_provisioning',
         'eats.order',
+        '',
       ];
 
-  const tokenUrl = targetSandbox
-    ? 'https://sandbox-login.uber.com/oauth/v2/token'
-    : 'https://login.uber.com/oauth/v2/token';
+  const tokenUrls = targetSandbox
+    ? [
+        'https://auth.uber.com/oauth/v2/token',
+        'https://sandbox-login.uber.com/oauth/v2/token',
+        'https://login.uber.com/oauth/v2/token',
+      ]
+    : [
+        'https://auth.uber.com/oauth/v2/token',
+        'https://login.uber.com/oauth/v2/token',
+      ];
 
   let lastOAuthStatus = 401;
   let lastOAuthError = '';
   let lastOAuthDetails: unknown = undefined;
 
   if (clientId && clientSecret) {
-    for (let i = 0; i < scopeCandidates.length; i++) {
-      const scope = scopeCandidates[i];
-      try {
-        const oauthResult = await fetchOAuthToken(tokenUrl, clientId, clientSecret, scope);
+    for (const tokenUrl of tokenUrls) {
+      for (let i = 0; i < scopeCandidates.length; i++) {
+        const scope = scopeCandidates[i];
+        try {
+          const oauthResult = await fetchOAuthToken(tokenUrl, clientId, clientSecret, scope);
 
-        if (oauthResult.ok && oauthResult.accessToken) {
-          cachedTokens[cacheKey] = {
-            token: oauthResult.accessToken,
-            baseUrl,
-            expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
-          };
-          return {
-            ok: true,
-            token: cachedTokens[cacheKey]!.token,
-            baseUrl,
-            fromCache: false,
-          };
+          if (oauthResult.ok && oauthResult.accessToken) {
+            cachedTokens[cacheKey] = {
+              token: oauthResult.accessToken,
+              baseUrl,
+              tokenUrl,
+              expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
+            };
+            return {
+              ok: true,
+              token: cachedTokens[cacheKey]!.token,
+              baseUrl,
+              tokenUrl,
+              fromCache: false,
+            };
+          }
+
+          lastOAuthStatus = oauthResult.status || 401;
+          lastOAuthDetails = oauthResult.parsed || { raw: oauthResult.rawText };
+          lastOAuthError =
+            oauthResult.parsed?.error_description ||
+            oauthResult.parsed?.error ||
+            oauthResult.rawText ||
+            `OAuth failed (${lastOAuthStatus})`;
+
+          const isInvalidScope =
+            oauthResult.status === 400 &&
+            oauthResult.rawText.toLowerCase().includes('invalid_scope');
+          if (isInvalidScope && i < scopeCandidates.length - 1) {
+            continue;
+          }
+          if (oauthResult.status === 400 && i < scopeCandidates.length - 1) {
+            continue;
+          }
+          break;
+        } catch (oauthErr) {
+          lastOAuthStatus = 502;
+          lastOAuthError =
+            oauthErr instanceof Error
+              ? `Uber OAuth Fetch Error: ${oauthErr.message}`
+              : 'Uber OAuth Fetch Error';
+          break;
         }
-
-        const isInvalidScope =
-          oauthResult.status === 400 &&
-          oauthResult.rawText.toLowerCase().includes('invalid_scope');
-        if (isInvalidScope && i < scopeCandidates.length - 1) {
-          continue;
-        }
-
-        lastOAuthStatus = oauthResult.status || 401;
-        lastOAuthDetails = oauthResult.parsed || { raw: oauthResult.rawText };
-        lastOAuthError =
-          oauthResult.parsed?.error_description ||
-          oauthResult.parsed?.error ||
-          oauthResult.rawText ||
-          `OAuth failed (${lastOAuthStatus})`;
-        break;
-      } catch (oauthErr) {
-        lastOAuthStatus = 502;
-        lastOAuthError =
-          oauthErr instanceof Error
-            ? `Uber OAuth Fetch Error: ${oauthErr.message}`
-            : 'Uber OAuth Fetch Error';
-        break;
       }
     }
   }
@@ -351,6 +368,7 @@ async function getTokenForSpecificEnv(
       ok: true,
       token: fallbackToken.trim(),
       baseUrl,
+      tokenUrl: 'env_or_db_static_token',
       fromCache: false,
     };
   }
@@ -366,13 +384,26 @@ async function getTokenForSpecificEnv(
   };
 }
 
-export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
+export async function getUberAccessTokenWithMeta(
+  isSandbox = isUberSandboxMode()
+): Promise<{ token: string; tokenUrl: string; baseUrl: string } | null> {
   const order = isSandbox ? [true, false] : [false, true];
   for (const targetSandbox of order) {
     const res = await getTokenForSpecificEnv(targetSandbox);
-    if (res.ok && res.token) return res.token;
+    if (res.ok && res.token) {
+      return {
+        token: res.token,
+        tokenUrl: res.tokenUrl || 'https://auth.uber.com/oauth/v2/token',
+        baseUrl: res.baseUrl || getUberBaseUrl(targetSandbox),
+      };
+    }
   }
   return null;
+}
+
+export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
+  const meta = await getUberAccessTokenWithMeta(isSandbox);
+  return meta?.token || null;
 }
 
 export async function executeUberOrderAction(params: {
@@ -472,57 +503,69 @@ export async function executeUberOrderAction(params: {
     let currentToken = initialTokenRes.token;
     const currentBaseUrl = initialTokenRes.baseUrl;
     anyCredentialsConfigured = true;
-    let { res: response, endpointUrl: url } = await invokeUberEndpoint(
-      currentToken,
-      currentBaseUrl
+
+    const candidateHosts = Array.from(
+      new Set([
+        currentBaseUrl,
+        'https://test-api.uber.com',
+        'https://api.uber.com',
+        'https://sandbox-api.uber.com',
+      ])
     );
 
-    // Cached token expired -> clear cache and retry this environment once before falling back
-    if (response.status === 401 && initialTokenRes.fromCache) {
-      clearUberAccessTokenCache(targetSandbox);
-      const refreshed = await getTokenForSpecificEnv(targetSandbox, { forceRefresh: true });
-      if (refreshed.ok && refreshed.token) {
-        currentToken = refreshed.token;
-        const retried = await invokeUberEndpoint(currentToken, refreshed.baseUrl || currentBaseUrl);
-        response = retried.res;
-        url = retried.endpointUrl;
+    let stopEnvLoop = false;
+    for (const host of candidateHosts) {
+      let { res: response, endpointUrl: url } = await invokeUberEndpoint(currentToken, host);
+
+      // Cached token expired -> clear cache and retry this host once
+      if (response.status === 401 && initialTokenRes.fromCache) {
+        clearUberAccessTokenCache(targetSandbox);
+        const refreshed = await getTokenForSpecificEnv(targetSandbox, { forceRefresh: true });
+        if (refreshed.ok && refreshed.token) {
+          currentToken = refreshed.token;
+          const retried = await invokeUberEndpoint(currentToken, host);
+          response = retried.res;
+          url = retried.endpointUrl;
+        }
+      }
+
+      const text = await response.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { raw: text };
+      }
+
+      if (response.ok) {
+        return {
+          ok: true,
+          status: response.status,
+          url,
+          env: host,
+          nextStatus,
+          uberResponse: data,
+        };
+      }
+
+      lastFailure = {
+        status: response.status,
+        url,
+        error: data?.message || data?.error || `Uber API error (${response.status})`,
+        uberResponse: data,
+      };
+
+      // Non-401 means auth succeeded and the Uber endpoint itself responded (e.g. 400 / 404 / 409)
+      if (response.status !== 401) {
+        stopEnvLoop = true;
+        break;
       }
     }
 
-    const text = await response.text();
-    let data: any = null;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = { raw: text };
-    }
-
-    if (response.ok) {
-      return {
-        ok: true,
-        status: response.status,
-        url,
-        env: currentBaseUrl,
-        nextStatus,
-        uberResponse: data,
-      };
-    }
-
-    if (response.status === 401) {
-      clearUberAccessTokenCache(targetSandbox);
-    }
-
-    lastFailure = {
-      status: response.status,
-      url,
-      error: data?.message || data?.error || `Uber API error (${response.status})`,
-      uberResponse: data,
-    };
-
-    // Stop immediately on any non-401 API error (400 / 403 / 404 / etc.) — that is the real endpoint response
-    if (response.status !== 401) {
+    if (stopEnvLoop) {
       break;
     }
+    clearUberAccessTokenCache(targetSandbox);
   }
 
   if (!anyCredentialsConfigured) {

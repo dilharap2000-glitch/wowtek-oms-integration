@@ -63,13 +63,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const order_id = String(rawOrderId).trim();
+    const order_id = String(rawOrderId).replace(/^#/, '').trim();
     const cleanInputId = order_id.replace(/^UBER-/i, '');
     const validObjectId = ObjectId.isValid(order_id) ? new ObjectId(order_id) : null;
 
     const isSandbox = isUberSandboxMode();
 
-    // Resolve Uber Order UUID if a short ID or Mongo _id was passed
+    // Resolve Uber Order UUID if a short ID, displayId, or Mongo _id was passed
     let uberOrderUuid = order_id;
     let mongoConn: Awaited<ReturnType<typeof connectToMongoDB>> = null;
     try {
@@ -79,32 +79,81 @@ export async function POST(req: NextRequest) {
         return (
           o.id === order_id ||
           anyO.orderId === order_id ||
+          anyO.uberOrderId === order_id ||
           anyO.uber_order_id === order_id ||
+          anyO.orderNumber === order_id ||
+          anyO.displayId === order_id ||
           o.invoiceNumber === order_id ||
           o.invoiceNumber === `UBER-${cleanInputId}` ||
           anyO.display_id === order_id ||
           anyO.display_id === `UBER-${cleanInputId}`
         );
       });
-      if (existingLocal && (existingLocal as any).uber_order_id) {
-        uberOrderUuid = String((existingLocal as any).uber_order_id).trim();
-      } else {
+      if (existingLocal) {
+        const anyLocal = existingLocal as any;
+        const localUuid =
+          anyLocal.uberOrderId ||
+          anyLocal.uber_order_id ||
+          (typeof anyLocal.orderId === 'string' && anyLocal.orderId.length >= 20
+            ? anyLocal.orderId
+            : '');
+        if (localUuid) {
+          uberOrderUuid = String(localUuid).trim();
+        }
+      }
+
+      if (uberOrderUuid === order_id || uberOrderUuid.length < 20) {
         mongoConn = await connectToMongoDB();
         if (mongoConn) {
-          const doc = await mongoConn.db.collection('oms_orders').findOne({
+          const lookupQuery: Record<string, unknown> = {
             $or: [
               ...(validObjectId ? [{ _id: validObjectId }] : []),
+              { uberOrderId: order_id },
               { uber_order_id: order_id },
               { orderId: order_id },
               { orderId: cleanInputId },
+              { order_id: order_id },
+              { orderNumber: order_id },
+              { orderNumber: `#${order_id}` },
+              { displayId: order_id },
+              { displayId: cleanInputId.toUpperCase() },
               { display_id: cleanInputId.toUpperCase() },
               { display_id: `UBER-${cleanInputId.toUpperCase()}` },
               { display_id: order_id },
               { short_display_id: cleanInputId.toUpperCase() },
+              { invoiceNumber: order_id },
+              { invoiceNumber: `UBER-${cleanInputId.toUpperCase()}` },
             ],
-          });
-          if (doc?.uber_order_id) {
-            uberOrderUuid = String(doc.uber_order_id).trim();
+          };
+
+          const existingCols = await mongoConn.db.listCollections().toArray().catch(() => []);
+          const colNames = Array.from(
+            new Set([
+              'oms_orders',
+              'orders',
+              'webhook_events',
+              ...existingCols
+                .map((c) => c.name)
+                .filter((n) => /order|event|webhook/i.test(n)),
+            ])
+          );
+
+          for (const colName of colNames) {
+            const doc = await mongoConn.db
+              .collection(colName)
+              .findOne(lookupQuery)
+              .catch(() => null);
+            if (!doc) continue;
+            const fullUuid = String(
+              doc.uberOrderId ||
+                doc.uber_order_id ||
+                (typeof doc.orderId === 'string' && doc.orderId.length >= 20 ? doc.orderId : '') ||
+                ''
+            ).trim();
+            if (fullUuid) {
+              uberOrderUuid = fullUuid;
+              break;
+            }
           }
         }
       }
@@ -115,9 +164,10 @@ export async function POST(req: NextRequest) {
     // Attempt live Uber Eats sync (gracefully fall back to local OMS update if Uber verification is pending)
     let synced = false;
     let note = 'Updated locally (Uber verification pending)';
-    let uberStatus: number | string = 'PENDING_LOCAL';
+    let uberStatusCode: number | string = 'PENDING_LOCAL';
+    let uberApiHost: string | null = null;
     let uberResponse: unknown = null;
-    let uberError: string | undefined;
+    let uberError: string | null = null;
 
     try {
       const uberResult = await executeUberOrderAction({
@@ -127,12 +177,13 @@ export async function POST(req: NextRequest) {
         isSandbox,
       });
 
-      uberStatus = uberResult.status;
+      uberStatusCode = uberResult.status;
+      uberApiHost = uberResult.env || null;
       uberResponse = uberResult.uberResponse;
 
       if (uberResult.ok) {
         synced = true;
-        note = 'Synced with Uber Eats';
+        note = `Synced with Uber (${uberResult.env || 'Uber Eats'})`;
       } else {
         uberError = uberResult.error || `Uber API returned status ${uberResult.status}`;
         console.warn('[Uber Action Local Fallback]:', {
@@ -166,7 +217,10 @@ export async function POST(req: NextRequest) {
           anyO.orderId === cleanInputId ||
           anyO.orderId === uberOrderUuid ||
           anyO.order_id === order_id ||
+          anyO.orderNumber === order_id ||
+          anyO.displayId === order_id ||
           anyO.uberOrderId === order_id ||
+          anyO.uberOrderId === uberOrderUuid ||
           anyO.uber_order_id === order_id ||
           anyO.uber_order_id === cleanInputId ||
           anyO.uber_order_id === uberOrderUuid
@@ -175,6 +229,7 @@ export async function POST(req: NextRequest) {
       for (const existing of matchedOrders) {
         existing.status = nextStatus;
         (existing as any).uberStatus = nextStatus;
+        (existing as any).orderStatus = nextStatus;
         existing.updatedAt = now;
         saveServerOrder(existing);
       }
@@ -189,7 +244,10 @@ export async function POST(req: NextRequest) {
           ev.invoiceNumber === order_id ||
           anyEv.eventId === order_id ||
           anyEv.order_id === order_id ||
+          anyEv.orderNumber === order_id ||
+          anyEv.displayId === order_id ||
           anyEv.uberOrderId === order_id ||
+          anyEv.uberOrderId === uberOrderUuid ||
           anyEv.uber_order_id === order_id ||
           anyEv.uber_order_id === cleanInputId ||
           anyEv.uber_order_id === uberOrderUuid
@@ -216,66 +274,75 @@ export async function POST(req: NextRequest) {
         mongoConn = await connectToMongoDB();
       }
       if (mongoConn) {
+        const candidates = Array.from(
+          new Set(
+            [
+              order_id,
+              `#${order_id}`,
+              cleanInputId,
+              cleanInputId.toUpperCase(),
+              `UBER-${cleanInputId.toUpperCase()}`,
+              uberOrderUuid,
+            ].filter(Boolean)
+          )
+        );
+
         const orderMatchFilter = {
           $or: [
             ...(validObjectId ? [{ _id: validObjectId }] : []),
-            { id: order_id },
-            { id: cleanInputId },
-            { id: uberOrderUuid },
-            { invoiceNumber: order_id },
-            { invoiceNumber: `UBER-${cleanInputId}` },
-            { orderId: order_id },
-            { orderId: cleanInputId },
-            { orderId: uberOrderUuid },
-            { order_id: order_id },
-            { order_id: cleanInputId },
-            { order_id: uberOrderUuid },
-            { external_order_id: order_id },
-            { uberOrderId: order_id },
-            { uberOrderId: uberOrderUuid },
-            { uber_order_id: order_id },
-            { uber_order_id: cleanInputId },
-            { uber_order_id: uberOrderUuid },
-            { display_id: order_id },
-            { display_id: `UBER-${cleanInputId}` },
+            { id: { $in: candidates } },
+            { orderId: { $in: candidates } },
+            { order_id: { $in: candidates } },
+            { external_order_id: { $in: candidates } },
+            { uberOrderId: { $in: candidates } },
+            { uber_order_id: { $in: candidates } },
+            { orderNumber: { $in: candidates } },
+            { displayId: { $in: candidates } },
+            { display_id: { $in: candidates } },
+            { invoiceNumber: { $in: candidates } },
           ],
         };
 
-        await mongoConn.db.collection('orders').updateMany(orderMatchFilter, {
-          $set: { status: nextStatus, uberStatus: nextStatus, updatedAt: now, uberSynced: synced },
-        });
+        const lastUberSync = {
+          synced,
+          statusCode: uberStatusCode ?? null,
+          apiHost: uberApiHost ?? null,
+          error: uberError ?? null,
+          at: new Date(),
+        };
 
-        await mongoConn.db.collection('oms_orders').updateMany(orderMatchFilter, {
-          $set: {
-            status: nextStatus,
-            uberStatus: nextStatus,
-            uberSynced: synced,
-            updated_at: new Date(),
-            updatedAt: now,
-          },
-        });
+        const existingCols = await mongoConn.db.listCollections().toArray().catch(() => []);
+        const targetColNames = Array.from(
+          new Set([
+            'orders',
+            'oms_orders',
+            'webhook_events',
+            ...existingCols
+              .map((c) => c.name)
+              .filter((n) => /order|event|webhook/i.test(n)),
+          ])
+        );
 
-        await mongoConn.db.collection('webhook_events').updateMany(orderMatchFilter, {
-          $set: { orderStatus: nextStatus, uberStatus: nextStatus, uberSynced: synced },
-        });
-
-        // Update any additional order/event collections dynamically without overwriting webhook delivery status
-        const existingCols = await mongoConn.db.listCollections().toArray();
-        for (const col of existingCols) {
-          if (
-            !(/order/i.test(col.name)) ||
-            col.name === 'orders' ||
-            col.name === 'oms_orders'
-          ) {
-            continue;
-          }
-          await mongoConn.db.collection(col.name).updateMany(orderMatchFilter, {
-            $set: {
-              status: nextStatus,
-              uberStatus: nextStatus,
-              uberSynced: synced,
-              updatedAt: now,
-            },
+        for (const colName of targetColNames) {
+          const isWebhookLogCol = /event|webhook/i.test(colName) && !/order/i.test(colName);
+          await mongoConn.db.collection(colName).updateMany(orderMatchFilter, {
+            $set: isWebhookLogCol
+              ? {
+                  orderStatus: nextStatus,
+                  uberStatus: nextStatus,
+                  uberSynced: synced,
+                  lastUberSync,
+                  updatedAt: now,
+                }
+              : {
+                  status: nextStatus,
+                  uberStatus: nextStatus,
+                  orderStatus: nextStatus,
+                  uberSynced: synced,
+                  lastUberSync,
+                  updatedAt: now,
+                  ...(colName === 'oms_orders' ? { updated_at: new Date() } : {}),
+                },
           });
         }
       }
@@ -286,23 +353,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const actionVerb = action === 'CANCEL' ? 'cancelled' : `${action.toLowerCase()}ed`;
     return NextResponse.json({
       ok: true,
       success: true,
       synced,
       uberSynced: synced,
       note,
-      orderId: uberOrderUuid,
+      orderId: rawOrderId,
+      uberOrderId: uberOrderUuid,
       action,
-      message: synced
-        ? `Order ${actionVerb} & synced with Uber Eats`
-        : `Order ${actionVerb} locally (Uber verification pending)`,
       status: nextStatus,
       nextStatus,
-      uberStatus,
+      uberStatus: uberStatusCode,
+      uberStatusCode,
+      uberApiHost,
+      uberError,
       uberResponse,
-      ...(uberError ? { uberError } : {}),
+      message: synced
+        ? `Synced with Uber (${uberApiHost || 'Uber Eats'})`
+        : `OMS updated to ${nextStatus} — Uber API returned ${uberStatusCode}: ${uberError || note}`,
     });
   } catch (err: unknown) {
     console.error('[/api/orders/action Error]:', err);
