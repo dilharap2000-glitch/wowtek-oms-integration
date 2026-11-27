@@ -233,22 +233,35 @@ async function fetchOAuthToken(
   }
 }
 
-async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<{
-  token: string | null;
-  baseUrl: string;
-  oauthError?: string;
-}> {
-  const defaultBaseUrl = getUberBaseUrl(isSandbox);
-  const cacheKey = isSandbox ? 'sandbox' : 'production';
+type EnvTokenResult = {
+  ok: boolean;
+  token?: string;
+  baseUrl?: string;
+  fromCache?: boolean;
+  status?: number;
+  error?: string;
+  details?: unknown;
+  hasCredentials?: boolean;
+};
+
+async function getTokenForSpecificEnv(
+  targetSandbox: boolean,
+  options?: { forceRefresh?: boolean }
+): Promise<EnvTokenResult> {
+  const cacheKey = targetSandbox ? 'sandbox' : 'production';
+  const baseUrl = getUberBaseUrl(targetSandbox);
   const existing = cachedTokens[cacheKey];
 
-  // 1. Cache එකේ valid token එකක් තියෙනවා නම් (expiry එකට තත්පර 60කට වඩා තියෙනවා නම්) ඒක දෙන්න
-  if (existing && Date.now() < existing.expiresAt - 60_000) {
-    return { token: existing.token, baseUrl: existing.baseUrl };
+  if (!options?.forceRefresh && existing && Date.now() < existing.expiresAt - 60_000) {
+    return {
+      ok: true,
+      token: existing.token,
+      baseUrl: existing.baseUrl,
+      fromCache: true,
+    };
   }
 
-  // 2. Env variables + MongoDB settings fallback වලින් Client ID & Secret ගන්න
-  const envCreds = getUberClientCredentialsFromEnv(isSandbox);
+  const envCreds = getUberClientCredentialsFromEnv(targetSandbox);
   let clientId = envCreds.clientId;
   let clientSecret = envCreds.clientSecret;
   let mongoAccessToken: string | undefined;
@@ -269,71 +282,61 @@ async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<
         'eats.order',
       ];
 
-  const prodEndpoint = {
-    tokenUrl: 'https://login.uber.com/oauth/v2/token',
-    apiBase: getUberBaseUrl(false),
-  };
-  const sandboxEndpoint = {
-    tokenUrl: 'https://sandbox-login.uber.com/oauth/v2/token',
-    apiBase: getUberBaseUrl(true),
-  };
-  const tokenEndpoints = isSandbox
-    ? [sandboxEndpoint, prodEndpoint]
-    : [prodEndpoint, sandboxEndpoint];
+  const tokenUrl = targetSandbox
+    ? 'https://sandbox-login.uber.com/oauth/v2/token'
+    : 'https://login.uber.com/oauth/v2/token';
 
-  let oauthError: string | undefined;
+  let lastOAuthStatus = 401;
+  let lastOAuthError = '';
+  let lastOAuthDetails: unknown = undefined;
 
   if (clientId && clientSecret) {
-    const endpointErrors: string[] = [];
+    for (let i = 0; i < scopeCandidates.length; i++) {
+      const scope = scopeCandidates[i];
+      try {
+        const oauthResult = await fetchOAuthToken(tokenUrl, clientId, clientSecret, scope);
 
-    for (const ep of tokenEndpoints) {
-      for (let i = 0; i < scopeCandidates.length; i++) {
-        const scope = scopeCandidates[i];
-        try {
-          const oauthResult = await fetchOAuthToken(ep.tokenUrl, clientId, clientSecret, scope);
-
-          if (oauthResult.ok && oauthResult.accessToken) {
-            cachedTokens[cacheKey] = {
-              token: oauthResult.accessToken,
-              baseUrl: ep.apiBase,
-              expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
-            };
-            return {
-              token: cachedTokens[cacheKey]!.token,
-              baseUrl: ep.apiBase,
-            };
-          }
-
-          const isInvalidScope =
-            oauthResult.status === 400 &&
-            oauthResult.rawText.toLowerCase().includes('invalid_scope');
-          if (isInvalidScope && i < scopeCandidates.length - 1) {
-            continue;
-          }
-
-          const detail =
-            oauthResult.parsed?.error_description ||
-            oauthResult.parsed?.error ||
-            oauthResult.rawText ||
-            'Unauthorized';
-          endpointErrors.push(`${ep.tokenUrl} -> (${oauthResult.status}) ${detail}`);
-          break;
-        } catch (oauthErr) {
-          const msg = oauthErr instanceof Error ? oauthErr.message : 'Network error';
-          endpointErrors.push(`${ep.tokenUrl} -> ${msg}`);
-          break;
+        if (oauthResult.ok && oauthResult.accessToken) {
+          cachedTokens[cacheKey] = {
+            token: oauthResult.accessToken,
+            baseUrl,
+            expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
+          };
+          return {
+            ok: true,
+            token: cachedTokens[cacheKey]!.token,
+            baseUrl,
+            fromCache: false,
+          };
         }
-      }
-    }
 
-    if (endpointErrors.length > 0) {
-      oauthError = `Uber OAuth failed on both endpoints: ${endpointErrors.join(' | ')}`;
-      console.error('[Uber OAuth Refresh Failed]:', oauthError);
+        const isInvalidScope =
+          oauthResult.status === 400 &&
+          oauthResult.rawText.toLowerCase().includes('invalid_scope');
+        if (isInvalidScope && i < scopeCandidates.length - 1) {
+          continue;
+        }
+
+        lastOAuthStatus = oauthResult.status || 401;
+        lastOAuthDetails = oauthResult.parsed || { raw: oauthResult.rawText };
+        lastOAuthError =
+          oauthResult.parsed?.error_description ||
+          oauthResult.parsed?.error ||
+          oauthResult.rawText ||
+          `OAuth failed (${lastOAuthStatus})`;
+        break;
+      } catch (oauthErr) {
+        lastOAuthStatus = 502;
+        lastOAuthError =
+          oauthErr instanceof Error
+            ? `Uber OAuth Fetch Error: ${oauthErr.message}`
+            : 'Uber OAuth Fetch Error';
+        break;
+      }
     }
   }
 
-  // 3. Fallback: Static token from Env or MongoDB settings
-  const fallbackToken = isSandbox
+  const fallbackToken = targetSandbox
     ? process.env.UBER_SANDBOX_ACCESS_TOKEN ||
       process.env.UBER_ACCESS_TOKEN ||
       process.env.UBER_EATS_ACCESS_TOKEN ||
@@ -343,16 +346,33 @@ async function resolveUberAccessToken(isSandbox = isUberSandboxMode()): Promise<
       process.env.UBER_EATS_ACCESS_TOKEN ||
       mongoAccessToken;
 
+  if (isUsableToken(fallbackToken)) {
+    return {
+      ok: true,
+      token: fallbackToken.trim(),
+      baseUrl,
+      fromCache: false,
+    };
+  }
+
   return {
-    token: isUsableToken(fallbackToken) ? fallbackToken.trim() : null,
-    baseUrl: defaultBaseUrl,
-    oauthError,
+    ok: false,
+    status: lastOAuthStatus,
+    error:
+      lastOAuthError ||
+      'Missing Uber Client ID / Client Secret in environment variables (UBER_CLIENT_ID / UBER_CLIENT_SECRET) and MongoDB settings',
+    details: lastOAuthDetails,
+    hasCredentials: Boolean(clientId && clientSecret),
   };
 }
 
 export async function getUberAccessToken(isSandbox = isUberSandboxMode()): Promise<string | null> {
-  const { token } = await resolveUberAccessToken(isSandbox);
-  return token;
+  const order = isSandbox ? [true, false] : [false, true];
+  for (const targetSandbox of order) {
+    const res = await getTokenForSpecificEnv(targetSandbox);
+    if (res.ok && res.token) return res.token;
+  }
+  return null;
 }
 
 export async function executeUberOrderAction(params: {
@@ -363,16 +383,6 @@ export async function executeUberOrderAction(params: {
 }) {
   const isSandbox = params.isSandbox ?? isUberSandboxMode();
   const cleanOrderId = encodeURIComponent(params.orderId.trim());
-
-  const resolved = await resolveUberAccessToken(isSandbox);
-  let token = resolved.token;
-  let baseUrl = resolved.baseUrl || getUberBaseUrl(isSandbox);
-  if (!token) {
-    throw new Error(
-      resolved.oauthError ||
-        'Missing Uber Client ID / Client Secret in environment variables (UBER_CLIENT_ID / UBER_CLIENT_SECRET) and MongoDB settings'
-    );
-  }
 
   let path = '';
   let payload: Record<string, unknown> = {};
@@ -427,47 +437,105 @@ export async function executeUberOrderAction(params: {
     }
   };
 
-  let { res: response, endpointUrl: url } = await invokeUberEndpoint(token, baseUrl);
+  // Try sandbox first when in sandbox mode (or default auto-detect), and fall back to the other environment on 401
+  const envMode = (process.env.UBER_ENV || '').trim().toLowerCase();
+  const envOrder: boolean[] =
+    params.isSandbox !== undefined
+      ? [params.isSandbox, !params.isSandbox]
+      : envMode.includes('prod')
+      ? [false, true]
+      : [true, false];
 
-  // Token expire වෙලා 401 ආවොත් cache clear කරලා එක පාරක් retry කරන්න
-  if (response.status === 401) {
-    clearUberAccessTokenCache(isSandbox);
-    const refreshed = await resolveUberAccessToken(isSandbox);
-    if (refreshed.token && (refreshed.token !== token || refreshed.baseUrl !== baseUrl)) {
-      token = refreshed.token;
-      baseUrl = refreshed.baseUrl || baseUrl;
-      const retried = await invokeUberEndpoint(token, baseUrl);
-      response = retried.res;
-      url = retried.endpointUrl;
+  let anyCredentialsConfigured = false;
+  let lastFailure: {
+    status: number;
+    url: string;
+    error: string;
+    uberResponse: unknown;
+  } | null = null;
+
+  for (const targetSandbox of envOrder) {
+    const initialTokenRes = await getTokenForSpecificEnv(targetSandbox);
+    if (!initialTokenRes.ok || !initialTokenRes.token || !initialTokenRes.baseUrl) {
+      if (initialTokenRes.hasCredentials) anyCredentialsConfigured = true;
+      lastFailure = {
+        status: initialTokenRes.status || 401,
+        url: targetSandbox
+          ? 'https://sandbox-login.uber.com/oauth/v2/token'
+          : 'https://login.uber.com/oauth/v2/token',
+        error: initialTokenRes.error || 'Invalid OAuth 2.0 credentials provided.',
+        uberResponse: initialTokenRes.details,
+      };
+      continue;
     }
-  }
 
-  const text = await response.text();
-  let data: any = null;
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
-  }
+    let currentToken = initialTokenRes.token;
+    const currentBaseUrl = initialTokenRes.baseUrl;
+    anyCredentialsConfigured = true;
+    let { res: response, endpointUrl: url } = await invokeUberEndpoint(
+      currentToken,
+      currentBaseUrl
+    );
 
-  if (!response.ok) {
+    // Cached token expired -> clear cache and retry this environment once before falling back
+    if (response.status === 401 && initialTokenRes.fromCache) {
+      clearUberAccessTokenCache(targetSandbox);
+      const refreshed = await getTokenForSpecificEnv(targetSandbox, { forceRefresh: true });
+      if (refreshed.ok && refreshed.token) {
+        currentToken = refreshed.token;
+        const retried = await invokeUberEndpoint(currentToken, refreshed.baseUrl || currentBaseUrl);
+        response = retried.res;
+        url = retried.endpointUrl;
+      }
+    }
+
+    const text = await response.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+
+    if (response.ok) {
+      return {
+        ok: true,
+        status: response.status,
+        url,
+        env: currentBaseUrl,
+        nextStatus,
+        uberResponse: data,
+      };
+    }
+
     if (response.status === 401) {
-      clearUberAccessTokenCache(isSandbox);
+      clearUberAccessTokenCache(targetSandbox);
     }
-    return {
-      ok: false,
+
+    lastFailure = {
       status: response.status,
       url,
       error: data?.message || data?.error || `Uber API error (${response.status})`,
       uberResponse: data,
     };
+
+    // Stop immediately on any non-401 API error (400 / 403 / 404 / etc.) — that is the real endpoint response
+    if (response.status !== 401) {
+      break;
+    }
+  }
+
+  if (!anyCredentialsConfigured) {
+    throw new Error(
+      'Missing Uber Client ID / Client Secret in environment variables (UBER_CLIENT_ID / UBER_CLIENT_SECRET) and MongoDB settings'
+    );
   }
 
   return {
-    ok: true,
-    status: response.status,
-    url,
-    nextStatus,
-    uberResponse: data,
+    ok: false,
+    status: lastFailure?.status || 401,
+    url: lastFailure?.url || '',
+    error: lastFailure?.error || 'Invalid OAuth 2.0 credentials provided.',
+    uberResponse: lastFailure?.uberResponse,
   };
 }
