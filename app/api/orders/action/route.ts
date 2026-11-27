@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { getServerStore, saveServerOrder, broadcastLiveUpdate } from '@/lib/serverStore';
+import {
+  getServerStore,
+  saveServerOrder,
+  saveServerWebhookEvent,
+  broadcastLiveUpdate,
+} from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
 import {
   executeUberOrderAction,
@@ -160,6 +165,8 @@ export async function POST(req: NextRequest) {
           anyO.orderId === order_id ||
           anyO.orderId === cleanInputId ||
           anyO.orderId === uberOrderUuid ||
+          anyO.order_id === order_id ||
+          anyO.uberOrderId === order_id ||
           anyO.uber_order_id === order_id ||
           anyO.uber_order_id === cleanInputId ||
           anyO.uber_order_id === uberOrderUuid
@@ -167,8 +174,33 @@ export async function POST(req: NextRequest) {
       });
       for (const existing of matchedOrders) {
         existing.status = nextStatus;
+        (existing as any).uberStatus = nextStatus;
         existing.updatedAt = now;
         saveServerOrder(existing);
+      }
+
+      const matchedEvents = (serverStore.webhookEvents || []).filter((ev) => {
+        const anyEv = ev as any;
+        return (
+          ev.id === order_id ||
+          ev.orderId === order_id ||
+          ev.orderId === cleanInputId ||
+          ev.orderId === uberOrderUuid ||
+          ev.invoiceNumber === order_id ||
+          anyEv.eventId === order_id ||
+          anyEv.order_id === order_id ||
+          anyEv.uberOrderId === order_id ||
+          anyEv.uber_order_id === order_id ||
+          anyEv.uber_order_id === cleanInputId ||
+          anyEv.uber_order_id === uberOrderUuid
+        );
+      });
+      for (const existingEvt of matchedEvents) {
+        saveServerWebhookEvent({
+          ...existingEvt,
+          orderStatus: nextStatus,
+          ...(synced !== undefined ? ({ uberSynced: synced } as any) : {}),
+        });
       }
 
       broadcastLiveUpdate({

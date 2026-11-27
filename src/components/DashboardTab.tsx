@@ -141,15 +141,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   type UberOrderActionTarget = {
     uber_order_id?: string;
+    uberOrderId?: string;
     orderId?: string;
+    order_id?: string;
+    eventId?: string;
     id?: string;
+    _id?: string;
     display_id?: string;
     storeId?: string;
     externalStoreId?: string;
   };
 
   const getUberTargetOrderId = (order?: UberOrderActionTarget | null): string =>
-    String(order?.uber_order_id || order?.orderId || order?.id || '').trim();
+    String(
+      order?.uber_order_id ||
+        order?.uberOrderId ||
+        order?.orderId ||
+        order?.order_id ||
+        order?.eventId ||
+        order?.id ||
+        order?._id ||
+        ''
+    ).trim();
 
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
@@ -170,6 +183,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       setTimeout(() => setOrderActionToast(null), 5000);
       return;
     }
+
+    const fallbackNextStatus =
+      normalizedAction === 'ACCEPT'
+        ? 'ACCEPTED'
+        : normalizedAction === 'READY'
+        ? 'READY_FOR_PICKUP'
+        : 'CANCELLED';
 
     setOrderActionLoading(`${targetOrderId}-${action.toLowerCase()}`);
     try {
@@ -196,26 +216,38 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         return;
       }
 
-      const nextStatus =
-        data.nextStatus ||
-        data.status ||
-        (normalizedAction === 'ACCEPT'
-          ? 'ACCEPTED'
-          : normalizedAction === 'READY'
-          ? 'READY_FOR_PICKUP'
-          : 'CANCELLED');
+      const nextStatus = data.nextStatus || data.status || fallbackNextStatus;
 
       console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
 
       setLiveOrders((prev) =>
         (prev || []).map((o) => {
           const anyO = o as any;
+          const itemId = getUberTargetOrderId(anyO);
           const matches =
+            String(itemId) === String(targetOrderId) ||
             o.id === targetOrderId ||
             anyO.orderId === targetOrderId ||
-            anyO.uber_order_id === targetOrderId;
-          return matches ? { ...o, status: nextStatus } : o;
+            anyO.order_id === targetOrderId ||
+            anyO.uberOrderId === targetOrderId ||
+            anyO.uber_order_id === targetOrderId ||
+            anyO._id === targetOrderId ||
+            anyO === order;
+          return matches
+            ? ({
+                ...o,
+                status: nextStatus,
+                uberStatus: nextStatus,
+                orderStatus: nextStatus,
+              } as Order)
+            : o;
         })
+      );
+
+      setSelectedUberOrder((prev) =>
+        prev && (getUberTargetOrderId(prev as any) === targetOrderId || (prev as any) === order)
+          ? ({ ...prev, status: nextStatus, uberStatus: nextStatus } as Order)
+          : prev
       );
 
       setOrderActionToast({

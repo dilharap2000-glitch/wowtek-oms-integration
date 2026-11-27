@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Activity,
   Globe,
@@ -48,6 +48,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   onNavigateTab,
 }) => {
   const [selectedEventForPayload, setSelectedEventForPayload] = useState<WebhookEvent | null>(null);
+  const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>(events || []);
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -56,13 +57,33 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [orderActionLoadingId, setOrderActionLoadingId] = useState<string | null>(null);
 
+  useEffect(() => {
+    setLiveEvents(events || []);
+  }, [events]);
+
+  const getEventTargetOrderId = (order: any): string =>
+    String(
+      order?.uber_order_id ||
+        order?.uberOrderId ||
+        order?.orderId ||
+        order?.order_id ||
+        order?.eventId ||
+        order?.id ||
+        order?._id ||
+        ''
+    ).trim();
+
   // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
   const handleOrderAction = async (
     action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: {
       uber_order_id?: string;
+      uberOrderId?: string;
       orderId?: string;
+      order_id?: string;
+      eventId?: string;
       id?: string;
+      _id?: string;
       display_id?: string;
       storeId?: string;
       externalStoreId?: string;
@@ -70,12 +91,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     reason?: string
   ) => {
     // අනිවාර්යයෙන්ම දිග UUID එක ගන්න (display_id නොවේ)
-    const targetOrderId = String(
-      order?.uber_order_id ||
-      order?.orderId ||
-      order?.id ||
-      ''
-    ).trim();
+    const targetOrderId = getEventTargetOrderId(order);
     const normalizedAction = action.toUpperCase() as 'ACCEPT' | 'READY' | 'CANCEL';
 
     if (!targetOrderId) {
@@ -87,6 +103,13 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       setTimeout(() => setOrderActionFeedback(null), 5000);
       return;
     }
+
+    const fallbackNextStatus =
+      normalizedAction === 'ACCEPT'
+        ? 'ACCEPTED'
+        : normalizedAction === 'READY'
+        ? 'READY_FOR_PICKUP'
+        : 'CANCELLED';
 
     setOrderActionLoadingId(targetOrderId);
     try {
@@ -113,8 +136,25 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         return;
       }
 
-      const nextStatus = data.nextStatus || data.status;
+      const nextStatus = data.nextStatus || data.status || fallbackNextStatus;
       console.log('Updated order:', data.orderId || targetOrderId, '->', nextStatus);
+
+      // DB update වුණත් නැතත් UI row status එක වහාම update කරනවා
+      setLiveEvents((prev) =>
+        (prev || []).map((item) => {
+          const anyItem = item as any;
+          const itemId = getEventTargetOrderId(anyItem);
+          if (String(itemId) === String(targetOrderId) || anyItem === order) {
+            return {
+              ...item,
+              orderStatus: nextStatus,
+              uberStatus: nextStatus,
+            } as WebhookEvent;
+          }
+          return item;
+        })
+      );
+
       setOrderActionFeedback({
         message:
           data.message ||
@@ -164,7 +204,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     }
   };
 
-  const safeEvents = events || [];
+  const safeEvents = liveEvents || [];
 
   const filteredEvents = safeEvents.filter((e) => {
     if (!e) return false;
@@ -526,14 +566,12 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     {/* Action Column */}
                     <td className="py-3 px-4 text-right">
                       {(() => {
-                        const targetId = String(
-                          (item as any).uber_order_id ||
-                            (item as any).orderId ||
-                            item.id ||
-                            ''
-                        ).trim();
+                        const targetId = getEventTargetOrderId(item);
                         const uberStatus = String(
-                          item.orderStatus || (item as any).state || (item.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
+                          item.orderStatus ||
+                            (item as any).uberStatus ||
+                            (item as any).state ||
+                            (item.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
                         );
                         return (
                           <OrderActionCell
