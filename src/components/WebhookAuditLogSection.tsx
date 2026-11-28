@@ -93,6 +93,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [orderActionFeedback, setOrderActionFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [orderActionLoadingId, setOrderActionLoadingId] = useState<string | null>(null);
+  const inFlightActionKeysRef = useRef<Set<string>>(new Set());
 
   const getEventTargetOrderId = (order: any): string =>
     String(
@@ -129,8 +130,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     );
   }, [events]);
 
-  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම function එක
-  const handleOrderAction = (
+  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel — Uber Eats confirm වූ පසු පමණක් status update වේ
+  const handleOrderAction = async (
     action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: {
       uber_order_id?: string;
@@ -161,56 +162,27 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
     if (!targetOrderId && targetKeys.length === 0) {
       console.error('Missing order ID for action:', order);
       setOrderActionFeedback({
-        message: 'මෙම order එකට valid Order ID එකක් නැත.',
+        message: 'Valid Uber Eats Order ID not found for this order.',
         isError: true,
       });
       setTimeout(() => setOrderActionFeedback(null), 5000);
       return;
     }
 
-    const nextStatus: OrderStatus =
-      normalizedAction === 'ACCEPT'
-        ? 'ACCEPTED'
-        : normalizedAction === 'READY'
-        ? 'READY_FOR_PICKUP'
-        : 'CANCELLED';
-
-    // 1. UI එකේ state එක වහාම update කරනවා (non-blocking)
-    for (const k of targetKeys) {
-      optimisticEventStatusRef.current[k] = nextStatus;
-    }
-
-    const matchesTarget = (item: any) => {
-      if (item === order) return true;
-      const itemKeys = extractNormalizedOrderKeys(item);
-      return itemKeys.some((k) => targetKeys.includes(k));
-    };
-
-    setLiveEvents((prev) =>
-      (prev || []).map((item) =>
-        matchesTarget(item)
-          ? ({
-              ...item,
-              orderStatus: nextStatus,
-              uberStatus: nextStatus,
-            } as WebhookEvent)
-          : item
-      )
+    const lockKeys = Array.from(
+      new Set([targetOrderId.toLowerCase(), ...targetKeys].filter(Boolean))
     );
-
-    if (onOrderStatusSync) {
-      onOrderStatusSync(order, nextStatus);
+    if (lockKeys.some((k) => inFlightActionKeysRef.current.has(k))) {
+      return;
     }
 
-    setOrderActionFeedback({
-      message: `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
-      isError: false,
-    });
-    setTimeout(() => setOrderActionFeedback(null), 3500);
+    for (const k of lockKeys) {
+      inFlightActionKeysRef.current.add(k);
+    }
+    setOrderActionLoadingId(targetOrderId);
 
-    // 2. Background sync (UI block කරන්නේ නැහැ)
-    if (targetOrderId) {
-      void fetch('/api/orders/action', {
+    try {
+      const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -219,7 +191,91 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           reason,
           storeId: order.storeId || order.externalStoreId,
         }),
-      }).catch(() => {});
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok || !data?.synced) {
+        const errCode = data?.uberStatusCode || data?.uberStatus || res.status;
+        const errMsg =
+          data?.uberError ||
+          data?.error ||
+          data?.message ||
+          `Uber Eats rejected ${normalizedAction} request.`;
+
+        console.error('[Uber Eats Webhook Action Failed]:', {
+          action: normalizedAction,
+          orderId: targetOrderId,
+          httpStatus: res.status,
+          uberStatusCode: errCode,
+          error: errMsg,
+          response: data,
+        });
+
+        setOrderActionFeedback({
+          message: `Uber Eats Error (${errCode}): ${errMsg}`,
+          isError: true,
+        });
+        setTimeout(() => setOrderActionFeedback(null), 7000);
+        return;
+      }
+
+      const confirmedStatus: OrderStatus = (
+        data?.status ||
+        data?.nextStatus ||
+        (normalizedAction === 'ACCEPT'
+          ? 'ACCEPTED'
+          : normalizedAction === 'READY'
+          ? 'READY_FOR_PICKUP'
+          : 'CANCELLED')
+      ) as OrderStatus;
+
+      for (const k of targetKeys) {
+        optimisticEventStatusRef.current[k] = confirmedStatus;
+      }
+
+      const matchesTarget = (item: any) => {
+        if (item === order) return true;
+        const itemKeys = extractNormalizedOrderKeys(item);
+        return itemKeys.some((k) => targetKeys.includes(k));
+      };
+
+      setLiveEvents((prev) =>
+        (prev || []).map((item) =>
+          matchesTarget(item)
+            ? ({
+                ...item,
+                orderStatus: confirmedStatus,
+                uberStatus: confirmedStatus,
+              } as WebhookEvent)
+            : item
+        )
+      );
+
+      if (onOrderStatusSync) {
+        onOrderStatusSync(order, confirmedStatus);
+      }
+
+      setOrderActionFeedback({
+        message:
+          data?.message ||
+          `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`} on Uber Eats!`,
+        isError: false,
+      });
+      setTimeout(() => setOrderActionFeedback(null), 4000);
+    } catch (err: unknown) {
+      const networkMsg =
+        err instanceof Error ? err.message : 'Network error communicating with server.';
+      console.error('[Uber Eats Webhook Action Exception]:', err);
+      setOrderActionFeedback({
+        message: `Order action failed: ${networkMsg}`,
+        isError: true,
+      });
+      setTimeout(() => setOrderActionFeedback(null), 6000);
+    } finally {
+      for (const k of lockKeys) {
+        inFlightActionKeysRef.current.delete(k);
+      }
+      setOrderActionLoadingId((curr) => (curr === targetOrderId ? null : curr));
     }
   };
 

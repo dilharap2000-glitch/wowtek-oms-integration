@@ -5,6 +5,7 @@ import {
   Check,
   Code,
   FileText,
+  Loader2,
   MoreHorizontal,
   Printer,
   RotateCcw,
@@ -19,7 +20,7 @@ interface OrderActionCellProps {
   loading?: boolean;
   isUberOrder?: boolean;
   readyLabel?: string;
-  onAction?: (orderId: string, action: OrderActionType, reason?: string) => Promise<void> | void;
+  onAction?: (orderId: string, action: OrderActionType, reason?: string) => Promise<unknown> | void;
   onViewJson?: () => void;
   onPrintLabel?: () => void;
   onPrintInvoice?: () => void;
@@ -89,28 +90,32 @@ export function OrderActionCell({
       {isUberOrder && onAction && isPending ? (
         <button
           type="button"
+          disabled={loading}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (loading) return;
             onAction(orderId, 'ACCEPT');
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-500 px-3 py-1.5 min-h-[34px] text-xs font-semibold text-white shadow-sm transition cursor-pointer touch-manipulation select-none whitespace-nowrap"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 hover:bg-teal-800 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-500 px-3 py-1.5 min-h-[34px] text-xs font-semibold text-white shadow-sm transition cursor-pointer touch-manipulation select-none whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Check className="w-3.5 h-3.5" />
-          <span>Accept</span>
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          <span>{loading ? 'Accepting...' : 'Accept'}</span>
         </button>
       ) : isUberOrder && onAction && isProcessing ? (
         <button
           type="button"
+          disabled={loading}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (loading) return;
             onAction(orderId, 'READY');
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 px-3 py-1.5 min-h-[34px] text-xs font-semibold text-white shadow-sm transition cursor-pointer touch-manipulation select-none whitespace-nowrap"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-95 px-3 py-1.5 min-h-[34px] text-xs font-semibold text-white shadow-sm transition cursor-pointer touch-manipulation select-none whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Check className="w-3.5 h-3.5" />
-          <span>{readyLabel}</span>
+          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          <span>{loading ? 'Updating...' : readyLabel}</span>
         </button>
       ) : isUberOrder && isReady ? (
         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 whitespace-nowrap">
@@ -248,13 +253,15 @@ export function OrderActionCell({
               )}
               <button
                 type="button"
+                disabled={loading}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  if (loading) return;
                   setMenuOpen(false);
                   onAction(orderId, 'CANCEL', 'POS_NOT_READY');
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors cursor-pointer touch-manipulation"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors cursor-pointer touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-3.5 h-3.5 shrink-0" />
                 <span>Cancel Order</span>

@@ -315,6 +315,50 @@ export default function WowtekProApp() {
               if (Array.isArray(data.webhookEvents)) {
                 setWebhookEvents(data.webhookEvents);
               }
+            } else if (data.type === 'order_status_updated' && data.status) {
+              const targetIds = [data.orderId, data.uber_order_id]
+                .filter(Boolean)
+                .map((v: unknown) => String(v).replace(/^#/, '').trim().toLowerCase());
+              const nextStatus = data.status as Order['status'];
+              if (targetIds.length > 0) {
+                for (const k of targetIds) {
+                  optimisticStatusMapRef.current[k] = nextStatus;
+                }
+                const matchesIds = (item: any) => {
+                  const vals = [
+                    item?.id,
+                    item?.orderId,
+                    item?.order_id,
+                    item?.uberOrderId,
+                    item?.uber_order_id,
+                    item?.orderNumber,
+                    item?.invoiceNumber,
+                    item?.display_id,
+                  ]
+                    .filter(Boolean)
+                    .map((v: unknown) => String(v).replace(/^#/, '').trim().toLowerCase());
+                  return vals.some((v: string) => targetIds.includes(v));
+                };
+                setOrders((prev) =>
+                  prev.map((o) =>
+                    matchesIds(o)
+                      ? ({
+                          ...o,
+                          status: nextStatus,
+                          uberStatus: nextStatus,
+                          orderStatus: nextStatus,
+                        } as Order)
+                      : o
+                  )
+                );
+                setWebhookEvents((prev) =>
+                  prev.map((ev) =>
+                    matchesIds(ev)
+                      ? ({ ...ev, orderStatus: nextStatus, uberStatus: nextStatus } as WebhookEvent)
+                      : ev
+                  )
+                );
+              }
             }
           } catch {
             // Ignore non-json

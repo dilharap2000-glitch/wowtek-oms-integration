@@ -5,6 +5,7 @@ type CachedToken = {
   token: string;
   baseUrl: string;
   tokenUrl: string;
+  scope: string;
   expiresAt: number;
 };
 
@@ -248,13 +249,19 @@ type EnvTokenResult = {
 
 async function getTokenForSpecificEnv(
   targetSandbox: boolean,
-  options?: { forceRefresh?: boolean }
+  options?: { forceRefresh?: boolean; requiredScope?: string }
 ): Promise<EnvTokenResult> {
   const cacheKey = targetSandbox ? 'sandbox' : 'production';
   const baseUrl = getUberBaseUrl(targetSandbox);
   const existing = cachedTokens[cacheKey];
+  const reqScope = options?.requiredScope?.trim();
 
-  if (!options?.forceRefresh && existing && Date.now() < existing.expiresAt - 60_000) {
+  if (
+    !options?.forceRefresh &&
+    existing &&
+    Date.now() < existing.expiresAt - 60_000 &&
+    (!reqScope || existing.scope.split(/\s+/).includes(reqScope))
+  ) {
     return {
       ok: true,
       token: existing.token,
@@ -277,7 +284,17 @@ async function getTokenForSpecificEnv(
   }
 
   const configuredScope = process.env.UBER_OAUTH_SCOPE?.trim();
-  const scopeCandidates = configuredScope
+  const scopeCandidates = reqScope
+    ? Array.from(
+        new Set(
+          [
+            reqScope,
+            configuredScope && configuredScope.includes(reqScope) ? configuredScope : '',
+            'eats.order eats.store.orders.read',
+          ].filter(Boolean)
+        )
+      )
+    : configuredScope
     ? [configuredScope, 'eats.order', '']
     : [
         'eats.order eats.store eats.store.orders.read eats.store.orders.write eats.store.status.write eats.pos_provisioning',
@@ -312,6 +329,7 @@ async function getTokenForSpecificEnv(
               token: oauthResult.accessToken,
               baseUrl,
               tokenUrl,
+              scope,
               expiresAt: Date.now() + (oauthResult.expiresIn || 2592000) * 1000,
             };
             return {
@@ -331,13 +349,7 @@ async function getTokenForSpecificEnv(
             oauthResult.rawText ||
             `OAuth failed (${lastOAuthStatus})`;
 
-          const isInvalidScope =
-            oauthResult.status === 400 &&
-            oauthResult.rawText.toLowerCase().includes('invalid_scope');
-          if (isInvalidScope && i < scopeCandidates.length - 1) {
-            continue;
-          }
-          if (oauthResult.status === 400 && i < scopeCandidates.length - 1) {
+          if ((oauthResult.status === 400 || oauthResult.status === 401 || oauthResult.status === 403) && i < scopeCandidates.length - 1) {
             continue;
           }
           break;
@@ -509,14 +521,16 @@ export async function executeUberOrderAction(params: {
     }
   };
 
-  // Try sandbox first when in sandbox mode (or default auto-detect), and fall back to the other environment on 401
+  // Default to production (https://api.uber.com) unless sandbox mode is active
   const envMode = (process.env.UBER_ENV || '').trim().toLowerCase();
   const envOrder: boolean[] =
-    params.isSandbox !== undefined
-      ? [params.isSandbox, !params.isSandbox]
-      : envMode.includes('prod')
+    envMode.includes('prod')
       ? [false, true]
-      : [true, false];
+      : envMode.includes('sandbox') || envMode.includes('test')
+      ? [true, false]
+      : params.isSandbox !== undefined
+      ? [params.isSandbox, !params.isSandbox]
+      : [false, true];
 
   let anyCredentialsConfigured = false;
   let lastFailure: {
@@ -527,15 +541,15 @@ export async function executeUberOrderAction(params: {
   } | null = null;
 
   for (const targetSandbox of envOrder) {
-    const initialTokenRes = await getTokenForSpecificEnv(targetSandbox);
+    const initialTokenRes = await getTokenForSpecificEnv(targetSandbox, {
+      requiredScope: 'eats.order',
+    });
     if (!initialTokenRes.ok || !initialTokenRes.token || !initialTokenRes.baseUrl) {
       if (initialTokenRes.hasCredentials) anyCredentialsConfigured = true;
       lastFailure = {
         status: initialTokenRes.status || 401,
-        url: targetSandbox
-          ? 'https://sandbox-login.uber.com/oauth/v2/token'
-          : 'https://login.uber.com/oauth/v2/token',
-        error: initialTokenRes.error || 'Invalid OAuth 2.0 credentials provided.',
+        url: 'https://auth.uber.com/oauth/v2/token',
+        error: initialTokenRes.error || 'Invalid OAuth 2.0 credentials or missing eats.order scope.',
         uberResponse: initialTokenRes.details,
       };
       continue;
@@ -545,14 +559,20 @@ export async function executeUberOrderAction(params: {
     const currentBaseUrl = initialTokenRes.baseUrl;
     anyCredentialsConfigured = true;
 
-    const candidateHosts = Array.from(
-      new Set([
-        currentBaseUrl,
-        'https://test-api.uber.com',
-        'https://api.uber.com',
-        'https://sandbox-api.uber.com',
-      ])
-    );
+    const candidateHosts = targetSandbox
+      ? Array.from(
+          new Set([
+            currentBaseUrl,
+            'https://test-api.uber.com',
+            'https://sandbox-api.uber.com',
+          ])
+        )
+      : Array.from(
+          new Set([
+            'https://api.uber.com',
+            currentBaseUrl,
+          ])
+        );
 
     let stopEnvLoop = false;
     for (const host of candidateHosts) {
@@ -561,7 +581,10 @@ export async function executeUberOrderAction(params: {
       // Cached token expired -> clear cache and retry this host once
       if (response.status === 401 && initialTokenRes.fromCache) {
         clearUberAccessTokenCache(targetSandbox);
-        const refreshed = await getTokenForSpecificEnv(targetSandbox, { forceRefresh: true });
+        const refreshed = await getTokenForSpecificEnv(targetSandbox, {
+          forceRefresh: true,
+          requiredScope: 'eats.order',
+        });
         if (refreshed.ok && refreshed.token) {
           currentToken = refreshed.token;
           const retried = await invokeUberEndpoint(currentToken, host);
@@ -578,7 +601,7 @@ export async function executeUberOrderAction(params: {
         data = { raw: text };
       }
 
-      if (response.ok) {
+      if (response.status === 204 || response.ok) {
         return {
           ok: true,
           status: response.status,
@@ -592,12 +615,27 @@ export async function executeUberOrderAction(params: {
       lastFailure = {
         status: response.status,
         url,
-        error: data?.message || data?.error || `Uber API error (${response.status})`,
+        error:
+          data?.message ||
+          data?.error_description ||
+          data?.error ||
+          (typeof data?.raw === 'string' && data.raw) ||
+          `Uber API rejected request (HTTP ${response.status})`,
         uberResponse: data,
       };
 
-      // Non-401 means auth succeeded and the Uber endpoint itself responded (e.g. 400 / 404 / 409)
-      if (response.status !== 401) {
+      console.error('[Uber API Order Action Rejected]:', {
+        action: params.action,
+        orderId: params.orderId,
+        url,
+        status: response.status,
+        error: lastFailure.error,
+        uberResponse: data,
+      });
+
+      // Stop immediately on definitive order/permission rejections (400 / 403 / 409 / 422);
+      // allow fallback across sandbox/prod on 401/404.
+      if (response.status !== 401 && response.status !== 404) {
         stopEnvLoop = true;
         break;
       }
@@ -606,7 +644,9 @@ export async function executeUberOrderAction(params: {
     if (stopEnvLoop) {
       break;
     }
-    clearUberAccessTokenCache(targetSandbox);
+    if (lastFailure?.status === 401) {
+      clearUberAccessTokenCache(targetSandbox);
+    }
   }
 
   if (!anyCredentialsConfigured) {

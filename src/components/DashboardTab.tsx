@@ -94,6 +94,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const isFetchingOrdersRef = React.useRef(false);
   const rateLimitUntilRef = React.useRef(0);
   const optimisticStatusRef = React.useRef<Record<string, string>>({});
+  const inFlightActionKeysRef = React.useRef<Set<string>>(new Set());
 
   type UberOrderActionTarget = {
     uber_order_id?: string;
@@ -226,13 +227,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     setLiveOrders(applyOptimisticOverrides(orders || []));
   }, [orders, applyOptimisticOverrides]);
 
-  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel සඳහා එකම non-blocking function එක
-  const handleOrderAction = (
+  // ඕනෑම තැනක (Table හෝ Card) Accept / Ready / Cancel — Uber Eats confirm වූ පසු පමණක් status update වේ
+  const handleOrderAction = async (
     action: 'accept' | 'ready' | 'cancel' | 'ACCEPT' | 'READY' | 'CANCEL',
     order: UberOrderActionTarget,
     reason?: string,
     e?: React.SyntheticEvent
-  ) => {
+  ): Promise<boolean> => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
 
@@ -243,63 +244,27 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     if (!targetOrderId && targetKeys.length === 0) {
       console.error('Missing order ID for action:', order);
       setOrderActionToast({
-        message: 'මෙම order එකට valid Order ID එකක් නැත.',
+        message: 'Valid Uber Eats Order ID not found for this order.',
         isError: true,
       });
       setTimeout(() => setOrderActionToast(null), 5000);
-      return;
+      return false;
     }
 
-    const nextStatus: Order['status'] =
-      normalizedAction === 'ACCEPT'
-        ? 'ACCEPTED'
-        : normalizedAction === 'READY'
-        ? 'READY_FOR_PICKUP'
-        : 'CANCELLED';
-
-    // 1. Phone / Desktop UI එකේ state එක වහාම update කරනවා (non-blocking)
-    for (const k of targetKeys) {
-      optimisticStatusRef.current[k] = nextStatus;
-    }
-
-    const matchesTarget = (o: any) => {
-      if (o === order) return true;
-      const itemKeys = extractNormalizedOrderKeys(o);
-      return itemKeys.some((k) => targetKeys.includes(k));
-    };
-
-    setLiveOrders((prev) =>
-      (prev || []).map((o) =>
-        matchesTarget(o)
-          ? ({
-              ...o,
-              status: nextStatus,
-              uberStatus: nextStatus,
-              orderStatus: nextStatus,
-            } as Order)
-          : o
-      )
+    const lockKeys = Array.from(
+      new Set([targetOrderId.toLowerCase(), ...targetKeys].filter(Boolean))
     );
-
-    setSelectedUberOrder((prev) =>
-      prev && matchesTarget(prev)
-        ? ({ ...prev, status: nextStatus, uberStatus: nextStatus } as Order)
-        : prev
-    );
-
-    if (onOrderStatusSync) {
-      onOrderStatusSync(order, nextStatus);
+    if (lockKeys.some((k) => inFlightActionKeysRef.current.has(k))) {
+      return false;
     }
 
-    setOrderActionToast({
-      message: `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`}!`,
-      isError: false,
-    });
-    setTimeout(() => setOrderActionToast(null), 3500);
+    for (const k of lockKeys) {
+      inFlightActionKeysRef.current.add(k);
+    }
+    setOrderActionLoading(`${targetOrderId}-${normalizedAction}`);
 
-    // 2. Background sync (UI block කරන්නේ නැහැ)
-    if (targetOrderId) {
-      void fetch('/api/orders/action', {
+    try {
+      const res = await fetch('/api/orders/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -308,7 +273,103 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           reason,
           storeId: order.storeId || order.externalStoreId,
         }),
-      }).catch(() => {});
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok || !data?.synced) {
+        const errCode = data?.uberStatusCode || data?.uberStatus || res.status;
+        const errMsg =
+          data?.uberError ||
+          data?.error ||
+          data?.message ||
+          `Uber Eats rejected ${normalizedAction} request.`;
+
+        console.error('[Uber Eats Order Action Failed]:', {
+          action: normalizedAction,
+          orderId: targetOrderId,
+          httpStatus: res.status,
+          uberStatusCode: errCode,
+          error: errMsg,
+          response: data,
+        });
+
+        setOrderActionToast({
+          message: `Uber Eats Error (${errCode}): ${errMsg}`,
+          isError: true,
+        });
+        setTimeout(() => setOrderActionToast(null), 7000);
+        return false;
+      }
+
+      const confirmedStatus: Order['status'] = (
+        data?.status ||
+        data?.nextStatus ||
+        (normalizedAction === 'ACCEPT'
+          ? 'ACCEPTED'
+          : normalizedAction === 'READY'
+          ? 'READY_FOR_PICKUP'
+          : 'CANCELLED')
+      ) as Order['status'];
+
+      for (const k of targetKeys) {
+        optimisticStatusRef.current[k] = confirmedStatus;
+      }
+
+      const matchesTarget = (o: any) => {
+        if (o === order) return true;
+        const itemKeys = extractNormalizedOrderKeys(o);
+        return itemKeys.some((k) => targetKeys.includes(k));
+      };
+
+      setLiveOrders((prev) =>
+        (prev || []).map((o) =>
+          matchesTarget(o)
+            ? ({
+                ...o,
+                status: confirmedStatus,
+                uberStatus: confirmedStatus,
+                orderStatus: confirmedStatus,
+                uberSynced: true,
+              } as Order)
+            : o
+        )
+      );
+
+      setSelectedUberOrder((prev) =>
+        prev && matchesTarget(prev)
+          ? ({ ...prev, status: confirmedStatus, uberStatus: confirmedStatus } as Order)
+          : prev
+      );
+
+      if (onOrderStatusSync) {
+        onOrderStatusSync(order, confirmedStatus);
+      }
+
+      setOrderActionToast({
+        message:
+          data?.message ||
+          `Order ${normalizedAction === 'CANCEL' ? 'cancelled' : `${normalizedAction.toLowerCase()}ed`} on Uber Eats!`,
+        isError: false,
+      });
+      setTimeout(() => setOrderActionToast(null), 4000);
+      return true;
+    } catch (err: unknown) {
+      const networkMsg =
+        err instanceof Error ? err.message : 'Network error communicating with server.';
+      console.error('[Uber Eats Order Action Exception]:', err);
+      setOrderActionToast({
+        message: `Order action failed: ${networkMsg}`,
+        isError: true,
+      });
+      setTimeout(() => setOrderActionToast(null), 6000);
+      return false;
+    } finally {
+      for (const k of lockKeys) {
+        inFlightActionKeysRef.current.delete(k);
+      }
+      setOrderActionLoading((curr) =>
+        curr === `${targetOrderId}-${normalizedAction}` ? null : curr
+      );
     }
   };
 
@@ -1086,6 +1147,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             <OrderActionCell
                               orderId={targetUberId || idToPass}
                               status={rowStatus}
+                              loading={Boolean(
+                                targetUberId &&
+                                  orderActionLoading &&
+                                  orderActionLoading.startsWith(`${targetUberId}-`)
+                              )}
                               isUberOrder={order.channel === 'ubereats'}
                               readyLabel="Mark Ready"
                               onAction={(_, actionType: OrderActionType, reason) =>
@@ -1379,22 +1445,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <>
                       <button
                         type="button"
+                        disabled={Boolean(orderActionLoading)}
                         onClick={async () => {
-                          await handleOrderAction('accept', selectedUberOrder as any);
-                          setSelectedUberOrder(null);
+                          const ok = await handleOrderAction('accept', selectedUberOrder as any);
+                          if (ok) setSelectedUberOrder(null);
                         }}
-                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Accept</span>
+                        <span>{orderActionLoading?.endsWith('-ACCEPT') ? 'Accepting...' : 'Accept'}</span>
                       </button>
                       <button
                         type="button"
+                        disabled={Boolean(orderActionLoading)}
                         onClick={async () => {
-                          await handleOrderAction('cancel', selectedUberOrder as any);
-                          setSelectedUberOrder(null);
+                          const ok = await handleOrderAction('cancel', selectedUberOrder as any);
+                          if (ok) setSelectedUberOrder(null);
                         }}
-                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <X className="w-3.5 h-3.5" />
                         <span>Cancel</span>
@@ -1407,22 +1475,24 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <>
                       <button
                         type="button"
+                        disabled={Boolean(orderActionLoading)}
                         onClick={async () => {
-                          await handleOrderAction('ready', selectedUberOrder as any);
-                          setSelectedUberOrder(null);
+                          const ok = await handleOrderAction('ready', selectedUberOrder as any);
+                          if (ok) setSelectedUberOrder(null);
                         }}
-                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                        className="bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white px-3.5 py-2 rounded-lg font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Ready</span>
+                        <span>{orderActionLoading?.endsWith('-READY') ? 'Updating...' : 'Ready'}</span>
                       </button>
                       <button
                         type="button"
+                        disabled={Boolean(orderActionLoading)}
                         onClick={async () => {
-                          await handleOrderAction('cancel', selectedUberOrder as any);
-                          setSelectedUberOrder(null);
+                          const ok = await handleOrderAction('cancel', selectedUberOrder as any);
+                          if (ok) setSelectedUberOrder(null);
                         }}
-                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5"
+                        className="rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 px-3.5 py-2 font-semibold flex-1 cursor-pointer transition-colors text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <X className="w-3.5 h-3.5" />
                         <span>Cancel</span>
