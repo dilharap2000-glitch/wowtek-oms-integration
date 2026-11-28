@@ -48,10 +48,11 @@ const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   pickmeMerchantId: 'MERCH-PKM-COL-4491',
   pickmeApiKey: 'pkm_live_9a87d091fb726c11a',
   pickmeBranchId: 'BR-BAMBALAPITIYA-01',
-  uberEatsStoreId: 'eats-store-srilanka-0914',
-  uberEatsClientId: 'uber_client_id_lk_881920',
-  oauthClientId: 'uber_client_id_lk_881920',
-  uberEatsClientSecret: 'ubr_sec_9941a87b003',
+  uberEatsStoreId: 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d',
+  uberEatsClientId: '',
+  oauthClientId: '',
+  uberEatsClientSecret: '',
+  uberEnv: 'sandbox',
   transExpressAccountId: 'TX-ACCT-SL-9082',
   transExpressApiKey: 'tx_live_e9914bca88172c',
   transExpressPickupBranch: 'Colombo Main Sorting Facility (Borella)',
@@ -1117,20 +1118,36 @@ export async function getApiConfig(): Promise<ApiIntegrationConfig> {
 }
 
 export async function saveApiConfig(config: ApiIntegrationConfig): Promise<ApiIntegrationConfig> {
+  const safeLocalConfig: ApiIntegrationConfig = {
+    ...config,
+    uberEatsClientSecret: '',
+    uberEatsClientSecretConfigured:
+      Boolean(config.uberEatsClientSecret?.trim()) || Boolean(config.uberEatsClientSecretConfigured),
+  };
+
   const mock = initMockDb();
-  mock.apiConfig = { ...config };
+  mock.apiConfig = safeLocalConfig;
   persistMockDb();
 
   if (typeof window !== 'undefined') {
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiConfig: config }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.apiConfig) {
+          const updated = { ...INITIAL_API_CONFIG, ...data.apiConfig, uberEatsClientSecret: '' };
+          mock.apiConfig = updated;
+          persistMockDb();
+          return updated;
+        }
+      }
     } catch {}
   }
-  return config;
+  return safeLocalConfig;
 }
 
 // ---------------------------------------------------------------------------

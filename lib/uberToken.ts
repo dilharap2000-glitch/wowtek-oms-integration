@@ -25,16 +25,26 @@ const DUMMY_CREDENTIAL_VALUES = new Set([
   'YOUR_UBER_CLIENT_SECRET',
   'uber_client_id_lk_881920',
   'ubr_sec_9941a87b003',
+  'custom_oauth_client_9941',
 ]);
 
 function isUsableToken(token?: string | null): token is string {
   if (!token) return false;
   const trimmed = token.trim();
   if (!trimmed) return false;
+  if (/^[•*]+$/.test(trimmed)) return false;
   if (DUMMY_CREDENTIAL_VALUES.has(trimmed)) return false;
   if (DUMMY_CREDENTIAL_VALUES.has(trimmed.toUpperCase())) return false;
   if (trimmed.toLowerCase().startsWith('your_uber_')) return false;
   return true;
+}
+
+export function maskUberClientId(clientId?: string | null): string | undefined {
+  if (!clientId) return undefined;
+  const trimmed = clientId.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length <= 8) return '****';
+  return `${trimmed.slice(0, 4)}****${trimmed.slice(-4)}`;
 }
 
 function normalizeHostUrl(raw?: string | null): string {
@@ -177,18 +187,31 @@ export function clearUberAccessTokenCache(isSandbox?: boolean): void {
   }
 }
 
+type CredentialSource = 'env_sandbox' | 'env_prod' | 'env_generic' | 'mongo' | 'static_token' | 'none';
+
 function getUberClientCredentialsFromEnv(isSandbox: boolean): {
   clientId?: string;
   clientSecret?: string;
   source?: 'env_sandbox' | 'env_prod' | 'env_generic';
+  partialWarning?: string;
 } {
   const explicitEnv = getExplicitEnvMode();
 
   if (isSandbox) {
     const sbId = process.env.UBER_SANDBOX_CLIENT_ID?.trim();
     const sbSecret = process.env.UBER_SANDBOX_CLIENT_SECRET?.trim();
-    if (isUsableToken(sbId) && isUsableToken(sbSecret)) {
+    const hasSbId = isUsableToken(sbId);
+    const hasSbSecret = isUsableToken(sbSecret);
+
+    if (hasSbId && hasSbSecret) {
       return { clientId: sbId, clientSecret: sbSecret, source: 'env_sandbox' };
+    }
+    if (hasSbId !== hasSbSecret) {
+      return {
+        partialWarning: hasSbId
+          ? 'UBER_SANDBOX_CLIENT_ID is set, but UBER_SANDBOX_CLIENT_SECRET is missing.'
+          : 'UBER_SANDBOX_CLIENT_SECRET is set, but UBER_SANDBOX_CLIENT_ID is missing.',
+      };
     }
 
     // Only reuse generic UBER_CLIENT_ID / UBER_CLIENT_SECRET in sandbox when production isn't explicitly forced
@@ -203,8 +226,18 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
         process.env.ClientSecret ||
         process.env.OAuth_ClientSecret
       )?.trim();
-      if (isUsableToken(genericId) && isUsableToken(genericSecret)) {
+      const hasGenId = isUsableToken(genericId);
+      const hasGenSecret = isUsableToken(genericSecret);
+
+      if (hasGenId && hasGenSecret) {
         return { clientId: genericId, clientSecret: genericSecret, source: 'env_generic' };
+      }
+      if (hasGenId !== hasGenSecret) {
+        return {
+          partialWarning: hasGenId
+            ? 'UBER_CLIENT_ID is set without a matching UBER_CLIENT_SECRET.'
+            : 'UBER_CLIENT_SECRET is set without a matching UBER_CLIENT_ID.',
+        };
       }
     }
 
@@ -213,8 +246,18 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
 
   const prodId = process.env.UBER_PROD_CLIENT_ID?.trim();
   const prodSecret = process.env.UBER_PROD_CLIENT_SECRET?.trim();
-  if (isUsableToken(prodId) && isUsableToken(prodSecret)) {
+  const hasProdId = isUsableToken(prodId);
+  const hasProdSecret = isUsableToken(prodSecret);
+
+  if (hasProdId && hasProdSecret) {
     return { clientId: prodId, clientSecret: prodSecret, source: 'env_prod' };
+  }
+  if (hasProdId !== hasProdSecret) {
+    return {
+      partialWarning: hasProdId
+        ? 'UBER_PROD_CLIENT_ID is set, but UBER_PROD_CLIENT_SECRET is missing.'
+        : 'UBER_PROD_CLIENT_SECRET is set, but UBER_PROD_CLIENT_ID is missing.',
+    };
   }
 
   // Only reuse generic UBER_CLIENT_ID / UBER_CLIENT_SECRET in production when sandbox isn't explicitly active
@@ -229,8 +272,18 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
       process.env.ClientSecret ||
       process.env.OAuth_ClientSecret
     )?.trim();
-    if (isUsableToken(genericId) && isUsableToken(genericSecret)) {
+    const hasGenId = isUsableToken(genericId);
+    const hasGenSecret = isUsableToken(genericSecret);
+
+    if (hasGenId && hasGenSecret) {
       return { clientId: genericId, clientSecret: genericSecret, source: 'env_generic' };
+    }
+    if (hasGenId !== hasGenSecret) {
+      return {
+        partialWarning: hasGenId
+          ? 'UBER_CLIENT_ID is set without a matching UBER_CLIENT_SECRET.'
+          : 'UBER_CLIENT_SECRET is set without a matching UBER_CLIENT_ID.',
+      };
     }
   }
 
@@ -356,6 +409,84 @@ export function hasUberCredentialsConfigured(isSandbox: boolean): boolean {
   return Boolean(getStaticFallbackTokenFromEnv(isSandbox));
 }
 
+export interface UberCredentialState {
+  env: UberEnvironment;
+  baseUrl: string;
+  tokenUrl: string;
+  hasCredentials: boolean;
+  credentialSource: CredentialSource;
+  clientIdPreview?: string;
+  partialWarning?: string;
+}
+
+export async function getUberCredentialState(
+  isSandbox = isUberSandboxMode()
+): Promise<UberCredentialState> {
+  const targetSandbox = resolveUberEnvironment(isSandbox) === 'sandbox';
+  const targetEnv: UberEnvironment = targetSandbox ? 'sandbox' : 'production';
+  const baseUrl = getUberBaseUrl(targetSandbox);
+  const tokenUrl = getUberTokenUrl(targetSandbox);
+
+  const envCreds = getUberClientCredentialsFromEnv(targetSandbox);
+  if (envCreds.clientId && envCreds.clientSecret) {
+    return {
+      env: targetEnv,
+      baseUrl,
+      tokenUrl,
+      hasCredentials: true,
+      credentialSource: envCreds.source || 'env_generic',
+      clientIdPreview: maskUberClientId(envCreds.clientId),
+    };
+  }
+
+  if (envCreds.partialWarning) {
+    return {
+      env: targetEnv,
+      baseUrl,
+      tokenUrl,
+      hasCredentials: false,
+      credentialSource: 'none',
+      partialWarning: envCreds.partialWarning,
+    };
+  }
+
+  const fromDb = await getCredentialsFromMongo(targetEnv);
+  if (fromDb.clientId && fromDb.clientSecret) {
+    return {
+      env: targetEnv,
+      baseUrl,
+      tokenUrl,
+      hasCredentials: true,
+      credentialSource: 'mongo',
+      clientIdPreview: maskUberClientId(fromDb.clientId),
+    };
+  }
+
+  const staticToken = getStaticFallbackTokenFromEnv(targetSandbox) || fromDb.accessToken;
+  if (isUsableToken(staticToken)) {
+    return {
+      env: targetEnv,
+      baseUrl,
+      tokenUrl,
+      hasCredentials: true,
+      credentialSource: 'static_token',
+    };
+  }
+
+  return {
+    env: targetEnv,
+    baseUrl,
+    tokenUrl,
+    hasCredentials: false,
+    credentialSource: 'none',
+  };
+}
+
+export async function hasUberCredentialsConfiguredAsync(isSandbox: boolean): Promise<boolean> {
+  const state = await getUberCredentialState(isSandbox);
+  return state.hasCredentials;
+}
+
 async function fetchOAuthToken(
   tokenUrl: string,
   clientId: string,
@@ -422,6 +553,8 @@ type EnvTokenResult = {
   error?: string;
   details?: unknown;
   hasCredentials?: boolean;
+  credentialSource?: CredentialSource;
+  clientIdPreview?: string;
 };
 
 function getTokenUrlCandidatesForEnv(targetSandbox: boolean): string[] {
@@ -446,18 +579,36 @@ async function getTokenForSpecificEnv(
   const envCreds = getUberClientCredentialsFromEnv(targetSandbox);
   let clientId = envCreds.clientId;
   let clientSecret = envCreds.clientSecret;
+  let credentialSource: CredentialSource = envCreds.source || 'none';
   let mongoAccessToken: string | undefined;
+
+  // Never fall back to MongoDB or another variable if an explicit env pair is only half-configured
+  if (!clientId && !clientSecret && envCreds.partialWarning) {
+    clearUberAccessTokenCache(targetSandbox);
+    return {
+      ok: false,
+      env: targetEnv,
+      status: 401,
+      tokenUrl: primaryTokenUrl,
+      baseUrl,
+      error: `${envCreds.partialWarning} Configure both Client ID and Client Secret for the ${targetEnv} Uber app.`,
+      hasCredentials: false,
+      credentialSource: 'none',
+    };
+  }
 
   if (!clientId || !clientSecret) {
     const fromDb = await getCredentialsFromMongo(targetEnv);
     if (!clientId && !clientSecret && fromDb.clientId && fromDb.clientSecret) {
       clientId = fromDb.clientId;
       clientSecret = fromDb.clientSecret;
+      credentialSource = 'mongo';
     }
     mongoAccessToken = fromDb.accessToken;
   }
 
   if (clientId && clientSecret) {
+    const clientIdPreview = maskUberClientId(clientId);
     const credFingerprint = hashCredentialsFingerprint(
       targetEnv,
       primaryTokenUrl,
@@ -491,6 +642,8 @@ async function getTokenForSpecificEnv(
         baseUrl: existing.baseUrl,
         tokenUrl: existing.tokenUrl,
         fromCache: true,
+        credentialSource,
+        clientIdPreview,
       };
     }
 
@@ -541,6 +694,8 @@ async function getTokenForSpecificEnv(
               baseUrl,
               tokenUrl,
               fromCache: false,
+              credentialSource,
+              clientIdPreview,
             };
           }
 
@@ -552,36 +707,44 @@ async function getTokenForSpecificEnv(
             oauthResult.rawText ||
             `OAuth failed (${lastOAuthStatus})`;
 
+          const rawErrStr = String(rawOAuthErr);
           const isEnvMismatch =
             lastOAuthStatus === 401 &&
-            /environment\s+is\s+mismatched|mismatched\s+with\s+the\s+oauth\s+server/i.test(
-              String(rawOAuthErr)
-            );
+            /environment\s+is\s+mismatched|mismatched\s+with\s+the\s+oauth\s+server/i.test(rawErrStr);
+          const isSecretMismatch =
+            /client[\s_]*secret\s*mismatch|invalid_client|unauthorized_client/i.test(rawErrStr) ||
+            (lastOAuthStatus === 403 && /accessdenied|access_denied/i.test(rawErrStr));
 
           lastOAuthError = isEnvMismatch
-            ? `${rawOAuthErr} (OMS runtime is configured for ${targetEnv.toUpperCase()} via ${tokenUrl}; ensure UBER_ENV and Client ID/Secret belong to the ${targetEnv} Uber app).`
-            : String(rawOAuthErr);
+            ? `${rawErrStr} (OMS runtime is configured for ${targetEnv.toUpperCase()} via ${tokenUrl}; ensure UBER_ENV and Client ID/Secret belong to the ${targetEnv} Uber app).`
+            : isSecretMismatch
+            ? `${rawErrStr} (Client ID ${clientIdPreview || ''} from ${credentialSource} failed authentication at ${tokenUrl}; verify that the matching ${targetEnv.toUpperCase()} Client Secret is configured without extra spaces or production/test app mix-ups).`
+            : rawErrStr;
 
           console.error('[Uber OAuth Token Rejection]:', {
             env: targetEnv,
             tokenUrl,
             baseUrl,
+            credentialSource,
+            clientIdPreview,
             status: lastOAuthStatus,
             scope: scope || '(default)',
             error: lastOAuthError,
           });
 
-          if (isEnvMismatch) {
+          if (isEnvMismatch || isSecretMismatch) {
             clearUberAccessTokenCache(targetSandbox);
             return {
               ok: false,
               env: targetEnv,
-              status: 401,
+              status: lastOAuthStatus,
               tokenUrl,
               baseUrl,
               error: lastOAuthError,
               details: lastOAuthDetails,
               hasCredentials: true,
+              credentialSource,
+              clientIdPreview,
             };
           }
 
@@ -603,21 +766,24 @@ async function getTokenForSpecificEnv(
       }
     }
 
-    // If OAuth credentials were explicitly configured for this environment and failed,
-    // never silently mask an auth/environment failure with an arbitrary static token unless it is env-specific
-    const envSpecificStatic = targetSandbox
-      ? process.env.UBER_SANDBOX_ACCESS_TOKEN?.trim()
-      : process.env.UBER_PROD_TOKEN?.trim();
+    // Do not mask explicit 401/403 credential/environment rejections with a static token
+    if (lastOAuthStatus !== 401 && lastOAuthStatus !== 403) {
+      const envSpecificStatic = targetSandbox
+        ? process.env.UBER_SANDBOX_ACCESS_TOKEN?.trim()
+        : process.env.UBER_PROD_TOKEN?.trim();
 
-    if (isUsableToken(envSpecificStatic)) {
-      return {
-        ok: true,
-        env: targetEnv,
-        token: envSpecificStatic,
-        baseUrl,
-        tokenUrl: 'env_specific_static_token',
-        fromCache: false,
-      };
+      if (isUsableToken(envSpecificStatic)) {
+        return {
+          ok: true,
+          env: targetEnv,
+          token: envSpecificStatic,
+          baseUrl,
+          tokenUrl: 'env_specific_static_token',
+          fromCache: false,
+          credentialSource: 'static_token',
+          clientIdPreview,
+        };
+      }
     }
 
     return {
@@ -629,6 +795,8 @@ async function getTokenForSpecificEnv(
       error: lastOAuthError,
       details: lastOAuthDetails,
       hasCredentials: true,
+      credentialSource,
+      clientIdPreview,
     };
   }
 
@@ -641,6 +809,7 @@ async function getTokenForSpecificEnv(
       baseUrl,
       tokenUrl: 'env_or_db_static_token',
       fromCache: false,
+      credentialSource: 'static_token',
     };
   }
 
@@ -656,6 +825,7 @@ async function getTokenForSpecificEnv(
     baseUrl,
     error: `Missing Uber ${targetEnv} Client ID / Client Secret (${missingVars}).`,
     hasCredentials: false,
+    credentialSource: 'none',
   };
 }
 
@@ -669,13 +839,16 @@ export interface UberTokenAttempt {
   error?: string;
   details?: unknown;
   hasCredentials: boolean;
+  credentialSource?: CredentialSource;
+  clientIdPreview?: string;
 }
 
 export async function getUberAccessTokenAttempt(
-  isSandbox = isUberSandboxMode()
+  isSandbox = isUberSandboxMode(),
+  options?: { forceRefresh?: boolean; requiredScope?: string }
 ): Promise<UberTokenAttempt> {
   const targetSandbox = resolveUberEnvironment(isSandbox) === 'sandbox';
-  const res = await getTokenForSpecificEnv(targetSandbox);
+  const res = await getTokenForSpecificEnv(targetSandbox, options);
   if (res.ok && res.token) {
     return {
       ok: true,
@@ -684,6 +857,8 @@ export async function getUberAccessTokenAttempt(
       tokenUrl: res.tokenUrl || getUberTokenUrl(targetSandbox),
       baseUrl: res.baseUrl || getUberBaseUrl(targetSandbox),
       hasCredentials: true,
+      credentialSource: res.credentialSource,
+      clientIdPreview: res.clientIdPreview,
     };
   }
   return {
@@ -697,19 +872,31 @@ export async function getUberAccessTokenAttempt(
       `Missing Uber ${targetSandbox ? 'sandbox' : 'production'} credentials.`,
     details: res.details,
     hasCredentials: Boolean(res.hasCredentials),
+    credentialSource: res.credentialSource,
+    clientIdPreview: res.clientIdPreview,
   };
 }
 
 export async function getUberAccessTokenWithMeta(
-  isSandbox = isUberSandboxMode()
-): Promise<{ token: string; tokenUrl: string; baseUrl: string; env: UberEnvironment } | null> {
-  const attempt = await getUberAccessTokenAttempt(isSandbox);
+  isSandbox = isUberSandboxMode(),
+  options?: { forceRefresh?: boolean; requiredScope?: string }
+): Promise<{
+  token: string;
+  tokenUrl: string;
+  baseUrl: string;
+  env: UberEnvironment;
+  credentialSource?: CredentialSource;
+  clientIdPreview?: string;
+} | null> {
+  const attempt = await getUberAccessTokenAttempt(isSandbox, options);
   return attempt.ok && attempt.token
     ? {
         token: attempt.token,
         tokenUrl: attempt.tokenUrl || getUberTokenUrl(isSandbox),
         baseUrl: attempt.baseUrl || getUberBaseUrl(isSandbox),
         env: attempt.env || (isSandbox ? 'sandbox' : 'production'),
+        credentialSource: attempt.credentialSource,
+        clientIdPreview: attempt.clientIdPreview,
       }
     : null;
 }
@@ -834,8 +1021,8 @@ export async function executeUberOrderAction(params: {
   for (const host of candidateHosts) {
     let { res: response, endpointUrl: url } = await invokeUberEndpoint(currentToken, host);
 
-    // Cached token expired or rotated -> invalidate cache and re-authenticate within the SAME environment once
-    if (response.status === 401 && initialTokenRes.fromCache) {
+    // Cached token expired or revoked -> invalidate cache and re-authenticate within the SAME environment once
+    if ((response.status === 401 || response.status === 403) && initialTokenRes.fromCache) {
       clearUberAccessTokenCache(targetSandbox);
       const refreshed = await getTokenForSpecificEnv(targetSandbox, {
         forceRefresh: true,

@@ -816,8 +816,8 @@ export default function WowtekProApp() {
   };
 
   const handleSaveApiConfig = async (newConfig: ApiIntegrationConfig) => {
-    setApiConfig(newConfig);
-    await saveApiConfig(newConfig);
+    const saved = await saveApiConfig(newConfig);
+    setApiConfig(saved);
   };
 
   // Webhook Live Testing & Event Handlers

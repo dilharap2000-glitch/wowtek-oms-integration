@@ -70,8 +70,11 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
 }) => {
   const [config, setConfig] = useState<ApiIntegrationConfig>({
     ...apiConfig,
-    uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || 'uber_client_id_lk_881920',
-    oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || 'uber_client_id_lk_881920',
+    uberEatsStoreId: apiConfig.uberEatsStoreId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d',
+    uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || '',
+    oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || '',
+    uberEatsClientSecret: '',
+    uberEnv: apiConfig.uberEnv || 'sandbox',
     smsUserId: apiConfig.smsUserId || '588',
     smsAutoNotifyOrder: apiConfig.smsAutoNotifyOrder ?? true,
   });
@@ -81,8 +84,11 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
       setConfig((prev) => ({
         ...prev,
         ...apiConfig,
-        uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || prev.uberEatsClientId || 'uber_client_id_lk_881920',
-        oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || prev.oauthClientId || 'uber_client_id_lk_881920',
+        uberEatsStoreId: apiConfig.uberEatsStoreId || prev.uberEatsStoreId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d',
+        uberEatsClientId: apiConfig.uberEatsClientId || apiConfig.oauthClientId || prev.uberEatsClientId || '',
+        oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || prev.oauthClientId || '',
+        uberEatsClientSecret: '',
+        uberEnv: apiConfig.uberEnv || prev.uberEnv || 'sandbox',
       }));
     }
   }, [apiConfig]);
@@ -138,7 +144,14 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const [orderActionMsg, setOrderActionMsg] = useState<{ message: string; isError: boolean } | null>(null);
 
   // Uber Eats Sandbox Validation Suite State
-  const [uberSandboxStoreId, setUberSandboxStoreId] = useState(apiConfig.uberEatsStoreId || '');
+  const [uberSandboxStoreId, setUberSandboxStoreId] = useState(
+    apiConfig.uberEatsStoreId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d'
+  );
+  const [uberPingResult, setUberPingResult] = useState<{
+    ok: boolean;
+    message: string;
+    details?: string;
+  } | null>(null);
   const [uberSandboxOrderId, setUberSandboxOrderId] = useState('');
   const [uberSandboxIntegrationId, setUberSandboxIntegrationId] = useState('');
   const [uberSandboxRunCancel, setUberSandboxRunCancel] = useState(false);
@@ -499,7 +512,56 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     setTimeout(() => setSavedSuccess(false), 3500);
   };
 
+  const handlePingUberEats = async () => {
+    setTestingStatus((prev) => ({ ...prev, ubereats: 'Authenticating OAuth...' }));
+    setUberPingResult(null);
+    try {
+      const res = await fetch('/api/ubereats/validation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature: 'test_ping',
+          storeId: (config.uberEatsStoreId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d').trim(),
+          environment: config.uberEnv || 'sandbox',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        setTestingStatus((prev) => ({ ...prev, ubereats: `Connected (${res.status} OK)` }));
+        setUberPingResult({
+          ok: true,
+          message: `OAuth & Store verified (${data.environment || 'sandbox'} · HTTP ${data.status})`,
+          details: `Token URL: ${data.tokenUrl || 'sandbox-login.uber.com'} · Store: ${data.storeId || config.uberEatsStoreId}`,
+        });
+      } else {
+        const statusCode = data?.status || res.status || 401;
+        setTestingStatus((prev) => ({ ...prev, ubereats: `Failed (${statusCode})` }));
+        setUberPingResult({
+          ok: false,
+          message: data?.reason || data?.error || `Uber authentication failed (HTTP ${statusCode})`,
+          details: data?.tokenUrl
+            ? `Env: ${data.environment || 'sandbox'} · Token URL: ${data.tokenUrl} · Source: ${data.credentialSource || 'none'}${data.clientIdPreview ? ` · Client ID: ${data.clientIdPreview}` : ''}`
+            : undefined,
+        });
+      }
+    } catch (err: any) {
+      setTestingStatus((prev) => ({ ...prev, ubereats: 'Network Error' }));
+      setUberPingResult({
+        ok: false,
+        message: err?.message || 'Network error verifying Uber Eats authentication.',
+      });
+    } finally {
+      setTimeout(() => {
+        setTestingStatus((prev) => ({ ...prev, ubereats: null }));
+      }, 4500);
+    }
+  };
+
   const simulatePing = (service: string) => {
+    if (service === 'ubereats') {
+      void handlePingUberEats();
+      return;
+    }
     setTestingStatus((prev) => ({ ...prev, [service]: 'Testing handshake...' }));
     setTimeout(() => {
       setTestingStatus((prev) => ({
@@ -781,23 +843,43 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
 
               <button
                 type="button"
-                onClick={() => simulatePing('ubereats')}
-                className="px-2.5 py-1 rounded bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] text-[11px] font-medium transition-colors"
+                onClick={() => handlePingUberEats()}
+                disabled={testingStatus['ubereats'] === 'Authenticating OAuth...'}
+                className="px-2.5 py-1 rounded bg-[var(--bg-subtle)] hover:bg-[var(--border-subtle)] text-[var(--text-primary)] text-[11px] font-medium transition-colors disabled:opacity-50"
               >
                 {testingStatus['ubereats'] || 'Test Ping'}
               </button>
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label className="block text-[var(--text-secondary)] font-medium mb-1">Store UUID</label>
-                <input
-                  type="text"
-                  value={config.uberEatsStoreId}
-                  onChange={(e) => setConfig({ ...config, uberEatsStoreId: e.target.value })}
-                  placeholder="eats-store-srilanka-0914"
-                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Environment</label>
+                  <select
+                    value={config.uberEnv || 'sandbox'}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        uberEnv: e.target.value as 'sandbox' | 'production',
+                      })
+                    }
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)]"
+                  >
+                    <option value="sandbox">Sandbox / Test Store</option>
+                    <option value="production">Production (Live)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Store UUID</label>
+                  <input
+                    type="text"
+                    value={config.uberEatsStoreId}
+                    onChange={(e) => setConfig({ ...config, uberEatsStoreId: e.target.value })}
+                    placeholder="ba8761b9-5679-4bcd-845d-8b0baacf9e5d"
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
+                  />
+                </div>
               </div>
 
               <div>
@@ -809,7 +891,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                     const val = e.target.value;
                     setConfig({ ...config, uberEatsClientId: val, oauthClientId: val });
                   }}
-                  placeholder="Enter OAuth Client ID"
+                  placeholder="Enter Uber Test Client ID (or set UBER_SANDBOX_CLIENT_ID in Vercel)"
                   className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
                 />
               </div>
@@ -821,6 +903,11 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                     type={showSecrets['ubrSec'] ? 'text' : 'password'}
                     value={config.uberEatsClientSecret ?? ''}
                     onChange={(e) => setConfig({ ...config, uberEatsClientSecret: e.target.value })}
+                    placeholder={
+                      config.uberEatsClientSecretConfigured
+                        ? 'Stored on server (enter new secret to replace)'
+                        : 'Enter Test Client Secret (or set in Vercel env)'
+                    }
                     className="w-full px-3 py-1.5 pr-9 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
                   />
                   <button
@@ -834,6 +921,19 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
               </div>
             </div>
           </div>
+
+          {uberPingResult && (
+            <div
+              className={`p-2.5 rounded-lg border text-[10px] space-y-0.5 ${
+                uberPingResult.ok
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-700/50 text-emerald-800 dark:text-emerald-200'
+                  : 'bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-700/50 text-rose-800 dark:text-rose-200'
+              }`}
+            >
+              <div className="font-semibold">{uberPingResult.message}</div>
+              {uberPingResult.details && <div className="font-mono opacity-85">{uberPingResult.details}</div>}
+            </div>
+          )}
 
           <div className="p-2.5 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-lg text-[10px] text-[var(--text-secondary)] mt-3">
             Payout reconciliations automatically reflect the 15.4% commission rate in analytics.

@@ -3,7 +3,8 @@ import {
   getUberAccessToken,
   getUberAccessTokenAttempt,
   getUberBaseUrl,
-  hasUberCredentialsConfigured,
+  getUberCredentialState,
+  resolveUberEnvironment,
 } from '@/lib/uberToken';
 
 const DEFAULT_STORE_ID = (
@@ -23,14 +24,28 @@ export type UberSandboxTestResult = {
 };
 
 export async function getUberSandboxStatus() {
-  const baseUrl = getUberBaseUrl(true);
+  const resolvedEnv = resolveUberEnvironment();
+  const sandboxState = await getUberCredentialState(true);
+  const activeState = resolvedEnv === 'sandbox' ? sandboxState : await getUberCredentialState(false);
   const defaultStoreId = DEFAULT_STORE_ID;
 
   return NextResponse.json({
-    environment: baseUrl,
-    tokenConfigured: hasUberCredentialsConfigured(true),
+    environment: sandboxState.baseUrl,
+    activeRuntimeEnvironment: resolvedEnv,
+    activeBaseUrl: activeState.baseUrl,
+    tokenUrl: sandboxState.tokenUrl,
+    tokenConfigured: sandboxState.hasCredentials,
+    credentialSource: sandboxState.credentialSource,
+    clientIdPreview: sandboxState.clientIdPreview,
+    partialWarning: sandboxState.partialWarning,
     defaultStoreIdConfigured: Boolean(defaultStoreId),
     defaultStoreId: defaultStoreId || undefined,
+    ...(resolvedEnv !== 'sandbox'
+      ? {
+          runtimeWarning:
+            'Runtime is currently resolving to PRODUCTION for order actions; set UBER_ENV=sandbox if using the Test Store.',
+        }
+      : {}),
   });
 }
 
@@ -42,31 +57,53 @@ async function runSingleFeatureValidation(body: {
   order_id?: string;
   host?: string;
   integrator_store_id?: string;
+  environment?: 'sandbox' | 'production';
 }) {
   const feature = String(body.feature || 'store_status').trim();
   const storeId = String(body.storeId || body.store_id || DEFAULT_STORE_ID).trim();
   const orderId = String(body.orderId || body.order_id || '').trim();
   const requestedHost = String(body.host || '').trim().replace(/\/+$/, '');
-  const defaultSandboxHost = getUberBaseUrl(true);
-  const host =
-    requestedHost && /sandbox|test-api/i.test(requestedHost)
-      ? requestedHost
-      : defaultSandboxHost;
 
-  const auth = await getUberAccessTokenAttempt(true);
+  const isTestPing = feature === 'test_ping';
+  const targetEnv = isTestPing
+    ? resolveUberEnvironment(
+        body.environment === 'sandbox'
+          ? true
+          : body.environment === 'production'
+          ? false
+          : undefined
+      )
+    : 'sandbox';
+  const targetSandbox = targetEnv === 'sandbox';
+
+  const defaultHost = getUberBaseUrl(targetSandbox);
+  const host = targetSandbox
+    ? requestedHost && /sandbox|test-api/i.test(requestedHost)
+      ? requestedHost
+      : defaultHost
+    : defaultHost;
+
+  const auth = await getUberAccessTokenAttempt(targetSandbox, {
+    forceRefresh: isTestPing,
+  });
   if (!auth.ok || !auth.token) {
+    const errStatus = auth.status || 401;
     return NextResponse.json(
       {
         ok: false,
+        status: errStatus,
+        oauthOk: false,
         error: 'Failed to get Uber OAuth token',
         reason: auth.error,
-        environment: auth.env || 'sandbox',
+        environment: auth.env || targetEnv,
         tokenUrl: auth.tokenUrl,
         baseUrl: auth.baseUrl,
         hasCredentials: auth.hasCredentials,
+        credentialSource: auth.credentialSource,
+        clientIdPreview: auth.clientIdPreview,
         details: auth.details,
       },
-      { status: 401 }
+      { status: errStatus }
     );
   }
 
@@ -74,7 +111,7 @@ async function runSingleFeatureValidation(body: {
   let method = 'GET';
   let payload: unknown = undefined;
 
-  if (feature === 'store_status') {
+  if (feature === 'store_status' || feature === 'test_ping') {
     endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/status`;
     method = 'GET';
   } else if (feature === 'stores_list') {
@@ -135,15 +172,20 @@ async function runSingleFeatureValidation(body: {
 
     return NextResponse.json({
       ok: res.ok,
+      oauthOk: true,
       status: res.status,
       feature,
+      environment: auth.env || targetEnv,
+      storeId,
       endpoint,
       tokenUrl: auth.tokenUrl,
+      credentialSource: auth.credentialSource,
+      clientIdPreview: auth.clientIdPreview,
       data,
     });
   } catch (err: unknown) {
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : 'Unknown error' },
+      { ok: false, oauthOk: true, error: err instanceof Error ? err.message : 'Unknown error' },
       { status: 500 }
     );
   } finally {
@@ -162,6 +204,7 @@ export async function runUberSandboxValidation(req: NextRequest) {
     integrator_store_id?: string;
     host?: string;
     run_cancel?: boolean;
+    environment?: 'sandbox' | 'production';
   } = {};
 
   try {
@@ -179,6 +222,7 @@ export async function runUberSandboxValidation(req: NextRequest) {
       order_id: body.order_id,
       host: body.host,
       integrator_store_id: body.integrator_store_id,
+      environment: body.environment,
     });
   }
 
