@@ -75,6 +75,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || '',
     uberEatsClientSecret: '',
     uberEnv: apiConfig.uberEnv || 'sandbox',
+    uberAuthSource: apiConfig.uberAuthSource || 'auto',
     smsUserId: apiConfig.smsUserId || '588',
     smsAutoNotifyOrder: apiConfig.smsAutoNotifyOrder ?? true,
   });
@@ -89,9 +90,38 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
         oauthClientId: apiConfig.oauthClientId || apiConfig.uberEatsClientId || prev.oauthClientId || '',
         uberEatsClientSecret: '',
         uberEnv: apiConfig.uberEnv || prev.uberEnv || 'sandbox',
+        uberAuthSource: apiConfig.uberAuthSource || prev.uberAuthSource || 'auto',
       }));
     }
   }, [apiConfig]);
+
+  const [uberRuntimeStatus, setUberRuntimeStatus] = useState<{
+    activeRuntimeEnvironment?: string;
+    tokenUrl?: string;
+    credentialSource?: string;
+    credentialPair?: string;
+    clientIdPreview?: string;
+    secretConfigured?: boolean;
+    conflictWarning?: string;
+    partialWarning?: string;
+    defaultStoreId?: string;
+  } | null>(null);
+
+  const refreshUberRuntimeStatus = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/ubereats/validation', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setUberRuntimeStatus(data);
+      }
+    } catch {
+      // Ignore transient status fetch issues
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refreshUberRuntimeStatus();
+  }, [refreshUberRuntimeStatus]);
   const [showSecrets, setShowSecrets] = useState<{ [key: string]: boolean }>({});
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingStatus, setTestingStatus] = useState<{ [key: string]: string | null }>({});
@@ -175,7 +205,14 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   const [uberSingleFeatureResult, setUberSingleFeatureResult] = useState<any | null>(null);
 
   const handleRunUberSingleFeature = async (
-    feature: 'store_status' | 'stores_list' | 'set_store_online' | 'activate_integration' | 'get_order'
+    feature:
+      | 'store_status'
+      | 'stores_list'
+      | 'set_store_online'
+      | 'update_prep_time'
+      | 'activate_integration'
+      | 'update_integration'
+      | 'get_order'
   ) => {
     setUberSingleFeatureLoading(feature);
     setUberSandboxError(null);
@@ -505,10 +542,12 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveConfig(config);
+    await Promise.resolve(onSaveConfig(config));
     setSavedSuccess(true);
+    setUberPingResult(null);
+    await refreshUberRuntimeStatus();
     setTimeout(() => setSavedSuccess(false), 3500);
   };
 
@@ -516,6 +555,11 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
     setTestingStatus((prev) => ({ ...prev, ubereats: 'Authenticating OAuth...' }));
     setUberPingResult(null);
     try {
+      const hasPendingSecretInput = Boolean(config.uberEatsClientSecret?.trim());
+      if (hasPendingSecretInput) {
+        await Promise.resolve(onSaveConfig(config));
+        await refreshUberRuntimeStatus();
+      }
       const res = await fetch('/api/ubereats/validation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -871,15 +915,33 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Store UUID</label>
-                  <input
-                    type="text"
-                    value={config.uberEatsStoreId}
-                    onChange={(e) => setConfig({ ...config, uberEatsStoreId: e.target.value })}
-                    placeholder="ba8761b9-5679-4bcd-845d-8b0baacf9e5d"
-                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
-                  />
+                  <label className="block text-[var(--text-secondary)] font-medium mb-1">Credential Source</label>
+                  <select
+                    value={config.uberAuthSource || 'auto'}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        uberAuthSource: e.target.value as 'auto' | 'mongo' | 'env',
+                      })
+                    }
+                    className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-[var(--accent-primary)]"
+                  >
+                    <option value="auto">Auto (Env Specific → UI → Generic)</option>
+                    <option value="mongo">Integration UI (MongoDB)</option>
+                    <option value="env">Vercel Environment Vars</option>
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--text-secondary)] font-medium mb-1">Store UUID</label>
+                <input
+                  type="text"
+                  value={config.uberEatsStoreId}
+                  onChange={(e) => setConfig({ ...config, uberEatsStoreId: e.target.value })}
+                  placeholder="ba8761b9-5679-4bcd-845d-8b0baacf9e5d"
+                  className="w-full px-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] font-mono focus:outline-none focus:border-[var(--accent-primary)]"
+                />
               </div>
 
               <div>
@@ -921,6 +983,32 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
               </div>
             </div>
           </div>
+
+          {uberRuntimeStatus && (
+            <div className="p-2.5 rounded-lg bg-[var(--bg-app)] border border-[var(--border-subtle)] text-[10px] font-mono space-y-1 text-[var(--text-secondary)]">
+              <div className="flex items-center justify-between gap-2">
+                <span>
+                  Runtime: <strong className="text-[var(--text-primary)]">{(uberRuntimeStatus.activeRuntimeEnvironment || 'sandbox').toUpperCase()}</strong>
+                </span>
+                <span>
+                  Source: <strong className="text-[var(--text-primary)]">{uberRuntimeStatus.credentialSource || 'none'}</strong>
+                </span>
+              </div>
+              <div className="truncate">
+                OAuth: {uberRuntimeStatus.tokenUrl || 'https://sandbox-login.uber.com/oauth/v2/token'}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span>Client ID: {uberRuntimeStatus.clientIdPreview || 'Not Set'}</span>
+                <span>Secret: {uberRuntimeStatus.secretConfigured ? 'Configured' : 'Missing'}</span>
+              </div>
+              {uberRuntimeStatus.partialWarning && (
+                <div className="text-amber-700 dark:text-amber-300">{uberRuntimeStatus.partialWarning}</div>
+              )}
+              {uberRuntimeStatus.conflictWarning && (
+                <div className="text-amber-700 dark:text-amber-300">{uberRuntimeStatus.conflictWarning}</div>
+              )}
+            </div>
+          )}
 
           {uberPingResult && (
             <div
@@ -1797,7 +1885,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                 type="text"
                 value={uberSandboxStoreId}
                 onChange={(e) => setUberSandboxStoreId(e.target.value)}
-                placeholder="e.g. 68dba37f-7468-49c0-..."
+                placeholder="e.g. ba8761b9-5679-4bcd-845d-8b0baacf9e5d"
                 className="w-full px-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
@@ -1819,7 +1907,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                 type="text"
                 value={uberSandboxIntegrationId}
                 onChange={(e) => setUberSandboxIntegrationId(e.target.value)}
-                placeholder="Defaults to Store UUID"
+                placeholder="Defaults to WOWTEK-CENTRAL-HUB"
                 className="w-full px-3 py-2 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/70 font-mono focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
@@ -1862,9 +1950,11 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
             {(
               [
                 { key: 'activate_integration', label: 'Activate Integration (POS)' },
+                { key: 'update_integration', label: 'Update Integration (PATCH)' },
                 { key: 'store_status', label: 'Store Status' },
                 { key: 'stores_list', label: 'Stores List' },
                 { key: 'set_store_online', label: 'Set Store Online' },
+                { key: 'update_prep_time', label: 'Update Prep Time' },
                 { key: 'get_order', label: 'Get Order' },
               ] as const
             ).map((btn) => (

@@ -331,6 +331,7 @@ export interface ApiIntegrationConfig {
   uberEatsClientSecret: string;
   uberEatsClientSecretConfigured?: boolean;
   uberEnv?: 'sandbox' | 'production';
+  uberAuthSource?: 'auto' | 'mongo' | 'env';
   transExpressAccountId: string;
   transExpressApiKey: string;
   transExpressPickupBranch: string;

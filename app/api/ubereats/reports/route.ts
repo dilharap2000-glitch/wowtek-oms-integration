@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
-import { getUberAccessToken, getUberBaseUrl, isUberSandboxMode } from '@/lib/uberToken';
+import {
+  getUberAccessTokenWithMeta,
+  resolveUberConfigurationAsync,
+} from '@/lib/uberToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,21 +16,23 @@ export async function POST(req: NextRequest) {
     const formattedEnd = endDate || today.toISOString().split('T')[0];
     const formattedStart = startDate || thirtyDaysAgo.toISOString().split('T')[0];
 
-    const isSandbox = isUberSandboxMode();
-    const baseUrl = getUberBaseUrl(isSandbox);
-    const accessToken = await getUberAccessToken(isSandbox);
+    const resolved = await resolveUberConfigurationAsync();
+    const tokenMeta = await getUberAccessTokenWithMeta(resolved.env === 'sandbox');
+    const fallbackStore = resolved.storeId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d';
+    const targetStores =
+      Array.isArray(storeUuids) && storeUuids.length > 0 ? storeUuids : [fallbackStore];
 
     // Valid report types: PAYMENT_DETAILS_REPORT, FINANCE_SUMMARY_REPORT, etc.
-    if (accessToken) {
-      const response = await fetch(`${baseUrl}/v1/eats/report`, {
+    if (tokenMeta?.token) {
+      const response = await fetch(`${tokenMeta.baseUrl}/v1/eats/report`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${tokenMeta.token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           report_type: reportType || 'PAYMENT_DETAILS_REPORT',
-          store_uuids: Array.isArray(storeUuids) && storeUuids.length > 0 ? storeUuids : ['68dba37f-7468-49c0-9d32-eats-colombo-01'],
+          store_uuids: targetStores,
           start_date: formattedStart,
           end_date: formattedEnd,
         }),
@@ -36,17 +41,19 @@ export async function POST(req: NextRequest) {
       const data = await response.json();
 
       if (!response.ok) {
-        return NextResponse.json({ error: data.message || 'Failed to request report from Uber Eats' }, { status: response.status });
+        return NextResponse.json(
+          { error: data.message || 'Failed to request report from Uber Eats' },
+          { status: response.status }
+        );
       }
 
-      // Record requested workflow in MongoDB
       try {
         const mongoConn = await connectToMongoDB();
         if (mongoConn) {
           await mongoConn.db.collection('financial_reports').insertOne({
             workflowId: data.workflow_id,
             reportType: reportType || 'PAYMENT_DETAILS_REPORT',
-            storeUuids: storeUuids || ['68dba37f-7468-49c0-9d32-eats-colombo-01'],
+            storeUuids: targetStores,
             startDate: formattedStart,
             endDate: formattedEnd,
             status: 'PENDING',
@@ -62,29 +69,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Sandbox / Prototyping Fallback workflow ID
-    const mockWorkflowId = `wf-uber-${Date.now().toString(36)}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-    try {
-      const mongoConn = await connectToMongoDB();
-      if (mongoConn) {
-        await mongoConn.db.collection('financial_reports').insertOne({
-          workflowId: mockWorkflowId,
-          reportType: reportType || 'PAYMENT_DETAILS_REPORT',
-          storeUuids: storeUuids || ['68dba37f-7468-49c0-9d32-eats-colombo-01'],
-          startDate: formattedStart,
-          endDate: formattedEnd,
-          status: 'PENDING',
-          createdAt: new Date().toISOString(),
-        });
-      }
-    } catch {}
-
-    return NextResponse.json({
-      success: true,
-      workflow_id: mockWorkflowId,
-      message: 'Report request accepted by Uber Eats (Sandbox Workflow)',
-    });
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          resolved.partialWarning ||
+          `Uber Eats ${resolved.env} OAuth credentials are not configured.`,
+      },
+      { status: 401 }
+    );
 
   } catch (error: any) {
     console.error('Report Request Error:', error);

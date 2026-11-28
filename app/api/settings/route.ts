@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToMongoDB } from '@/lib/mongodb';
 import { DEFAULT_PLATFORMS, DEFAULT_GATEWAYS } from '@/lib/db';
-import { clearUberAccessTokenCache } from '@/lib/uberToken';
+import {
+  clearUberAccessTokenCache,
+  getUberCredentialState,
+  isUsableUberValue,
+} from '@/lib/uberToken';
 
 export const dynamic = 'force-dynamic';
 
-const DUMMY_UBER_VALUES = new Set([
-  'uber_client_id_lk_881920',
-  'ubr_sec_9941a87b003',
-  'YOUR_UBER_CLIENT_SECRET',
-  'YOUR_UBER_CLIENT_ID',
-]);
-
 function isValidSecretValue(val: unknown): val is string {
-  if (typeof val !== 'string') return false;
+  return typeof val === 'string' && isUsableUberValue(val);
+}
+
+function cleanClientId(val: unknown): string {
+  if (typeof val !== 'string') return '';
   const trimmed = val.trim();
-  if (!trimmed) return false;
-  if (/^[•*]+$/.test(trimmed)) return false;
-  if (DUMMY_UBER_VALUES.has(trimmed)) return false;
-  return true;
+  return isUsableUberValue(trimmed) ? trimmed : '';
 }
 
 function redactApiConfigForClient(apiConfig: Record<string, any> | null | undefined) {
@@ -37,16 +35,30 @@ function redactApiConfigForClient(apiConfig: Record<string, any> | null | undefi
     ...safeConfig
   } = apiConfig;
 
+  const cleanedClientId =
+    cleanClientId(safeConfig.uberEatsClientId) || cleanClientId(safeConfig.oauthClientId);
+
   return {
     ...safeConfig,
+    uberEatsClientId: cleanedClientId,
+    oauthClientId: cleanedClientId,
     uberEatsClientSecret: '',
     uberEatsClientSecretConfigured: hasSecret,
+    uberEnv:
+      safeConfig.uberEnv === 'production' || safeConfig.uberEnv === 'sandbox'
+        ? safeConfig.uberEnv
+        : 'sandbox',
+    uberAuthSource:
+      safeConfig.uberAuthSource === 'mongo' || safeConfig.uberAuthSource === 'env'
+        ? safeConfig.uberAuthSource
+        : 'auto',
   };
 }
 
 export async function GET() {
   try {
     const mongoConn = await connectToMongoDB();
+    const uberStatus = await getUberCredentialState().catch(() => null);
     if (mongoConn) {
       const settings = await mongoConn.db.collection('settings').findOne({ id: 'app_settings' });
       if (settings) {
@@ -55,9 +67,17 @@ export async function GET() {
           platforms: settings.platforms || DEFAULT_PLATFORMS,
           gateways: settings.gateways || DEFAULT_GATEWAYS,
           apiConfig: redactApiConfigForClient(settings.apiConfig),
+          uberStatus,
         });
       }
     }
+    return NextResponse.json({
+      success: true,
+      platforms: DEFAULT_PLATFORMS,
+      gateways: DEFAULT_GATEWAYS,
+      apiConfig: null,
+      uberStatus,
+    });
   } catch (err: any) {
     console.warn('[Settings API GET] MongoDB read error:', err.message);
   }
@@ -100,13 +120,37 @@ export async function POST(req: NextRequest) {
             ...restIncoming,
           };
 
-          if (typeof restIncoming.uberEatsClientId === 'string') {
-            mergedConfig.uberEatsClientId = restIncoming.uberEatsClientId.trim();
-            mergedConfig.oauthClientId = restIncoming.uberEatsClientId.trim();
+          const rawIncomingClientId =
+            restIncoming.uberEatsClientId ?? restIncoming.oauthClientId;
+          if (typeof rawIncomingClientId === 'string') {
+            const cleaned = cleanClientId(rawIncomingClientId);
+            mergedConfig.uberEatsClientId = cleaned;
+            mergedConfig.oauthClientId = cleaned;
+          } else {
+            const existingCleaned =
+              cleanClientId(existingApiConfig.uberEatsClientId) ||
+              cleanClientId(existingApiConfig.oauthClientId);
+            mergedConfig.uberEatsClientId = existingCleaned;
+            mergedConfig.oauthClientId = existingCleaned;
           }
+
           if (typeof restIncoming.uberEatsStoreId === 'string') {
             mergedConfig.uberEatsStoreId = restIncoming.uberEatsStoreId.trim();
           }
+
+          mergedConfig.uberEnv =
+            restIncoming.uberEnv === 'production' || restIncoming.uberEnv === 'sandbox'
+              ? restIncoming.uberEnv
+              : existingApiConfig.uberEnv === 'production'
+              ? 'production'
+              : 'sandbox';
+
+          mergedConfig.uberAuthSource =
+            restIncoming.uberAuthSource === 'mongo' ||
+            restIncoming.uberAuthSource === 'env' ||
+            restIncoming.uberAuthSource === 'auto'
+              ? restIncoming.uberAuthSource
+              : existingApiConfig.uberAuthSource || 'auto';
 
           if (isValidSecretValue(incomingSecret)) {
             mergedConfig.uberEatsClientSecret = incomingSecret.trim();
@@ -133,11 +177,14 @@ export async function POST(req: NextRequest) {
       console.warn('[Settings API POST] MongoDB write error:', err.message);
     }
 
+    const uberStatus = await getUberCredentialState().catch(() => null);
+
     return NextResponse.json({
       success: true,
       ...(platforms ? { platforms } : {}),
       ...(gateways ? { gateways } : {}),
       ...(safeResponseConfig ? { apiConfig: safeResponseConfig } : {}),
+      uberStatus,
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

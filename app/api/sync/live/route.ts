@@ -126,7 +126,6 @@ export async function GET() {
       products: atlasProducts,
       lastUpdated: store.lastUpdated,
       listenerActive: true,
-      webhookSecret: 'WOWTEK-WC-Webhook-2026-9X7Kl42',
       timestamp: new Date().toISOString(),
     },
     {

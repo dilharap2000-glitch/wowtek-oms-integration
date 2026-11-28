@@ -9,7 +9,7 @@ import { connectToMongoDB } from '@/lib/mongodb';
 import {
   acceptUberEatsOrder,
   executeUberOrderAction,
-  isUberSandboxMode,
+  resolveUberConfigurationAsync,
   type UberOrderAction,
   type UberOrderActionResult,
 } from '@/lib/uberClient';
@@ -127,7 +127,8 @@ export async function processUberOrderAction(params: {
     const order_id = rawOrderId.replace(/^#/, '').trim();
     const cleanInputId = order_id.replace(/^UBER-/i, '');
     const validObjectId = ObjectId.isValid(order_id) ? new ObjectId(order_id) : null;
-    const isSandbox = isUberSandboxMode();
+    const resolvedUberConfig = await resolveUberConfigurationAsync();
+    const isSandbox = resolvedUberConfig.env === 'sandbox';
 
     // 1. Validate order & resolve the original Uber Eats order_id UUID (MongoDB primary `orders` collection first)
     let uberOrderUuid = '';
@@ -358,6 +359,7 @@ export async function processUberOrderAction(params: {
               action,
               reason: reasonCode,
               isSandbox,
+              currentStatus: previousStatus,
             });
     } catch (uberErr: unknown) {
       const errorMsg =
@@ -574,12 +576,56 @@ export async function processUberOrderAction(params: {
         updatedAt: now,
       };
 
-      const primaryUpdateResult = await ordersCollection.updateOne(primaryUpdateFilter, {
+      let primaryUpdateResult = await ordersCollection.updateOne(primaryUpdateFilter, {
         $set: primarySetFields,
       });
 
       matchedCount = primaryUpdateResult.matchedCount ?? 0;
       modifiedCount = primaryUpdateResult.modifiedCount ?? 0;
+
+      // If order was visible via oms_orders/webhook_events only and missing from `orders`, materialize once cleanly
+      if (matchedCount === 0 && matchedDoc) {
+        const { _id: _omitId, ...seedFields } = matchedDoc;
+        const shortCode = String(
+          matchedDoc.short_display_id ||
+            matchedDoc.orderNumber ||
+            matchedDoc.display_id ||
+            uberOrderUuid.slice(-5)
+        )
+          .replace(/^#/, '')
+          .replace(/^UBER-/i, '')
+          .toUpperCase();
+        const seededId = matchedDoc.id && !String(matchedDoc.id).startsWith('evt-')
+          ? String(matchedDoc.id)
+          : `ord-ubr-${shortCode}`;
+        const seededInvoice = String(matchedDoc.invoiceNumber || `UBER-${shortCode}`);
+
+        const upsertRes = await ordersCollection.updateOne(
+          {
+            $or: [
+              { uberOrderId: uberOrderUuid },
+              { uber_order_id: uberOrderUuid },
+              { orderId: uberOrderUuid },
+              { id: seededId },
+            ],
+          },
+          {
+            $set: {
+              ...seedFields,
+              id: seededId,
+              invoiceNumber: seededInvoice,
+              channel: 'ubereats',
+              ...primarySetFields,
+            },
+            $setOnInsert: {
+              createdAt: matchedDoc.createdAt || matchedDoc.receivedAt || now,
+            },
+          },
+          { upsert: true }
+        );
+        matchedCount = (upsertRes.matchedCount ?? 0) + (upsertRes.upsertedCount ?? 0);
+        modifiedCount = (upsertRes.modifiedCount ?? 0) + (upsertRes.upsertedCount ?? 0);
+      }
 
       if (matchedCount === 0) {
         const notFoundMsg = `Uber Eats confirmed ${action} (HTTP ${uberResult.status}), but primary order record was not found or updated in MongoDB 'orders' collection.`;

@@ -1,6 +1,8 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { broadcastLiveUpdate, saveServerWebhookEvent, saveServerOrder } from '@/lib/serverStore';
 import { connectToMongoDB } from '@/lib/mongodb';
+import { resolveUberConfigurationAsync } from '@/lib/uberToken';
 import { WebhookEvent, Order, OrderItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +18,30 @@ export async function OPTIONS() {
   });
 }
 
-async function saveUberWebhookEvent(payload: any) {
+async function verifyOptionalUberSignature(
+  rawBody: string,
+  signatureHeader: string | null
+): Promise<boolean | null> {
+  if (!signatureHeader) return null;
+  try {
+    const cfg = await resolveUberConfigurationAsync();
+    const secret = cfg.clientSecret || process.env.UBER_WEBHOOK_SECRET || '';
+    if (!secret) return null;
+    const expectedHex = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex');
+    const cleanIncoming = signatureHeader.trim().toLowerCase();
+    const a = Buffer.from(cleanIncoming);
+    const b = Buffer.from(expectedHex.toLowerCase());
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return null;
+  }
+}
+
+async function saveUberWebhookEvent(payload: any, signatureVerified: boolean | null = null) {
   try {
     const now = new Date().toISOString();
 
@@ -56,6 +81,7 @@ async function saveUberWebhookEvent(payload: any) {
     const eventType = String(
       payload?.event_type || payload?.event || 'orders.notification'
     ).trim();
+    const eventLower = eventType.toLowerCase();
 
     const storeId = String(
       payload?.meta?.user_id ||
@@ -78,8 +104,14 @@ async function saveUberWebhookEvent(payload: any) {
       .toUpperCase()
       .replace(/[\s-]+/g, '_');
 
+    const isFailureWebhook = eventLower.includes('failure');
+    const isReleaseWebhook = eventLower.includes('release');
+    const isEditWebhook =
+      eventLower.includes('edit') ||
+      eventLower.includes('scheduled.notification') ||
+      Boolean(payload?.order?.cart || payload?.current_order_state);
     const isCancelledWebhook =
-      eventType.toLowerCase().includes('cancel') ||
+      eventLower.includes('cancel') ||
       normalizedIncoming.includes('CANCEL') ||
       normalizedIncoming.includes('DENI') ||
       normalizedIncoming.includes('DENY');
@@ -99,10 +131,12 @@ async function saveUberWebhookEvent(payload: any) {
       normalizedIncoming === 'UNACCEPTED' ||
       normalizedIncoming.includes('PENDING');
 
-    const resolvedStatus = eventType.toLowerCase().includes('failure')
+    const resolvedStatus = isFailureWebhook
       ? 'FAILED'
       : isCancelledWebhook
       ? 'CANCELLED'
+      : isReleaseWebhook && !normalizedIncoming
+      ? 'ACCEPTED'
       : isPendingWebhook
       ? 'PENDING_ACCEPTANCE'
       : normalizedIncoming;
@@ -282,10 +316,37 @@ async function saveUberWebhookEvent(payload: any) {
         { upsert: true }
       );
 
+      const omsFilter = fullOrderId
+        ? { $or: [{ uberOrderId: fullOrderId }, { uber_order_id: fullOrderId }, { orderId: fullOrderId }] }
+        : { invoiceNumber: displayId };
+      const existingOms = await db.collection('oms_orders').findOne(omsFilter).catch(() => null);
+      const existingOmsUpper = String(
+        existingOms?.uberStatus || existingOms?.orderStatus || existingOms?.status || ''
+      )
+        .trim()
+        .toUpperCase();
+      const omsProgressed =
+        existingOmsUpper === 'ACCEPTED' ||
+        existingOmsUpper === 'READY_FOR_PICKUP' ||
+        existingOmsUpper === 'READY' ||
+        existingOmsUpper === 'COMPLETED' ||
+        existingOmsUpper === 'CANCELLED';
+      const preserveOmsStatus =
+        omsProgressed &&
+        !isFailureWebhook &&
+        !isCancelledWebhook &&
+        resolvedStatus === 'PENDING_ACCEPTANCE';
+
       const omsDoc = {
         ...extraOrderFields,
-        state: orderData?.state || resolvedStatus,
-        status: resolvedStatus,
+        state: orderData?.state || (preserveOmsStatus ? existingOmsUpper : resolvedStatus),
+        status: preserveOmsStatus ? existingOms?.status || existingOmsUpper : resolvedStatus,
+        ...(preserveOmsStatus
+          ? {
+              uberStatus: existingOms?.uberStatus || existingOmsUpper,
+              orderStatus: existingOms?.orderStatus || existingOmsUpper,
+            }
+          : {}),
         carts: orderData?.carts || (orderData?.cart ? [orderData.cart] : items),
         items: orderItems,
         invoiceNumber: displayId,
@@ -298,9 +359,7 @@ async function saveUberWebhookEvent(payload: any) {
       };
 
       await db.collection('oms_orders').updateOne(
-        fullOrderId
-          ? { $or: [{ uberOrderId: fullOrderId }, { uber_order_id: fullOrderId }, { orderId: fullOrderId }] }
-          : { invoiceNumber: displayId },
+        omsFilter,
         {
           $set: omsDoc,
           $setOnInsert: {
@@ -318,27 +377,59 @@ async function saveUberWebhookEvent(payload: any) {
       const fullOrderDoc = {
         ...newOrder,
         ...extraOrderFields,
+        ...(signatureVerified !== null ? { uberSignatureVerified: signatureVerified } : {}),
+        ...(isReleaseWebhook ? { fastReleaseTriggeredAt: now } : {}),
+        ...(isEditWebhook ? { lastWebhookEditedAt: now } : {}),
         updatedAt: now,
       };
       const { createdAt: docCreatedAt, ...docWithoutCreatedAt } = fullOrderDoc;
 
       const upsertTarget = async (colName: string) => {
         if (fullOrderId) {
+          const matchFilter = {
+            $or: [
+              { uberOrderId: fullOrderId },
+              { uber_order_id: fullOrderId },
+              { orderId: fullOrderId },
+              { invoiceNumber: displayId },
+            ],
+          };
+          const existingDoc = await db.collection(colName).findOne(matchFilter).catch(() => null);
+          const existingUpper = String(
+            existingDoc?.uberStatus || existingDoc?.orderStatus || existingDoc?.status || ''
+          )
+            .trim()
+            .toUpperCase();
+          const alreadyProgressed =
+            existingUpper === 'ACCEPTED' ||
+            existingUpper === 'READY_FOR_PICKUP' ||
+            existingUpper === 'READY' ||
+            existingUpper === 'COMPLETED' ||
+            existingUpper === 'CANCELLED';
+
+          // Never let a duplicate notification, release, or live edit regress an accepted/ready order back to PENDING_ACCEPTANCE
+          const shouldPreserveStatus =
+            alreadyProgressed &&
+            !isFailureWebhook &&
+            !isCancelledWebhook &&
+            resolvedStatus === 'PENDING_ACCEPTANCE';
+
+          const setFields: Record<string, any> = {
+            ...docWithoutCreatedAt,
+            orderId: fullOrderId,
+            uberOrderId: fullOrderId,
+          };
+
+          if (shouldPreserveStatus && existingDoc) {
+            setFields.status = existingDoc.status || existingUpper;
+            setFields.uberStatus = existingDoc.uberStatus || existingUpper;
+            setFields.orderStatus = existingDoc.orderStatus || existingUpper;
+          }
+
           await db.collection(colName).updateOne(
+            matchFilter,
             {
-              $or: [
-                { uberOrderId: fullOrderId },
-                { uber_order_id: fullOrderId },
-                { orderId: fullOrderId },
-                { invoiceNumber: displayId },
-              ],
-            },
-            {
-              $set: {
-                ...docWithoutCreatedAt,
-                orderId: fullOrderId,
-                uberOrderId: fullOrderId,
-              },
+              $set: setFields,
               $setOnInsert: { createdAt: docCreatedAt || now },
             },
             { upsert: true }
@@ -364,6 +455,9 @@ async function saveUberWebhookEvent(payload: any) {
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
+    const signatureHeader = req.headers.get('x-uber-signature');
+    const signatureVerified = await verifyOptionalUberSignature(rawBody, signatureHeader);
+
     let payload: any = {};
     try {
       payload = rawBody ? JSON.parse(rawBody) : {};
@@ -371,10 +465,13 @@ export async function POST(req: NextRequest) {
       payload = { raw: rawBody };
     }
 
-    await saveUberWebhookEvent(payload);
+    await saveUberWebhookEvent(payload, signatureVerified);
 
-    // Uber webhook validation සඳහා අනිවාර්ය 200 OK
-    return NextResponse.json({ ok: true, received: true }, { status: 200 });
+    // Uber webhook validation requires 200 OK
+    return NextResponse.json(
+      { ok: true, received: true, ...(signatureVerified !== null ? { signatureVerified } : {}) },
+      { status: 200 }
+    );
   } catch (err: any) {
     console.error('Uber webhook handler error:', err);
     return NextResponse.json({ ok: true, received: true }, { status: 200 });

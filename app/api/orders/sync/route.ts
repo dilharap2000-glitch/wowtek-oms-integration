@@ -518,7 +518,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (platform === 'ubereats') {
-        const storeId = body.storeId || body.externalStoreId || 'eats-store-srilanka-0914';
+        const storeId =
+          body.storeId || body.externalStoreId || 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d';
         const uberPayload = {
           order_id: testOrderId,
           store_id: storeId,

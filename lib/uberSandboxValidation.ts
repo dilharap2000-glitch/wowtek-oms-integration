@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getUberAccessToken,
   getUberAccessTokenAttempt,
-  getUberBaseUrl,
   getUberCredentialState,
+  resolveUberConfigurationAsync,
   resolveUberEnvironment,
 } from '@/lib/uberToken';
 
@@ -24,29 +23,30 @@ export type UberSandboxTestResult = {
 };
 
 export async function getUberSandboxStatus() {
-  const resolvedEnv = resolveUberEnvironment();
-  const sandboxState = await getUberCredentialState(true);
-  const activeState = resolvedEnv === 'sandbox' ? sandboxState : await getUberCredentialState(false);
-  const defaultStoreId = DEFAULT_STORE_ID;
+  const resolved = await resolveUberConfigurationAsync();
+  const activeState = await getUberCredentialState();
+  const defaultStoreId = resolved.storeId || DEFAULT_STORE_ID;
 
   return NextResponse.json({
-    environment: sandboxState.baseUrl,
-    activeRuntimeEnvironment: resolvedEnv,
+    environment: resolved.baseUrl,
+    activeRuntimeEnvironment: resolved.env,
     activeBaseUrl: activeState.baseUrl,
-    tokenUrl: sandboxState.tokenUrl,
-    tokenConfigured: sandboxState.hasCredentials,
-    credentialSource: sandboxState.credentialSource,
-    credentialPair: sandboxState.credentialPair,
-    clientIdPreview: sandboxState.clientIdPreview,
-    partialWarning: sandboxState.partialWarning,
-    envOverridesMongo: sandboxState.envOverridesMongo,
-    conflictWarning: sandboxState.conflictWarning,
+    tokenUrl: activeState.tokenUrl,
+    tokenConfigured: activeState.hasCredentials,
+    secretConfigured: activeState.secretConfigured,
+    authSourceMode: activeState.authSourceMode,
+    credentialSource: activeState.credentialSource,
+    credentialPair: activeState.credentialPair,
+    clientIdPreview: activeState.clientIdPreview,
+    partialWarning: activeState.partialWarning,
+    envOverridesMongo: activeState.envOverridesMongo,
+    conflictWarning: activeState.conflictWarning,
     defaultStoreIdConfigured: Boolean(defaultStoreId),
     defaultStoreId: defaultStoreId || undefined,
-    ...(resolvedEnv !== 'sandbox'
+    ...(resolved.env !== 'sandbox'
       ? {
           runtimeWarning:
-            'Runtime is currently resolving to PRODUCTION for order actions; set UBER_ENV=sandbox if using the Test Store.',
+            'Runtime is currently resolving to PRODUCTION for order actions; switch Environment to Sandbox if using the Test Store.',
         }
       : {}),
   });
@@ -60,31 +60,26 @@ async function runSingleFeatureValidation(body: {
   order_id?: string;
   host?: string;
   integrator_store_id?: string;
+  default_prep_time?: number;
   environment?: 'sandbox' | 'production';
 }) {
+  const resolved = await resolveUberConfigurationAsync(
+    body.environment ? { explicitEnv: body.environment } : undefined
+  );
   const feature = String(body.feature || 'store_status').trim();
-  const storeId = String(body.storeId || body.store_id || DEFAULT_STORE_ID).trim();
+  const storeId = String(body.storeId || body.store_id || resolved.storeId || DEFAULT_STORE_ID).trim();
   const orderId = String(body.orderId || body.order_id || '').trim();
   const requestedHost = String(body.host || '').trim().replace(/\/+$/, '');
 
   const isTestPing = feature === 'test_ping';
-  const targetEnv = isTestPing
-    ? resolveUberEnvironment(
-        body.environment === 'sandbox'
-          ? true
-          : body.environment === 'production'
-          ? false
-          : undefined
-      )
-    : 'sandbox';
+  const targetEnv = body.environment ? resolveUberEnvironment(body.environment === 'sandbox') : resolved.env;
   const targetSandbox = targetEnv === 'sandbox';
 
-  const defaultHost = getUberBaseUrl(targetSandbox);
   const host = targetSandbox
     ? requestedHost && /sandbox|test-api/i.test(requestedHost)
       ? requestedHost
-      : defaultHost
-    : defaultHost;
+      : resolved.baseUrl
+    : resolved.baseUrl;
 
   const auth = await getUberAccessTokenAttempt(targetSandbox, {
     forceRefresh: isTestPing,
@@ -127,6 +122,14 @@ async function runSingleFeatureValidation(body: {
     endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/status`;
     method = 'POST';
     payload = { status: 'ONLINE' };
+  } else if (feature === 'set_store_paused') {
+    endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/status`;
+    method = 'POST';
+    payload = { status: 'PAUSED' };
+  } else if (feature === 'update_prep_time') {
+    endpoint = `${host}/v1/eats/store/${encodeURIComponent(storeId)}/prep-time`;
+    method = 'POST';
+    payload = { default_prep_time: Number(body.default_prep_time) || 15 };
   } else if (feature === 'activate_integration') {
     endpoint = `${host}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
     method = 'POST';
@@ -136,6 +139,16 @@ async function runSingleFeatureValidation(body: {
       is_order_manager_enabled: true,
       is_menu_manager_enabled: false,
     };
+  } else if (feature === 'update_integration') {
+    endpoint = `${host}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
+    method = 'PATCH';
+    payload = {
+      integrator_store_id: body.integrator_store_id || 'WOWTEK-CENTRAL-HUB',
+      is_order_manager_enabled: true,
+    };
+  } else if (feature === 'remove_integration') {
+    endpoint = `${host}/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`;
+    method = 'DELETE';
   } else if (feature === 'get_order') {
     if (!orderId) {
       return NextResponse.json(
@@ -213,6 +226,7 @@ export async function runUberSandboxValidation(req: NextRequest) {
     integrator_store_id?: string;
     host?: string;
     run_cancel?: boolean;
+    run_deprovision?: boolean;
     environment?: 'sandbox' | 'production';
   } = {};
 
@@ -235,23 +249,39 @@ export async function runUberSandboxValidation(req: NextRequest) {
     });
   }
 
-  const baseUrl = (body.host || getUberBaseUrl(true)).trim().replace(/\/+$/, '');
-  const accessToken = await getUberAccessToken(true);
+  const resolved = await resolveUberConfigurationAsync(
+    body.environment ? { explicitEnv: body.environment } : undefined
+  );
+  const targetSandbox = resolved.env === 'sandbox';
+  const baseUrl = (body.host || resolved.baseUrl).trim().replace(/\/+$/, '');
+  const auth = await getUberAccessTokenAttempt(targetSandbox);
 
-  if (!accessToken) {
+  if (!auth.ok || !auth.token) {
     return NextResponse.json(
-      { error: 'Uber Sandbox OAuth credentials හෝ access token එක සෙට් කර නැත.' },
-      { status: 400 }
+      {
+        error: auth.error || 'Uber OAuth credentials are not configured cleanly.',
+        status: auth.status || 401,
+        environment: auth.env || resolved.env,
+        tokenUrl: auth.tokenUrl,
+        credentialSource: auth.credentialSource,
+        conflictWarning: auth.conflictWarning,
+      },
+      { status: auth.status || 400 }
     );
   }
 
-  const storeId = (body.store_id || body.storeId || DEFAULT_STORE_ID).trim();
+  const storeId = (body.store_id || body.storeId || resolved.storeId || DEFAULT_STORE_ID).trim();
   const orderId = (body.order_id || body.orderId || '').trim();
-  const integrationId = body.integration_id?.trim() || storeId;
+  const integratorStoreId = (
+    body.integrator_store_id ||
+    body.integration_id ||
+    'WOWTEK-CENTRAL-HUB'
+  ).trim();
   const runCancel = Boolean(body.run_cancel);
+  const runDeprovision = Boolean(body.run_deprovision);
 
   const headers: HeadersInit = {
-    Authorization: `Bearer ${accessToken}`,
+    Authorization: `Bearer ${auth.token}`,
     'Content-Type': 'application/json',
   };
 
@@ -305,28 +335,55 @@ export async function runUberSandboxValidation(req: NextRequest) {
     }
   }
 
-  // 1. Store & Integration Endpoints (store_id අවශ්‍යයි)
+  // 1. Store & Integration Endpoints
   if (storeId) {
-    await callUber('Retrieve Store Status', 'GET', `/v1/eats/stores/${storeId}`);
+    await callUber(
+      'Retrieve Store Status',
+      'GET',
+      `/v1/eats/store/${encodeURIComponent(storeId)}/status`
+    );
 
-    await callUber('Set Store Status', 'POST', `/v1/eats/store/${storeId}/status`, {
+    await callUber('Set Store Status', 'POST', `/v1/eats/store/${encodeURIComponent(storeId)}/status`, {
       status: 'ONLINE',
     });
 
-    await callUber('Update Prep Time', 'POST', `/v1/eats/store/${storeId}/prep-time`, {
-      default_prep_time: 15,
-    });
+    await callUber(
+      'Update Prep Time',
+      'POST',
+      `/v1/eats/store/${encodeURIComponent(storeId)}/prep-time`,
+      {
+        default_prep_time: 15,
+      }
+    );
 
-    if (integrationId) {
-      await callUber('Update Integration Details', 'POST', `/v1/eats/stores/${storeId}/pos_data`, {
-        pos_data: {
-          integration_enabled: true,
-        },
-      });
+    await callUber(
+      'Activate Integration',
+      'POST',
+      `/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`,
+      {
+        store_id: storeId,
+        integrator_store_id: integratorStoreId,
+        is_order_manager_enabled: true,
+        is_menu_manager_enabled: false,
+      }
+    );
 
-      await callUber('Activate Integration', 'POST', `/v1/eats/stores/${storeId}/pos_data/activate`, {
-        integration_id: integrationId,
-      });
+    await callUber(
+      'Update Integration Details',
+      'PATCH',
+      `/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`,
+      {
+        integrator_store_id: integratorStoreId,
+        is_order_manager_enabled: true,
+      }
+    );
+
+    if (runDeprovision) {
+      await callUber(
+        'Remove Integration',
+        'DELETE',
+        `/v1/eats/stores/${encodeURIComponent(storeId)}/pos_data`
+      );
     }
   } else {
     results.push({
@@ -335,31 +392,34 @@ export async function runUberSandboxValidation(req: NextRequest) {
       path: '/v1/eats/stores/...',
       status: 'MISSING_STORE_ID',
       ok: false,
-      error: 'store_id ලබා දී නැත.',
+      error: 'Store UUID is required.',
     });
   }
 
-  // 2. Order Endpoints (order_id / UUID අවශ්‍යයි)
+  // 2. Order Endpoints (requires active Sandbox order_id UUID)
   if (orderId) {
-    await callUber('Get Order Details', 'GET', `/v2/eats/order/${orderId}`);
+    await callUber('Get Order Details', 'GET', `/v2/eats/order/${encodeURIComponent(orderId)}`);
 
-    await callUber('Accept Order', 'POST', `/v1/eats/orders/${orderId}/accept_pos_order`, {
-      reason: 'Accepted via WOWTEK OMS validation test',
-    });
+    await callUber(
+      'Accept Order',
+      'POST',
+      `/v1/eats/orders/${encodeURIComponent(orderId)}/accept_pos_order`,
+      {
+        reason: 'POS_ACCEPTED',
+      }
+    );
 
-    await callUber('Update Delivery Partner Count (DMC)', 'POST', `/v1/eats/orders/${orderId}/restaurant_delivery_status`, {
-      status: 'EN_ROUTE_TO_DROPOFF',
-    });
+    await callUber(
+      'Mark Order Ready',
+      'POST',
+      `/v1/eats/orders/${encodeURIComponent(orderId)}/restaurant_order_ready`,
+      {}
+    );
 
-    await callUber('Mark Order Ready', 'POST', `/v1/eats/orders/${orderId}/restaurant_delivery_status`, {
-      status: 'READY_FOR_PICKUP',
-    });
-
-    // Cancel / Deny test order එකක් මත පමණක් run කරන්න (live/active order එකක් නම් cancel වෙයි)
     if (runCancel) {
-      await callUber('Cancel Order', 'POST', `/v1/eats/orders/${orderId}/cancel`, {
+      await callUber('Deny / Cancel Order', 'POST', `/v1/eats/orders/${encodeURIComponent(orderId)}/deny_pos_order`, {
         reason: {
-          code: 'OTHER',
+          code: 'POS_NOT_READY',
           explanation: 'Validation test cancellation',
         },
       });
@@ -371,12 +431,15 @@ export async function runUberSandboxValidation(req: NextRequest) {
       path: '/v1/eats/orders/...',
       status: 'MISSING_ORDER_ID',
       ok: false,
-      error: 'Sandbox order UUID (order_id) ලබා දී නැත.',
+      error: 'Sandbox order UUID (order_id) was not provided.',
     });
   }
 
   return NextResponse.json({
-    environment: baseUrl,
+    environment: `${resolved.env} (${baseUrl})`,
+    tokenUrl: auth.tokenUrl,
+    credentialSource: auth.credentialSource,
+    clientIdPreview: auth.clientIdPreview,
     tested_at: new Date().toISOString(),
     results,
   });

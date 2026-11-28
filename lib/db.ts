@@ -53,6 +53,7 @@ const INITIAL_API_CONFIG: ApiIntegrationConfig = {
   oauthClientId: '',
   uberEatsClientSecret: '',
   uberEnv: 'sandbox',
+  uberAuthSource: 'auto',
   transExpressAccountId: 'TX-ACCT-SL-9082',
   transExpressApiKey: 'tx_live_e9914bca88172c',
   transExpressPickupBranch: 'Colombo Main Sorting Facility (Borella)',
@@ -1107,9 +1108,16 @@ export async function getApiConfig(): Promise<ApiIntegrationConfig> {
         const data = await res.json();
         if (data.apiConfig) {
           const mock = initMockDb();
-          mock.apiConfig = { ...INITIAL_API_CONFIG, ...data.apiConfig };
+          const updated = { ...INITIAL_API_CONFIG, ...data.apiConfig, uberEatsClientSecret: '' };
+          if (updated.uberEatsClientId === 'custom_oauth_client_9941' || updated.uberEatsClientId === 'uber_client_id_lk_881920') {
+            updated.uberEatsClientId = '';
+          }
+          if (updated.oauthClientId === 'custom_oauth_client_9941' || updated.oauthClientId === 'uber_client_id_lk_881920') {
+            updated.oauthClientId = '';
+          }
+          mock.apiConfig = updated;
           persistMockDb();
-          return mock.apiConfig;
+          return updated;
         }
       }
     } catch {}

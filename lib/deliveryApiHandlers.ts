@@ -61,9 +61,9 @@ export async function handleV1Get(request: NextRequest | Request) {
         message: 'Stores retrieved successfully',
         stores: deliveryStores.length > 0 ? deliveryStores : [
           {
-            store_id: 'eats-store-srilanka-0914',
-            name: 'WOWTEK Colombo Central Hub',
-            branch_name: 'Colombo 03 (Flagship)',
+            store_id: 'ba8761b9-5679-4bcd-845d-8b0baacf9e5d',
+            name: 'WOW TEK1 (Uber Eats Test Store)',
+            branch_name: 'Central Hub',
             platform: 'ubereats',
             status: 'active',
           },
