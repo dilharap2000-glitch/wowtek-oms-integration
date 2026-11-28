@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToMongoDB } from '@/lib/mongodb';
+import { connectToMongoDB, isMongoConfigured } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getServerStore, saveServerOrder, deleteServerOrder } from '@/lib/serverStore';
 import { Order, Product, ProductAlias } from '@/types';
@@ -9,27 +9,49 @@ import { formatSriLankanPhone } from '@/lib/phoneUtils';
 
 export const dynamic = 'force-dynamic';
 
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+};
+
 export async function GET() {
+  const mongoConfigured = isMongoConfigured();
   try {
     const mongoConn = await connectToMongoDB();
     if (mongoConn) {
       const orders = await mongoConn.db
         .collection('orders')
         .find({})
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1, _id: -1 })
         .toArray();
       const cleanOrders = orders.map(({ _id, ...rest }) => ({
         ...rest,
+        _id: _id.toString(),
         id: (rest as Partial<Order>).id || _id.toString(),
-      })) as Order[];
-      return NextResponse.json(cleanOrders);
+      })) as unknown as Order[];
+      return NextResponse.json(cleanOrders, { headers: NO_CACHE_HEADERS });
+    }
+    if (mongoConfigured) {
+      console.error('[Orders API GET] MongoDB Atlas configured but unavailable.');
+      return NextResponse.json(
+        { error: 'MongoDB Atlas unavailable' },
+        { status: 503, headers: NO_CACHE_HEADERS }
+      );
     }
   } catch (err: any) {
-    console.warn('[Orders API GET] MongoDB read error:', err.message);
+    console.error('[Orders API GET] MongoDB read error:', err?.message || err);
+    if (mongoConfigured) {
+      return NextResponse.json(
+        { error: err?.message || 'MongoDB read error' },
+        { status: 503, headers: NO_CACHE_HEADERS }
+      );
+    }
   }
 
   const store = getServerStore();
-  return NextResponse.json(store.orders);
+  return NextResponse.json(store.orders, { headers: NO_CACHE_HEADERS });
 }
 
 export async function POST(req: NextRequest) {

@@ -663,3 +663,52 @@ export async function executeUberOrderAction(params: {
     uberResponse: lastFailure?.uberResponse,
   };
 }
+
+export interface UberOrderActionResult {
+  ok: boolean;
+  status: number;
+  url: string;
+  env?: string;
+  nextStatus?: OrderStatus;
+  error?: string;
+  uberResponse?: unknown;
+}
+
+/**
+ * Authenticates with Uber Eats OAuth 2.0 (eats.order scope),
+ * sends POST /v1/eats/orders/{order_id}/accept_pos_order,
+ * and returns the verified result (HTTP 204 = accepted on Uber Eats).
+ */
+export async function acceptUberEatsOrder(
+  orderId: string,
+  options?: { reason?: string; isSandbox?: boolean }
+): Promise<UberOrderActionResult> {
+  const cleanOrderId = String(orderId || '').trim();
+  if (!cleanOrderId) {
+    return {
+      ok: false,
+      status: 400,
+      url: '',
+      error: 'Uber Eats orderId is required.',
+    };
+  }
+
+  const result = await executeUberOrderAction({
+    orderId: cleanOrderId,
+    action: 'ACCEPT',
+    reason: options?.reason || 'POS_ACCEPTED',
+    isSandbox: options?.isSandbox,
+  });
+
+  if (result.status !== 204) {
+    return {
+      ...result,
+      ok: false,
+      error:
+        result.error ||
+        `Uber Eats returned HTTP ${result.status} (expected HTTP 204 No Content)`,
+    };
+  }
+
+  return result;
+}

@@ -85,7 +85,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
 }) => {
   const [selectedEventForPayload, setSelectedEventForPayload] = useState<WebhookEvent | null>(null);
   const [liveEvents, setLiveEvents] = useState<WebhookEvent[]>(events || []);
-  const optimisticEventStatusRef = useRef<Record<string, string>>({});
+  const optimisticEventStatusRef = useRef<Record<string, { status: string; setAt: number }>>({});
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -111,6 +111,12 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
 
   useEffect(() => {
     const overrides = optimisticEventStatusRef.current;
+    const now = Date.now();
+    for (const [k, entry] of Object.entries(overrides)) {
+      if (!entry || now - entry.setAt > 4000) {
+        delete overrides[k];
+      }
+    }
     if (!overrides || Object.keys(overrides).length === 0) {
       setLiveEvents(events || []);
       return;
@@ -120,11 +126,16 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         const keys = extractNormalizedOrderKeys(ev);
         const match = keys.find((k) => overrides[k]);
         if (!match) return ev;
-        const next = overrides[match];
+        const entry = overrides[match];
+        const serverStatus = String((ev as any).uberStatus || ev.orderStatus || '').trim().toUpperCase();
+        if (serverStatus === String(entry.status).trim().toUpperCase()) {
+          delete overrides[match];
+          return ev;
+        }
         return {
           ...ev,
-          orderStatus: next,
-          uberStatus: next,
+          orderStatus: entry.status,
+          uberStatus: entry.status,
         } as WebhookEvent;
       })
     );
@@ -229,8 +240,9 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
           : 'CANCELLED')
       ) as OrderStatus;
 
+      const nowMs = Date.now();
       for (const k of targetKeys) {
-        optimisticEventStatusRef.current[k] = confirmedStatus;
+        optimisticEventStatusRef.current[k] = { status: confirmedStatus, setAt: nowMs };
       }
 
       const matchesTarget = (item: any) => {
@@ -254,6 +266,8 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
       if (onOrderStatusSync) {
         onOrderStatusSync(order, confirmedStatus);
       }
+
+      void onRefreshEvents?.();
 
       setOrderActionFeedback({
         message:

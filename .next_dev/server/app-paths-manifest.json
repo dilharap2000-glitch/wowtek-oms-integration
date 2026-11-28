@@ -1,8 +1,8 @@
 {
-  "/api/orders/action/route": "app/api/orders/action/route.js",
-  "/api/sync/live/route": "app/api/sync/live/route.js",
   "/api/orders/route": "app/api/orders/route.js",
-  "/api/webhooks/pickme/route": "app/api/webhooks/pickme/route.js",
+  "/api/sync/live/route": "app/api/sync/live/route.js",
+  "/api/orders/action/route": "app/api/orders/action/route.js",
   "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
+  "/api/webhooks/pickme/route": "app/api/webhooks/pickme/route.js",
   "/api/webhooks/woocommerce/route": "app/api/webhooks/woocommerce/route.js"
 }

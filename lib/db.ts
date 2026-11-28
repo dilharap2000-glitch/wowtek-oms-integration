@@ -250,11 +250,14 @@ export async function savePaymentGateways(gateways: PaymentGatewayConfig[]): Pro
 export async function getOrders(): Promise<Order[]> {
   if (typeof window !== 'undefined') {
     try {
-      const res = await fetch('/api/orders', { cache: 'no-store' });
+      const res = await fetch('/api/orders', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      });
       if (res.ok) {
         const data = await res.json();
-        const orderList = Array.isArray(data) ? data : (Array.isArray(data.orders) ? data.orders : []);
-        if (orderList.length > 0) {
+        const orderList = Array.isArray(data) ? data : (Array.isArray(data.orders) ? data.orders : null);
+        if (Array.isArray(orderList)) {
           const mock = initMockDb();
           mock.orders = orderList;
           persistMockDb();

@@ -1,4 +1,5 @@
 export {
+  acceptUberEatsOrder,
   clearUberAccessTokenCache,
   executeUberOrderAction,
   getUberAccessToken,
@@ -6,4 +7,5 @@ export {
   hasUberCredentialsConfigured,
   isUberSandboxMode,
   type UberOrderAction,
+  type UberOrderActionResult,
 } from './uberToken';

@@ -1,19 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerStore, saveServerOrder, clearServerWebhookEvents } from '@/lib/serverStore';
-import { connectToMongoDB } from '@/lib/mongodb';
+import { connectToMongoDB, isMongoConfigured } from '@/lib/mongodb';
 import { Order, TransExpressWaybill, WebhookEvent, StoreMapping, Product } from '@/types';
 import { DEFAULT_STORE_MAPPINGS } from '@/lib/storeMappings';
 
 export const dynamic = 'force-dynamic';
 
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+};
+
 /**
  * GET /api/sync/live
- * Fast live synchronization endpoint used by client-side dashboard polling (every 2s).
- * Connects directly to MongoDB Atlas when available without relying on Mock state,
- * and falls back gracefully to serverStore only if explicitly offline.
+ * Fast live synchronization endpoint used by client-side dashboard polling.
+ * Connects directly to MongoDB Atlas as primary source of truth,
+ * and avoids returning stale process-local orders when Atlas is configured but unavailable.
  */
 export async function GET() {
   const store = getServerStore();
+  const mongoConfigured = isMongoConfigured();
   let atlasConnected = false;
   let mongoDbName = '';
   let atlasOrders: Order[] = [];
@@ -33,10 +41,9 @@ export async function GET() {
         mongoConn.db
           .collection('orders')
           .find({})
-          .sort({ createdAt: -1 })
+          .sort({ createdAt: -1, _id: -1 })
           .limit(100)
-          .toArray()
-          .catch(() => []),
+          .toArray(),
         mongoConn.db
           .collection('waybills')
           .find({})
@@ -47,7 +54,7 @@ export async function GET() {
         mongoConn.db
           .collection('webhook_events')
           .find({})
-          .sort({ receivedAt: -1 })
+          .sort({ receivedAt: -1, _id: -1 })
           .limit(50)
           .toArray()
           .catch(() => []),
@@ -65,16 +72,18 @@ export async function GET() {
 
       atlasOrders = orderDocs.map(({ _id, ...rest }) => ({
         ...rest,
+        _id: _id.toString(),
         id: (rest as Partial<Order>).id || _id.toString(),
-      })) as Order[];
+      })) as unknown as Order[];
       atlasWaybills = waybillDocs.map(({ _id, ...rest }) => ({
         ...rest,
         id: (rest as Partial<TransExpressWaybill>).id || _id.toString(),
       })) as TransExpressWaybill[];
       atlasEvents = eventDocs.map(({ _id, ...rest }) => ({
         ...rest,
+        _id: _id.toString(),
         id: (rest as Partial<WebhookEvent>).id || _id.toString(),
-      })) as WebhookEvent[];
+      })) as unknown as WebhookEvent[];
       if (storeDocs && storeDocs.length > 0) {
         atlasStores = storeDocs.map(({ _id, ...rest }) => ({
           ...rest,
@@ -88,23 +97,26 @@ export async function GET() {
         })) as Product[];
       }
     }
-  } catch {
-    // MongoDB offline or unconfigured
+  } catch (err) {
+    console.error('[Sync Live GET Error]:', err);
     atlasConnected = false;
   }
 
-  // When Atlas is connected, use Atlas records directly without falling back to mock state
-  const finalOrders = atlasConnected ? atlasOrders : store.orders;
-  const finalWaybills = atlasConnected ? atlasWaybills : store.waybills;
-  const finalEvents = atlasConnected ? atlasEvents : store.webhookEvents;
+  // If MongoDB Atlas is configured but unavailable, do NOT return stale process-local memory pretending to be synced
+  const shouldUseLocalFallback = !atlasConnected && !mongoConfigured;
+  const finalOrders = atlasConnected ? atlasOrders : shouldUseLocalFallback ? store.orders : null;
+  const finalWaybills = atlasConnected ? atlasWaybills : shouldUseLocalFallback ? store.waybills : null;
+  const finalEvents = atlasConnected ? atlasEvents : shouldUseLocalFallback ? store.webhookEvents : null;
   const finalStores = atlasStores.length > 0 ? atlasStores : DEFAULT_STORE_MAPPINGS;
 
   return NextResponse.json(
     {
-      success: true,
-      dbStatus: atlasConnected ? 'connected' : 'fallback',
+      success: atlasConnected || shouldUseLocalFallback,
+      dbStatus: atlasConnected ? 'connected' : mongoConfigured ? 'offline' : 'fallback',
       databaseEngine: atlasConnected
         ? 'MongoDB Atlas Connected (Live)'
+        : mongoConfigured
+        ? 'MongoDB Atlas Temporarily Unavailable'
         : 'Mock DB Fallback (Offline)',
       databaseName: mongoDbName || (atlasConnected ? 'wowtek_pro' : 'in-memory'),
       orders: finalOrders,
@@ -118,11 +130,8 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     },
     {
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-      },
+      status: !atlasConnected && mongoConfigured ? 503 : 200,
+      headers: NO_CACHE_HEADERS,
     }
   );
 }

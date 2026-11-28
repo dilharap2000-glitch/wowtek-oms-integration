@@ -48,6 +48,21 @@ interface DashboardTabProps {
     supplier?: string
   ) => Promise<any>;
   onOrderStatusSync?: (rawOrder: any, nextStatus: Order['status']) => void;
+  onAcceptUberEatsOrder?: (
+    rawOrder: any,
+    reason?: string
+  ) => Promise<{
+    ok: boolean;
+    synced?: boolean;
+    status?: string;
+    nextStatus?: string;
+    uberStatus?: number | string;
+    uberStatusCode?: number | string;
+    uberError?: string | null;
+    error?: string;
+    message?: string;
+  }>;
+  onRefreshLiveSync?: () => Promise<void> | void;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -65,6 +80,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onTriggerTestOrder,
   onRestockProduct,
   onOrderStatusSync,
+  onAcceptUberEatsOrder,
+  onRefreshLiveSync,
 }) => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = React.useState<Order | null>(null);
   const [selectedOrderForThermalPrint, setSelectedOrderForThermalPrint] = React.useState<Order | null>(null);
@@ -89,11 +106,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [orderFilterTab, setOrderFilterTab] = React.useState<'ALL' | 'NEW' | 'PREPARING' | 'READY' | 'DONE'>('ALL');
   const [orderSearch, setOrderSearch] = React.useState('');
 
-  // Auto-refresh orders polling (15-second interval with rate-limit backoff)
+  // Auto-refresh orders polling (3-second interval + visibility/focus resume with sequence & rate-limit guards)
   const [liveOrders, setLiveOrders] = React.useState<Order[]>(orders || []);
   const isFetchingOrdersRef = React.useRef(false);
   const rateLimitUntilRef = React.useRef(0);
-  const optimisticStatusRef = React.useRef<Record<string, string>>({});
+  const fetchSeqRef = React.useRef(0);
+  const latestAppliedOrderSeqRef = React.useRef(0);
+  const optimisticStatusRef = React.useRef<
+    Record<string, { status: string; setAt: number }>
+  >({});
   const inFlightActionKeysRef = React.useRef<Set<string>>(new Set());
 
   type UberOrderActionTarget = {
@@ -165,16 +186,36 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const applyOptimisticOverrides = React.useCallback((list: Order[]): Order[] => {
     const overrides = optimisticStatusRef.current;
     if (!overrides || Object.keys(overrides).length === 0) return list;
+
+    const now = Date.now();
+    for (const [k, entry] of Object.entries(overrides)) {
+      if (!entry || now - entry.setAt > 4000) {
+        delete overrides[k];
+      }
+    }
+    if (Object.keys(overrides).length === 0) return list;
+
     return list.map((o) => {
       const candidateKeys = extractNormalizedOrderKeys(o);
       const matchedKey = candidateKeys.find((k) => overrides[k]);
       if (!matchedKey) return o;
-      const next = overrides[matchedKey];
+      const entry = overrides[matchedKey];
+      const serverStatus = String((o as any).uberStatus || o.status || '').trim().toUpperCase();
+      const serverUpdatedMs = o.updatedAt ? Date.parse(String(o.updatedAt)) : NaN;
+
+      if (
+        serverStatus === String(entry.status).trim().toUpperCase() ||
+        (!Number.isNaN(serverUpdatedMs) && serverUpdatedMs > entry.setAt + 250)
+      ) {
+        delete overrides[matchedKey];
+        return o;
+      }
+
       return {
         ...o,
-        status: next,
-        uberStatus: next,
-        orderStatus: next,
+        status: entry.status,
+        uberStatus: entry.status,
+        orderStatus: entry.status,
       } as Order;
     });
   }, [extractNormalizedOrderKeys]);
@@ -182,11 +223,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const fetchOrders = React.useCallback(async (force = false) => {
     if (typeof document !== 'undefined' && document.hidden && !force) return;
     if (!force && Date.now() < rateLimitUntilRef.current) return;
-    if (isFetchingOrdersRef.current) return;
+    if (!force && isFetchingOrdersRef.current) return;
 
     isFetchingOrdersRef.current = true;
+    const reqSeq = ++fetchSeqRef.current;
     try {
-      const res = await fetch('/api/orders', { cache: 'no-store' }); // ඔයාගේ orders ගන්න API එක
+      const res = await fetch('/api/orders', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      });
       if (res.status === 429) {
         rateLimitUntilRef.current = Date.now() + 30_000;
         return;
@@ -204,8 +249,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       }
 
       const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.orders || []);
-      if (Array.isArray(list) && list.length > 0) {
+      const list = Array.isArray(data) ? data : (Array.isArray(data.orders) ? data.orders : null);
+      if (Array.isArray(list)) {
+        if (reqSeq < latestAppliedOrderSeqRef.current) return;
+        latestAppliedOrderSeqRef.current = reqSeq;
         setLiveOrders(applyOptimisticOverrides(list));
       }
     } catch (err) {
@@ -218,12 +265,36 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   React.useEffect(() => {
     const interval = setInterval(() => {
       void fetchOrders(false);
-    }, 15000);
+    }, 3000);
 
-    return () => clearInterval(interval);
+    const handleResumeSync = () => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        void fetchOrders(true);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleResumeSync);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleResumeSync);
+      window.addEventListener('online', handleResumeSync);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleResumeSync);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleResumeSync);
+        window.removeEventListener('online', handleResumeSync);
+      }
+    };
   }, [fetchOrders]);
 
   React.useEffect(() => {
+    latestAppliedOrderSeqRef.current = ++fetchSeqRef.current;
     setLiveOrders(applyOptimisticOverrides(orders || []));
   }, [orders, applyOptimisticOverrides]);
 
@@ -264,30 +335,43 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     setOrderActionLoading(`${targetOrderId}-${normalizedAction}`);
 
     try {
-      const res = await fetch('/api/orders/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: targetOrderId,
-          action: normalizedAction,
-          reason,
-          storeId: order.storeId || order.externalStoreId,
-        }),
-      });
+      let httpStatus = 200;
+      let data: any = {};
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok || !data?.synced) {
-        const errCode = data?.uberStatusCode || data?.uberStatus || res.status;
+      if (normalizedAction === 'ACCEPT' && onAcceptUberEatsOrder) {
+        data = await onAcceptUberEatsOrder(order, reason);
+        httpStatus = Number(data?.uberStatusCode || data?.uberStatus || (data?.ok ? 204 : 502));
+      } else {
+        const res = await fetch('/api/orders/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: targetOrderId,
+            action: normalizedAction,
+            reason,
+            storeId: order.storeId || order.externalStoreId,
+          }),
+        });
+        httpStatus = res.status;
+        data = await res.json().catch(() => ({}));
+      }
+
+      const acceptNon204 =
+        normalizedAction === 'ACCEPT' &&
+        Number(data?.uberStatusCode ?? data?.uberStatus ?? httpStatus) !== 204;
+
+      if (!data?.ok || !data?.synced || acceptNon204) {
+        const errCode = data?.uberStatusCode || data?.uberStatus || httpStatus;
         const errMsg =
           data?.uberError ||
           data?.error ||
           data?.message ||
-          `Uber Eats rejected ${normalizedAction} request.`;
+          `Uber Eats returned HTTP ${errCode} (expected 204)`;
 
         console.error('[Uber Eats Order Action Failed]:', {
           action: normalizedAction,
           orderId: targetOrderId,
-          httpStatus: res.status,
+          httpStatus,
           uberStatusCode: errCode,
           error: errMsg,
           response: data,
@@ -311,8 +395,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           : 'CANCELLED')
       ) as Order['status'];
 
+      const nowMs = Date.now();
+      latestAppliedOrderSeqRef.current = ++fetchSeqRef.current;
       for (const k of targetKeys) {
-        optimisticStatusRef.current[k] = confirmedStatus;
+        optimisticStatusRef.current[k] = { status: confirmedStatus, setAt: nowMs };
       }
 
       const matchesTarget = (o: any) => {
@@ -344,6 +430,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       if (onOrderStatusSync) {
         onOrderStatusSync(order, confirmedStatus);
       }
+
+      void fetchOrders(true);
+      void onRefreshLiveSync?.();
 
       setOrderActionToast({
         message:
@@ -407,9 +496,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   };
 
-  // Defensive array bindings
+  // Defensive array bindings — do not fall back to stale orders when liveOrders is explicitly []
   const safeOrders = React.useMemo(
-    () => (liveOrders && liveOrders.length > 0 ? liveOrders : orders) || [],
+    () => (Array.isArray(liveOrders) ? liveOrders : orders) || [],
     [liveOrders, orders]
   );
   const safeWaybills = waybills || [];

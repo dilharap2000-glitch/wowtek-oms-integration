@@ -88,6 +88,7 @@ import {
   clearWebhookEvents,
   checkDatabaseHealth,
 } from '@/lib/db';
+import { acceptUberEatsOrderAction } from '@/app/actions/ubereats';
 
 import { DashboardTab } from '@/src/components/DashboardTab';
 import { PosTab } from '@/src/components/PosTab';
@@ -148,7 +149,13 @@ export default function WowtekProApp() {
   const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
   const [aliases, setAliases] = useState<ProductAlias[]>([]);
   const [stores, setStores] = useState<StoreMapping[]>([]);
-  const optimisticStatusMapRef = React.useRef<Record<string, Order['status']>>({});
+  const optimisticStatusMapRef = React.useRef<
+    Record<string, { status: Order['status']; setAt: number }>
+  >({});
+  const syncSeqRef = React.useRef(0);
+  const latestAppliedSyncSeqRef = React.useRef(0);
+  const isSyncingRef = React.useRef(false);
+  const rateLimitUntilRef = React.useRef(0);
 
   const [dbHealth, setDbHealth] = useState<{
     status: 'connected' | 'fallback';
@@ -222,32 +229,40 @@ export default function WowtekProApp() {
       }
 
       // Initial fast live server sync
+      const reqSeq = ++syncSeqRef.current;
       try {
-        const liveRes = await fetch('/api/sync/live', { cache: 'no-store' });
-        if (liveRes.ok) {
+        const liveRes = await fetch('/api/sync/live', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+        });
+        const contentType = liveRes.headers.get('content-type') || '';
+        if (liveRes.ok && contentType.includes('application/json')) {
           const liveData = await liveRes.json();
-          if (Array.isArray(liveData.orders)) {
-            setOrders(liveData.orders);
-          }
-          if (Array.isArray(liveData.waybills)) {
-            setWaybills(liveData.waybills);
-          }
-          if (Array.isArray(liveData.webhookEvents)) {
-            setWebhookEvents(liveData.webhookEvents);
-          }
-          if (Array.isArray(liveData.stores)) {
-            setStores(liveData.stores);
-          }
-          if (liveData.dbStatus) {
-            setDbHealth({
-              status: liveData.dbStatus === 'connected' ? 'connected' : 'fallback',
-              latencyMs: 12,
-              database:
-                liveData.databaseEngine ||
-                (liveData.dbStatus === 'connected'
-                  ? 'MongoDB Atlas Connected (Live)'
-                  : 'Mock DB Fallback (Offline)'),
-            });
+          if (reqSeq >= latestAppliedSyncSeqRef.current) {
+            latestAppliedSyncSeqRef.current = reqSeq;
+            if (Array.isArray(liveData.orders)) {
+              setOrders(liveData.orders);
+            }
+            if (Array.isArray(liveData.waybills)) {
+              setWaybills(liveData.waybills);
+            }
+            if (Array.isArray(liveData.webhookEvents)) {
+              setWebhookEvents(liveData.webhookEvents);
+            }
+            if (Array.isArray(liveData.stores)) {
+              setStores(liveData.stores);
+            }
+            if (liveData.dbStatus) {
+              setDbHealth({
+                status: liveData.dbStatus === 'connected' ? 'connected' : 'fallback',
+                latencyMs: 12,
+                database:
+                  liveData.databaseEngine ||
+                  (liveData.dbStatus === 'connected'
+                    ? 'MongoDB Atlas Connected (Live)'
+                    : 'Mock DB Fallback (Offline)'),
+              });
+            }
           }
         }
       } catch {
@@ -321,8 +336,10 @@ export default function WowtekProApp() {
                 .map((v: unknown) => String(v).replace(/^#/, '').trim().toLowerCase());
               const nextStatus = data.status as Order['status'];
               if (targetIds.length > 0) {
+                const nowMs = Date.now();
+                latestAppliedSyncSeqRef.current = ++syncSeqRef.current;
                 for (const k of targetIds) {
-                  optimisticStatusMapRef.current[k] = nextStatus;
+                  optimisticStatusMapRef.current[k] = { status: nextStatus, setAt: nowMs };
                 }
                 const matchesIds = (item: any) => {
                   const vals = [
@@ -376,61 +393,109 @@ export default function WowtekProApp() {
     };
   }, []);
 
-  // Periodic Live Polling from Server API (/api/sync/live every 15s with 429 backoff)
-  // Ensures incoming Webhook events stay synced while avoiding proxy rate limits
-  useEffect(() => {
-    let isSyncing = false;
-    let rateLimitUntil = 0;
+  const applyStatusOverrides = React.useCallback(
+    <T extends Record<string, any>>(list: T[], isEvent = false): T[] => {
+      const map = optimisticStatusMapRef.current;
+      if (!map || Object.keys(map).length === 0) return list;
 
-    const syncServerData = async () => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      if (Date.now() < rateLimitUntil || isSyncing) return;
-      isSyncing = true;
+      const now = Date.now();
+      for (const [k, entry] of Object.entries(map)) {
+        if (!entry || now - entry.setAt > 4000) {
+          delete map[k];
+        }
+      }
+      if (Object.keys(map).length === 0) return list;
+
+      return list.map((item) => {
+        const vals = [
+          item?.id,
+          item?._id,
+          item?.orderId,
+          item?.order_id,
+          item?.uberOrderId,
+          item?.uber_order_id,
+          item?.orderNumber,
+          item?.invoiceNumber,
+          item?.invoiceRef,
+          item?.reference,
+          item?.display_id,
+          item?.eventId,
+        ];
+        const serverStatus = String(
+          isEvent ? item?.uberStatus || item?.orderStatus || '' : item?.uberStatus || item?.status || ''
+        )
+          .trim()
+          .toUpperCase();
+        const serverUpdatedMs = item?.updatedAt ? Date.parse(String(item.updatedAt)) : NaN;
+
+        for (const v of vals) {
+          const norm = String(v || '').replace(/^#/, '').trim().toLowerCase();
+          if (!norm) continue;
+          const stripped = norm.replace(/^uber-/i, '');
+          const matchedKey = map[norm] ? norm : map[stripped] ? stripped : '';
+          const entry = matchedKey ? map[matchedKey] : undefined;
+          if (!entry) continue;
+
+          // If server already reflects the same status or has a newer updatedAt, clear override
+          if (
+            serverStatus === String(entry.status).trim().toUpperCase() ||
+            (!Number.isNaN(serverUpdatedMs) && serverUpdatedMs > entry.setAt + 250)
+          ) {
+            delete map[matchedKey];
+            return item;
+          }
+
+          return isEvent
+            ? ({ ...item, orderStatus: entry.status, uberStatus: entry.status } as T)
+            : ({ ...item, status: entry.status, uberStatus: entry.status, orderStatus: entry.status } as T);
+        }
+        return item;
+      });
+    },
+    []
+  );
+
+  const syncServerData = React.useCallback(
+    async (force = false) => {
+      if (!force && typeof document !== 'undefined' && document.hidden) return;
+      if (!force && Date.now() < rateLimitUntilRef.current) return;
+      if (!force && isSyncingRef.current) return;
+
+      isSyncingRef.current = true;
+      const reqSeq = ++syncSeqRef.current;
 
       try {
         const start = Date.now();
-        const res = await fetch('/api/sync/live', { cache: 'no-store' });
+        const res = await fetch('/api/sync/live', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+        });
         if (res.status === 429) {
-          rateLimitUntil = Date.now() + 30_000;
+          rateLimitUntilRef.current = Date.now() + 30_000;
           return;
         }
         const contentType = res.headers.get('content-type') || '';
-        if (res.ok && contentType.includes('application/json')) {
+        if (contentType.includes('application/json')) {
           const data = await res.json();
           const latency = Date.now() - start;
 
-          const applyStatusOverrides = <T extends Record<string, any>>(list: T[], isEvent = false): T[] => {
-            const map = optimisticStatusMapRef.current;
-            if (!map || Object.keys(map).length === 0) return list;
-            return list.map((item) => {
-              const vals = [
-                item?.id,
-                item?._id,
-                item?.orderId,
-                item?.order_id,
-                item?.uberOrderId,
-                item?.uber_order_id,
-                item?.orderNumber,
-                item?.invoiceNumber,
-                item?.invoiceRef,
-                item?.reference,
-                item?.display_id,
-                item?.eventId,
-              ];
-              for (const v of vals) {
-                const norm = String(v || '').replace(/^#/, '').trim().toLowerCase();
-                if (!norm) continue;
-                const stripped = norm.replace(/^uber-/i, '');
-                const next = map[norm] || map[stripped];
-                if (next) {
-                  return isEvent
-                    ? ({ ...item, orderStatus: next, uberStatus: next } as T)
-                    : ({ ...item, status: next, uberStatus: next, orderStatus: next } as T);
-                }
-              }
-              return item;
+          if (data.dbStatus) {
+            setDbHealth({
+              status: data.dbStatus === 'connected' ? 'connected' : 'fallback',
+              latencyMs: latency,
+              database:
+                data.databaseEngine ||
+                (data.dbStatus === 'connected'
+                  ? 'MongoDB Atlas Connected (Live)'
+                  : 'Mock DB Fallback (Offline)'),
             });
-          };
+          }
+
+          if (!res.ok) return;
+
+          // Drop stale out-of-order responses that finished after a newer request/action
+          if (reqSeq < latestAppliedSyncSeqRef.current) return;
+          latestAppliedSyncSeqRef.current = reqSeq;
 
           if (Array.isArray(data.orders)) {
             setOrders(applyStatusOverrides(data.orders, false));
@@ -451,46 +516,47 @@ export default function WowtekProApp() {
           if (Array.isArray(data.webhookEvents)) {
             setWebhookEvents(applyStatusOverrides(data.webhookEvents, true));
           }
-
-          if (data.dbStatus) {
-            setDbHealth({
-              status: data.dbStatus === 'connected' ? 'connected' : 'fallback',
-              latencyMs: latency,
-              database:
-                data.databaseEngine ||
-                (data.dbStatus === 'connected'
-                  ? 'MongoDB Atlas Connected (Live)'
-                  : 'Mock DB Fallback (Offline)'),
-            });
-          }
         }
       } catch {
         // Keep current state
       } finally {
-        isSyncing = false;
+        isSyncingRef.current = false;
+      }
+    },
+    [applyStatusOverrides]
+  );
+
+  // Authoritative MongoDB-backed live polling every 3s + immediate sync on tab focus/resume
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      void syncServerData(false);
+    }, 3000);
+
+    const handleResumeSync = () => {
+      if (typeof document === 'undefined' || !document.hidden) {
+        void syncServerData(true);
       }
     };
 
-    const intervalId = setInterval(syncServerData, 15000);
-
-    // Also listen for BroadcastChannel updates if available
-    let channel: BroadcastChannel | null = null;
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        channel = new BroadcastChannel('wowtek_live_sync');
-        channel.onmessage = () => {
-          void syncServerData();
-        };
-      } catch {
-        // Ignore
-      }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleResumeSync);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleResumeSync);
+      window.addEventListener('online', handleResumeSync);
     }
 
     return () => {
       clearInterval(intervalId);
-      if (channel) channel.close();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleResumeSync);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleResumeSync);
+        window.removeEventListener('online', handleResumeSync);
+      }
     };
-  }, []);
+  }, [syncServerData]);
 
   // Handlers for Orders & POS Invoicing
   const handleCreateOrder = async (newOrder: Order) => {
@@ -838,8 +904,10 @@ export default function WowtekProApp() {
     const targetKeys = extractKeys(rawOrder);
     if (targetKeys.length === 0) return;
 
+    const nowMs = Date.now();
+    latestAppliedSyncSeqRef.current = ++syncSeqRef.current;
     for (const k of targetKeys) {
-      optimisticStatusMapRef.current[k] = nextStatus;
+      optimisticStatusMapRef.current[k] = { status: nextStatus, setAt: nowMs };
     }
 
     const matchesTarget = (item: any) => {
@@ -872,6 +940,45 @@ export default function WowtekProApp() {
           : item
       )
     );
+  };
+
+  const handleAcceptUberEatsOrder = async (rawOrder: any, reason?: string) => {
+    const targetOrderId = String(
+      rawOrder?.uber_order_id ||
+        rawOrder?.uberOrderId ||
+        rawOrder?.orderId ||
+        rawOrder?.order_id ||
+        rawOrder?.eventId ||
+        rawOrder?.orderNumber ||
+        rawOrder?.invoiceNumber ||
+        rawOrder?.id ||
+        rawOrder?._id ||
+        ''
+    )
+      .replace(/^#/, '')
+      .trim();
+
+    if (!targetOrderId) {
+      return {
+        ok: false,
+        synced: false,
+        uberStatusCode: 400,
+        error: 'Valid Uber Eats Order ID not found for this order.',
+      };
+    }
+
+    const result = await acceptUberEatsOrderAction({
+      orderId: targetOrderId,
+      storeId: rawOrder?.storeId || rawOrder?.externalStoreId,
+      reason,
+    });
+
+    if (result.ok && result.synced && (result.uberStatusCode === 204 || result.uberStatus === 204)) {
+      handleSyncOrderStatus(rawOrder, (result.status || 'ACCEPTED') as Order['status']);
+      void syncServerData(true);
+    }
+
+    return result;
   };
 
   const handleClearWebhookEvents = async () => {
@@ -1131,6 +1238,8 @@ export default function WowtekProApp() {
                 onTriggerTestOrder={handleTriggerTestOrder}
                 onRestockProduct={handleRestockProduct}
                 onOrderStatusSync={handleSyncOrderStatus}
+                onAcceptUberEatsOrder={handleAcceptUberEatsOrder}
+                onRefreshLiveSync={() => syncServerData(true)}
               />
             )}
 
