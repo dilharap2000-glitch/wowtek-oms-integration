@@ -46,9 +46,12 @@ async function runSingleFeatureValidation(body: {
   const feature = String(body.feature || 'store_status').trim();
   const storeId = String(body.storeId || body.store_id || DEFAULT_STORE_ID).trim();
   const orderId = String(body.orderId || body.order_id || '').trim();
-  const host = String(body.host || 'https://test-api.uber.com')
-    .trim()
-    .replace(/\/+$/, '');
+  const requestedHost = String(body.host || '').trim().replace(/\/+$/, '');
+  const defaultSandboxHost = getUberBaseUrl(true);
+  const host =
+    requestedHost && /sandbox|test-api/i.test(requestedHost)
+      ? requestedHost
+      : defaultSandboxHost;
 
   const auth = await getUberAccessTokenAttempt(true);
   if (!auth.ok || !auth.token) {
@@ -57,6 +60,9 @@ async function runSingleFeatureValidation(body: {
         ok: false,
         error: 'Failed to get Uber OAuth token',
         reason: auth.error,
+        environment: auth.env || 'sandbox',
+        tokenUrl: auth.tokenUrl,
+        baseUrl: auth.baseUrl,
         hasCredentials: auth.hasCredentials,
         details: auth.details,
       },

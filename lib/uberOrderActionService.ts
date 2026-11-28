@@ -13,6 +13,7 @@ import {
   type UberOrderAction,
   type UberOrderActionResult,
 } from '@/lib/uberClient';
+import { resolveOrderChannel } from '@/lib/orderFilters';
 import type { OrderStatus } from '@/types';
 
 const ACTION_MAP: Record<string, UberOrderAction> = {
@@ -257,10 +258,19 @@ export async function processUberOrderAction(params: {
       isSandbox,
     });
 
-    const channelStr = String(
-      matchedDoc?.channel || matchedDoc?.source || matchedDoc?.provider || ''
-    ).toLowerCase();
-    if (channelStr && !channelStr.includes('uber')) {
+    const resolvedChannel = matchedDoc ? resolveOrderChannel(matchedDoc) : 'unknown';
+    const rawChannelLabel = String(
+      matchedDoc?.channel ||
+        matchedDoc?.orderSource ||
+        matchedDoc?.source ||
+        matchedDoc?.provider ||
+        (matchedDoc?.isPosSale ? 'pos' : '')
+    ).trim();
+    if (
+      matchedDoc?.isPosSale === true ||
+      (resolvedChannel !== 'unknown' && resolvedChannel !== 'ubereats') ||
+      (rawChannelLabel && !/uber/i.test(rawChannelLabel))
+    ) {
       return {
         httpStatus: 400,
         body: {
@@ -268,7 +278,7 @@ export async function processUberOrderAction(params: {
           success: false,
           synced: false,
           uberSynced: false,
-          error: `Order belongs to channel "${channelStr}", not Uber Eats.`,
+          error: `Order belongs to channel "${rawChannelLabel || resolvedChannel}", not Uber Eats.`,
         },
       };
     }

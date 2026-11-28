@@ -33,7 +33,7 @@ export function OrderActionCell({
   orderId,
   status,
   loading = false,
-  isUberOrder = true,
+  isUberOrder = false,
   readyLabel = 'Ready',
   onAction,
   onViewJson,

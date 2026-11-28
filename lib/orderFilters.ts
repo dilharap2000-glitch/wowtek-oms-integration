@@ -1,16 +1,115 @@
-export const isUberItem = (item: any): boolean => {
-  if (!item || typeof item !== 'object') return false;
+export type ResolvedOrderChannel =
+  | 'ubereats'
+  | 'pickme'
+  | 'woocommerce'
+  | 'pos'
+  | 'unknown';
+
+function classifyChannelToken(raw: unknown): ResolvedOrderChannel | null {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+
+  // Explicit Uber Eats platform tokens only (never match generic "order" or customer names)
   if (
-    /uber/i.test(
-      String(item?.channel || item?.channelName || item?.source || item?.provider || '')
-    )
+    s === 'uber' ||
+    s === 'ubereats' ||
+    s === 'uber eats' ||
+    s === 'uber_eats' ||
+    s === 'uber-eats' ||
+    /\buber\s*[-_]?\s*eats\b/i.test(s)
   ) {
-    return true;
+    return 'ubereats';
   }
-  if (item?.uberOrderId || item?.uber_order_id) return true;
-  const idHint = String(item?.invoiceNumber || item?.display_id || item?.id || '');
-  return /^UBER-/i.test(idHint) || /^ord-ubr-/i.test(idHint);
-};
+
+  // Explicit POS / in-store / walk-in tokens
+  if (
+    s === 'pos' ||
+    s === 'in-store' ||
+    s === 'instore' ||
+    s === 'walk-in' ||
+    s === 'walkin' ||
+    s === 'cashier' ||
+    /\bin[-\s]?store\s+pos\b/i.test(s) ||
+    /\bpos\s+retail\b/i.test(s)
+  ) {
+    return 'pos';
+  }
+
+  if (/\bpickme\b/i.test(s)) {
+    return 'pickme';
+  }
+
+  if (/\bwoo(?:commerce)?\b/i.test(s) || s === 'website' || s === 'website / pos') {
+    return s.includes('pos') && !s.includes('website') ? 'pos' : 'woocommerce';
+  }
+
+  if (s === 'stream' || s === 'manual_sync') {
+    return 'unknown';
+  }
+
+  return null;
+}
+
+function hasValidUberUuid(val: unknown): boolean {
+  if (typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'null' || lower === 'undefined' || lower === 'n/a' || lower === 'none' || lower === '-') {
+    return false;
+  }
+  return true;
+}
+
+export function resolveOrderChannel(item: any): ResolvedOrderChannel {
+  if (!item || typeof item !== 'object') return 'unknown';
+
+  // In-store POS checkout records are never live Uber Eats API orders
+  if (item.isPosSale === true) {
+    return 'pos';
+  }
+
+  // Check primary authoritative channel fields in precedence order
+  const primaryFields = [item.channel, item.orderSource, item.source, item.provider];
+  for (const field of primaryFields) {
+    const matched = classifyChannelToken(field);
+    if (matched) return matched;
+  }
+
+  // Only inspect channelName when primary fields did not classify the order
+  const fromChannelName = classifyChannelToken(item.channelName);
+  if (fromChannelName) return fromChannelName;
+
+  // Fallback to explicit Uber Eats order UUIDs / invoice prefixes
+  if (hasValidUberUuid(item.uberOrderId) || hasValidUberUuid(item.uber_order_id)) {
+    return 'ubereats';
+  }
+
+  const idHints = [item.invoiceNumber, item.display_id, item.id];
+  for (const hint of idHints) {
+    const s = String(hint || '').trim();
+    if (/^UBER-/i.test(s) || /^ord-ubr-/i.test(s) || /^WT-UBR-/i.test(s)) {
+      return 'ubereats';
+    }
+    if (/^INV-POS-/i.test(s)) {
+      return 'pos';
+    }
+    if (/^WT-WC-/i.test(s) || /^ord-wc-/i.test(s)) {
+      return 'woocommerce';
+    }
+    if (/^PKM-/i.test(s) || /^ord-pkm-/i.test(s)) {
+      return 'pickme';
+    }
+  }
+
+  return 'unknown';
+}
+
+export const isUberItem = (item: any): boolean => resolveOrderChannel(item) === 'ubereats';
+
+export const isPosItem = (item: any): boolean => resolveOrderChannel(item) === 'pos';
+
+export const isPickMeItem = (item: any): boolean => resolveOrderChannel(item) === 'pickme';
 
 export type UberOrderWorkflowStage =
   | 'PENDING'
@@ -34,7 +133,15 @@ export function getRawUberOrderStatus(item: any): string {
   const candidates = [item.uberStatus, item.orderStatus, item.status, item.state];
   for (const cand of candidates) {
     if (isMeaningfulOrderStatus(cand)) {
-      return String(cand).trim();
+      const trimmed = String(cand).trim();
+      const upper = trimmed.toUpperCase().replace(/[\s-]+/g, '_');
+      if (
+        (upper === 'POS' || upper === 'POS_CREATED' || upper === 'ORDER_CREATED') &&
+        isUberItem(item)
+      ) {
+        return 'PENDING_ACCEPTANCE';
+      }
+      return trimmed;
     }
   }
   return '';
@@ -121,10 +228,7 @@ export function normalizeUberOrderStage(
   return isUber ? 'PENDING' : 'COMPLETED';
 }
 
-export const isWooItem = (item: any): boolean =>
-  /woo/i.test(
-    String(item?.channel || item?.channelName || item?.source || item?.provider || '')
-  );
+export const isWooItem = (item: any): boolean => resolveOrderChannel(item) === 'woocommerce';
 
 export const isPingRow = (item: any): boolean => {
   const text = String(

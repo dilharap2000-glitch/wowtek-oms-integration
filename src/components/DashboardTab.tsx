@@ -1062,7 +1062,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           loading={Boolean(
                             orderActionLoading && orderActionLoading.startsWith(`${uberOriginalUuid}-`)
                           )}
-                          isUberOrder
+                          isUberOrder={isUberItem(order)}
                           onAction={(_, actionType: OrderActionType, reason) =>
                             handleOrderAction(
                               actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
@@ -1360,7 +1360,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             >
                               <td className="py-3 px-3.5 font-mono font-medium text-[var(--text-primary)]">
                                 <div className="font-bold text-[var(--accent-primary)]">
-                                  {order.channel === 'ubereats'
+                                  {isUberItem(order)
                                     ? String(
                                         (order as any).display_id ||
                                           (order as any).order_number ||

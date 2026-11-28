@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
+import { isUberItem } from '@/lib/orderFilters';
 
 export interface CleanOrder {
   id: string;
@@ -202,7 +203,7 @@ export function CleanOrdersTable({
                         orderId={rowKey}
                         status={order.status}
                         loading={isBusy}
-                        isUberOrder={/uber/i.test(String(order.channel || ''))}
+                        isUberOrder={isUberItem(order)}
                         readyLabel="Mark Ready"
                         onAction={(_, action, reason) => handleRowAction(order, index, action, reason)}
                         onPrintLabel={onPrintLabel ? () => onPrintLabel(order) : undefined}
