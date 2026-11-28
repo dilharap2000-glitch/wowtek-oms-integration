@@ -36,6 +36,7 @@ export async function getUberSandboxStatus() {
     tokenUrl: sandboxState.tokenUrl,
     tokenConfigured: sandboxState.hasCredentials,
     credentialSource: sandboxState.credentialSource,
+    credentialPair: sandboxState.credentialPair,
     clientIdPreview: sandboxState.clientIdPreview,
     partialWarning: sandboxState.partialWarning,
     defaultStoreIdConfigured: Boolean(defaultStoreId),
@@ -100,6 +101,7 @@ async function runSingleFeatureValidation(body: {
         baseUrl: auth.baseUrl,
         hasCredentials: auth.hasCredentials,
         credentialSource: auth.credentialSource,
+        credentialPair: auth.credentialPair,
         clientIdPreview: auth.clientIdPreview,
         details: auth.details,
       },
@@ -180,6 +182,7 @@ async function runSingleFeatureValidation(body: {
       endpoint,
       tokenUrl: auth.tokenUrl,
       credentialSource: auth.credentialSource,
+      credentialPair: auth.credentialPair,
       clientIdPreview: auth.clientIdPreview,
       data,
     });

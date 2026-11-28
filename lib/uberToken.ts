@@ -189,10 +189,49 @@ export function clearUberAccessTokenCache(isSandbox?: boolean): void {
 
 type CredentialSource = 'env_sandbox' | 'env_prod' | 'env_generic' | 'mongo' | 'static_token' | 'none';
 
+function matchGenericEnvPair(): {
+  clientId?: string;
+  clientSecret?: string;
+  credentialPair?: string;
+  partialWarning?: string;
+} {
+  const pairDefs: Array<[string, string]> = [
+    ['UBER_CLIENT_ID', 'UBER_CLIENT_SECRET'],
+    ['ClientID', 'ClientSecret'],
+    ['OAuth_ClientID', 'OAuth_ClientSecret'],
+  ];
+
+  let firstPartialWarning: string | undefined;
+
+  for (const [idKey, secretKey] of pairDefs) {
+    const rawId = process.env[idKey]?.trim();
+    const rawSecret = process.env[secretKey]?.trim();
+    const hasId = isUsableToken(rawId);
+    const hasSecret = isUsableToken(rawSecret);
+
+    if (hasId && hasSecret) {
+      return {
+        clientId: rawId,
+        clientSecret: rawSecret,
+        credentialPair: `${idKey} + ${secretKey}`,
+      };
+    }
+
+    if (hasId !== hasSecret && !firstPartialWarning) {
+      firstPartialWarning = hasId
+        ? `${idKey} is set without a matching ${secretKey}.`
+        : `${secretKey} is set without a matching ${idKey}.`;
+    }
+  }
+
+  return firstPartialWarning ? { partialWarning: firstPartialWarning } : {};
+}
+
 function getUberClientCredentialsFromEnv(isSandbox: boolean): {
   clientId?: string;
   clientSecret?: string;
   source?: 'env_sandbox' | 'env_prod' | 'env_generic';
+  credentialPair?: string;
   partialWarning?: string;
 } {
   const explicitEnv = getExplicitEnvMode();
@@ -204,7 +243,12 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
     const hasSbSecret = isUsableToken(sbSecret);
 
     if (hasSbId && hasSbSecret) {
-      return { clientId: sbId, clientSecret: sbSecret, source: 'env_sandbox' };
+      return {
+        clientId: sbId,
+        clientSecret: sbSecret,
+        source: 'env_sandbox',
+        credentialPair: 'UBER_SANDBOX_CLIENT_ID + UBER_SANDBOX_CLIENT_SECRET',
+      };
     }
     if (hasSbId !== hasSbSecret) {
       return {
@@ -214,30 +258,19 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
       };
     }
 
-    // Only reuse generic UBER_CLIENT_ID / UBER_CLIENT_SECRET in sandbox when production isn't explicitly forced
+    // Only reuse generic env pairs in sandbox when production isn't explicitly forced
     if (explicitEnv !== 'production' && !hasProdSpecificEnvCreds()) {
-      const genericId = (
-        process.env.UBER_CLIENT_ID ||
-        process.env.ClientID ||
-        process.env.OAuth_ClientID
-      )?.trim();
-      const genericSecret = (
-        process.env.UBER_CLIENT_SECRET ||
-        process.env.ClientSecret ||
-        process.env.OAuth_ClientSecret
-      )?.trim();
-      const hasGenId = isUsableToken(genericId);
-      const hasGenSecret = isUsableToken(genericSecret);
-
-      if (hasGenId && hasGenSecret) {
-        return { clientId: genericId, clientSecret: genericSecret, source: 'env_generic' };
-      }
-      if (hasGenId !== hasGenSecret) {
+      const generic = matchGenericEnvPair();
+      if (generic.clientId && generic.clientSecret) {
         return {
-          partialWarning: hasGenId
-            ? 'UBER_CLIENT_ID is set without a matching UBER_CLIENT_SECRET.'
-            : 'UBER_CLIENT_SECRET is set without a matching UBER_CLIENT_ID.',
+          clientId: generic.clientId,
+          clientSecret: generic.clientSecret,
+          source: 'env_generic',
+          credentialPair: generic.credentialPair,
         };
+      }
+      if (generic.partialWarning) {
+        return { partialWarning: generic.partialWarning };
       }
     }
 
@@ -250,7 +283,12 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
   const hasProdSecret = isUsableToken(prodSecret);
 
   if (hasProdId && hasProdSecret) {
-    return { clientId: prodId, clientSecret: prodSecret, source: 'env_prod' };
+    return {
+      clientId: prodId,
+      clientSecret: prodSecret,
+      source: 'env_prod',
+      credentialPair: 'UBER_PROD_CLIENT_ID + UBER_PROD_CLIENT_SECRET',
+    };
   }
   if (hasProdId !== hasProdSecret) {
     return {
@@ -260,30 +298,19 @@ function getUberClientCredentialsFromEnv(isSandbox: boolean): {
     };
   }
 
-  // Only reuse generic UBER_CLIENT_ID / UBER_CLIENT_SECRET in production when sandbox isn't explicitly active
+  // Only reuse generic env pairs in production when sandbox isn't explicitly active
   if (explicitEnv !== 'sandbox' && !hasSandboxSpecificEnvCreds()) {
-    const genericId = (
-      process.env.UBER_CLIENT_ID ||
-      process.env.ClientID ||
-      process.env.OAuth_ClientID
-    )?.trim();
-    const genericSecret = (
-      process.env.UBER_CLIENT_SECRET ||
-      process.env.ClientSecret ||
-      process.env.OAuth_ClientSecret
-    )?.trim();
-    const hasGenId = isUsableToken(genericId);
-    const hasGenSecret = isUsableToken(genericSecret);
-
-    if (hasGenId && hasGenSecret) {
-      return { clientId: genericId, clientSecret: genericSecret, source: 'env_generic' };
-    }
-    if (hasGenId !== hasGenSecret) {
+    const generic = matchGenericEnvPair();
+    if (generic.clientId && generic.clientSecret) {
       return {
-        partialWarning: hasGenId
-          ? 'UBER_CLIENT_ID is set without a matching UBER_CLIENT_SECRET.'
-          : 'UBER_CLIENT_SECRET is set without a matching UBER_CLIENT_ID.',
+        clientId: generic.clientId,
+        clientSecret: generic.clientSecret,
+        source: 'env_generic',
+        credentialPair: generic.credentialPair,
       };
+    }
+    if (generic.partialWarning) {
+      return { partialWarning: generic.partialWarning };
     }
   }
 
@@ -359,25 +386,29 @@ async function getCredentialsFromMongo(targetEnv: UberEnvironment): Promise<{
       return undefined;
     };
 
-    const clientId = pickString(
+    const uberDocId = pickString(
       uberDoc?.clientId,
       uberDoc?.ClientID,
       uberDoc?.OAuth_ClientID,
       uberDoc?.oauthClientId,
-      uberDoc?.uberEatsClientId,
+      uberDoc?.uberEatsClientId
+    );
+    const uberDocSecret = pickString(
+      uberDoc?.clientSecret,
+      uberDoc?.ClientSecret,
+      uberDoc?.OAuth_ClientSecret,
+      uberDoc?.oauthClientSecret,
+      uberDoc?.uberEatsClientSecret
+    );
+
+    const apiCfgId = pickString(
       apiConfig.uberEatsClientId,
       apiConfig.oauthClientId,
       apiConfig.OAuth_ClientID,
       apiConfig.ClientID,
       apiConfig.clientId
     );
-
-    const clientSecret = pickString(
-      uberDoc?.clientSecret,
-      uberDoc?.ClientSecret,
-      uberDoc?.OAuth_ClientSecret,
-      uberDoc?.oauthClientSecret,
-      uberDoc?.uberEatsClientSecret,
+    const apiCfgSecret = pickString(
       apiConfig.uberEatsClientSecret,
       apiConfig.oauthClientSecret,
       apiConfig.OAuth_ClientSecret,
@@ -392,9 +423,12 @@ async function getCredentialsFromMongo(targetEnv: UberEnvironment): Promise<{
       apiConfig.uberAccessToken
     );
 
-    // Only return a complete clientId+clientSecret pair from Mongo so partial values don't mix
-    if (clientId && clientSecret) {
-      return { clientId, clientSecret, accessToken };
+    // Pair clientId + clientSecret strictly within the same document/section
+    if (uberDocId && uberDocSecret) {
+      return { clientId: uberDocId, clientSecret: uberDocSecret, accessToken };
+    }
+    if (apiCfgId && apiCfgSecret) {
+      return { clientId: apiCfgId, clientSecret: apiCfgSecret, accessToken };
     }
     return { accessToken };
   } catch (err) {
@@ -415,6 +449,7 @@ export interface UberCredentialState {
   tokenUrl: string;
   hasCredentials: boolean;
   credentialSource: CredentialSource;
+  credentialPair?: string;
   clientIdPreview?: string;
   partialWarning?: string;
 }
@@ -435,6 +470,7 @@ export async function getUberCredentialState(
       tokenUrl,
       hasCredentials: true,
       credentialSource: envCreds.source || 'env_generic',
+      credentialPair: envCreds.credentialPair,
       clientIdPreview: maskUberClientId(envCreds.clientId),
     };
   }
@@ -458,6 +494,7 @@ export async function getUberCredentialState(
       tokenUrl,
       hasCredentials: true,
       credentialSource: 'mongo',
+      credentialPair: 'mongo:app_settings.apiConfig',
       clientIdPreview: maskUberClientId(fromDb.clientId),
     };
   }
@@ -554,6 +591,7 @@ type EnvTokenResult = {
   details?: unknown;
   hasCredentials?: boolean;
   credentialSource?: CredentialSource;
+  credentialPair?: string;
   clientIdPreview?: string;
 };
 
@@ -580,6 +618,7 @@ async function getTokenForSpecificEnv(
   let clientId = envCreds.clientId;
   let clientSecret = envCreds.clientSecret;
   let credentialSource: CredentialSource = envCreds.source || 'none';
+  let credentialPair = envCreds.credentialPair;
   let mongoAccessToken: string | undefined;
 
   // Never fall back to MongoDB or another variable if an explicit env pair is only half-configured
@@ -603,6 +642,7 @@ async function getTokenForSpecificEnv(
       clientId = fromDb.clientId;
       clientSecret = fromDb.clientSecret;
       credentialSource = 'mongo';
+      credentialPair = 'mongo:app_settings.apiConfig';
     }
     mongoAccessToken = fromDb.accessToken;
   }
@@ -643,6 +683,7 @@ async function getTokenForSpecificEnv(
         tokenUrl: existing.tokenUrl,
         fromCache: true,
         credentialSource,
+        credentialPair,
         clientIdPreview,
       };
     }
@@ -695,6 +736,7 @@ async function getTokenForSpecificEnv(
               tokenUrl,
               fromCache: false,
               credentialSource,
+              credentialPair,
               clientIdPreview,
             };
           }
@@ -715,10 +757,11 @@ async function getTokenForSpecificEnv(
             /client[\s_]*secret\s*mismatch|invalid_client|unauthorized_client/i.test(rawErrStr) ||
             (lastOAuthStatus === 403 && /accessdenied|access_denied/i.test(rawErrStr));
 
+          const pairInfo = credentialPair ? `${credentialSource} (${credentialPair})` : credentialSource;
           lastOAuthError = isEnvMismatch
             ? `${rawErrStr} (OMS runtime is configured for ${targetEnv.toUpperCase()} via ${tokenUrl}; ensure UBER_ENV and Client ID/Secret belong to the ${targetEnv} Uber app).`
             : isSecretMismatch
-            ? `${rawErrStr} (Client ID ${clientIdPreview || ''} from ${credentialSource} failed authentication at ${tokenUrl}; verify that the matching ${targetEnv.toUpperCase()} Client Secret is configured without extra spaces or production/test app mix-ups).`
+            ? `${rawErrStr} (Client ID ${clientIdPreview || ''} from ${pairInfo} failed authentication at ${tokenUrl}; verify that the matching ${targetEnv.toUpperCase()} Client Secret is configured cleanly without production/test mix-ups).`
             : rawErrStr;
 
           console.error('[Uber OAuth Token Rejection]:', {
@@ -726,6 +769,7 @@ async function getTokenForSpecificEnv(
             tokenUrl,
             baseUrl,
             credentialSource,
+            credentialPair,
             clientIdPreview,
             status: lastOAuthStatus,
             scope: scope || '(default)',
@@ -744,6 +788,7 @@ async function getTokenForSpecificEnv(
               details: lastOAuthDetails,
               hasCredentials: true,
               credentialSource,
+              credentialPair,
               clientIdPreview,
             };
           }
@@ -796,6 +841,7 @@ async function getTokenForSpecificEnv(
       details: lastOAuthDetails,
       hasCredentials: true,
       credentialSource,
+      credentialPair,
       clientIdPreview,
     };
   }
@@ -840,6 +886,7 @@ export interface UberTokenAttempt {
   details?: unknown;
   hasCredentials: boolean;
   credentialSource?: CredentialSource;
+  credentialPair?: string;
   clientIdPreview?: string;
 }
 
@@ -858,6 +905,7 @@ export async function getUberAccessTokenAttempt(
       baseUrl: res.baseUrl || getUberBaseUrl(targetSandbox),
       hasCredentials: true,
       credentialSource: res.credentialSource,
+      credentialPair: res.credentialPair,
       clientIdPreview: res.clientIdPreview,
     };
   }
@@ -873,6 +921,7 @@ export async function getUberAccessTokenAttempt(
     details: res.details,
     hasCredentials: Boolean(res.hasCredentials),
     credentialSource: res.credentialSource,
+    credentialPair: res.credentialPair,
     clientIdPreview: res.clientIdPreview,
   };
 }
