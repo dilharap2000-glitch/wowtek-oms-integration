@@ -11,6 +11,7 @@ import {
   RotateCcw,
   X,
 } from 'lucide-react';
+import { normalizeUberOrderStage } from '@/lib/orderFilters';
 
 export type OrderActionType = 'ACCEPT' | 'READY' | 'CANCEL';
 
@@ -45,27 +46,13 @@ export function OrderActionCell({
   const [confirmingReturn, setConfirmingReturn] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const normalized = String(status || '').toUpperCase();
-  const isPending =
-    normalized === 'PENDING_ACCEPTANCE' ||
-    normalized === 'CREATED' ||
-    normalized === 'PENDING' ||
-    normalized === 'NEW' ||
-    normalized.includes('PENDING');
-  const isProcessing =
-    normalized === 'ACCEPTED' ||
-    normalized === 'PROCESSING' ||
-    normalized.includes('PROCESSING') ||
-    normalized.includes('PREPARING') ||
-    normalized.includes('ACCEPTED');
-  const isReady = normalized === 'READY_FOR_PICKUP' || normalized === 'READY';
-  const isCancelled = normalized === 'CANCELLED' || normalized === 'CANCEL' || normalized.includes('CANCEL');
-  const isDone =
-    isReady ||
-    isCancelled ||
-    normalized.includes('RETURN') ||
-    normalized.includes('COMPLETE') ||
-    normalized.includes('DELIVERED');
+  const normalized = String(status || '').trim().toUpperCase();
+  const stage = normalizeUberOrderStage(status, isUberOrder);
+  const isPending = isUberOrder && stage === 'PENDING';
+  const isProcessing = isUberOrder && stage === 'ACCEPTED';
+  const isReady = isUberOrder && stage === 'READY';
+  const isCancelled = isUberOrder && stage === 'CANCELLED';
+  const isDone = stage === 'READY' || stage === 'CANCELLED' || stage === 'COMPLETED';
 
   useEffect(() => {
     if (!menuOpen) {

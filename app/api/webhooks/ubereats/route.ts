@@ -65,22 +65,49 @@ async function saveUberWebhookEvent(payload: any) {
         'ba8761b9-5679-4bcd-845d-8b0baacf9e5d'
     ).trim();
 
-    const resolvedStatus = String(
+    const rawIncomingStatus = String(
       payload?.order?.current_state ||
         payload?.meta?.status ||
         orderData?.status ||
         orderData?.state ||
         payload?.current_order_state?.status ||
-        (eventType.includes('failure') ? 'FAILED' : 'PENDING_ACCEPTANCE')
+        ''
     ).trim();
 
-    const resolvedUberStatus = String(
-      payload?.order?.current_state ||
-        payload?.meta?.status ||
-        orderData?.status ||
-        orderData?.state ||
-        'PENDING_ACCEPTANCE'
-    ).trim();
+    const normalizedIncoming = rawIncomingStatus
+      .toUpperCase()
+      .replace(/[\s-]+/g, '_');
+
+    const isCancelledWebhook =
+      eventType.toLowerCase().includes('cancel') ||
+      normalizedIncoming.includes('CANCEL') ||
+      normalizedIncoming.includes('DENI') ||
+      normalizedIncoming.includes('DENY');
+
+    const isPendingWebhook =
+      !normalizedIncoming ||
+      normalizedIncoming === 'POS' ||
+      normalizedIncoming === 'POS_CREATED' ||
+      normalizedIncoming === 'ORDER_CREATED' ||
+      normalizedIncoming === 'CREATED' ||
+      normalizedIncoming === 'NEW' ||
+      normalizedIncoming === 'OFFERED' ||
+      normalizedIncoming === 'PENDING' ||
+      normalizedIncoming === 'PENDING_ACCEPTANCE' ||
+      normalizedIncoming === 'AWAITING_ACCEPTANCE' ||
+      normalizedIncoming === 'WAITING_ACCEPTANCE' ||
+      normalizedIncoming === 'UNACCEPTED' ||
+      normalizedIncoming.includes('PENDING');
+
+    const resolvedStatus = eventType.toLowerCase().includes('failure')
+      ? 'FAILED'
+      : isCancelledWebhook
+      ? 'CANCELLED'
+      : isPendingWebhook
+      ? 'PENDING_ACCEPTANCE'
+      : normalizedIncoming;
+
+    const resolvedUberStatus = resolvedStatus;
 
     const rawCents = payload?.order?.payment?.charges?.total?.amount;
     const rawFallbackTotal =

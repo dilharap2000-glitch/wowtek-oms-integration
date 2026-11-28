@@ -202,7 +202,7 @@ export function CleanOrdersTable({
                         orderId={rowKey}
                         status={order.status}
                         loading={isBusy}
-                        isUberOrder={order.channel === 'Uber Eats'}
+                        isUberOrder={/uber/i.test(String(order.channel || ''))}
                         readyLabel="Mark Ready"
                         onAction={(_, action, reason) => handleRowAction(order, index, action, reason)}
                         onPrintLabel={onPrintLabel ? () => onPrintLabel(order) : undefined}

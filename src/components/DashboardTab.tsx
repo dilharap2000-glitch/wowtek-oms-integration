@@ -24,7 +24,13 @@ import { A4WarrantyInvoiceModal } from './A4WarrantyInvoiceModal';
 import { ThermalWaybillModal } from './ThermalWaybillModal';
 import { RestockGRNForm } from '@/components/GRNForms';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
-import { isPingRow, isUberItem, isWooItem } from '@/lib/orderFilters';
+import {
+  getRawUberOrderStatus,
+  isPingRow,
+  isUberItem,
+  isWooItem,
+  normalizeUberOrderStage,
+} from '@/lib/orderFilters';
 
 interface DashboardTabProps {
   orders: Order[];
@@ -591,10 +597,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       for (const k of evtKeys) existingKeys.add(k);
       const amt = Number(evt.amount || 0);
       const fee = Math.round(amt * 0.154);
+      const evtStatus = getRawUberOrderStatus(evt) || 'PENDING_ACCEPTANCE';
       extraUberFromWebhooks.push({
+        ...(evt as any),
         id: evt.orderId || evt.id,
         invoiceNumber: evt.invoiceNumber || evt.orderId || evt.id,
         channel: 'ubereats',
+        source: 'ubereats',
         channelName: `Uber Eats Retail (${evt.storeName || evt.branchName || 'Central Hub'})`,
         storeId: evt.storeId || 'ubr-central',
         storeName: evt.storeName || 'Uber Eats Store',
@@ -605,7 +614,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         customerPhone: evt.customerPhone || '',
         deliveryAddress: 'Uber Eats Delivery',
         city: evt.branchName || 'Colombo',
-        items: [],
+        items: Array.isArray((evt as any).items) ? (evt as any).items : [],
         grossTotal: amt,
         platformFeePercent: 15.4,
         platformFeeAmount: fee,
@@ -617,14 +626,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         profitStatus: 'Calculated',
         hasUnregisteredItems: false,
         unregisteredItemsCount: 0,
-        status: ((evt as any).uberStatus || evt.orderStatus || 'PENDING_ACCEPTANCE') as Order['status'],
+        status: evtStatus as Order['status'],
+        uberStatus: evtStatus,
+        orderStatus: evtStatus,
         createdAt: evt.receivedAt,
         updatedAt: evt.receivedAt,
         waybillGenerated: false,
-        ...(evt as any),
       } as Order);
     }
-    return [...baseUberOrders, ...extraUberFromWebhooks];
+    return [...baseUberOrders, ...extraUberFromWebhooks].sort((a, b) => {
+      const stageA = normalizeUberOrderStage(getRawUberOrderStatus(a), true);
+      const stageB = normalizeUberOrderStage(getRawUberOrderStatus(b), true);
+      if (stageA === 'PENDING' && stageB !== 'PENDING') return -1;
+      if (stageB === 'PENDING' && stageA !== 'PENDING') return 1;
+      const timeA = Date.parse(String(a.createdAt || a.updatedAt || '')) || 0;
+      const timeB = Date.parse(String(b.createdAt || b.updatedAt || '')) || 0;
+      return timeB - timeA;
+    });
   }, [safeOrders, safeWebhookEvents, extractNormalizedOrderKeys]);
   const posOrders = safeOrders.filter((o) => /pos/i.test(String(o?.channel || '')) || o?.isPosSale);
   const invoiceTableOrders = safeOrders.filter((o) => !isPingRow(o));
@@ -992,9 +1010,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 {ubrOrders.slice(0, 8)
                   .map((order, idx) => {
                     const uberOrder = order as any;
-                    const effectiveStatus = String(uberOrder.uberStatus || order.status || '');
-                    const effectiveUpper = effectiveStatus.toUpperCase();
-                    const uberOriginalUuid = getUberTargetOrderId(uberOrder);
+                    const effectiveStatus = getRawUberOrderStatus(uberOrder) || 'PENDING_ACCEPTANCE';
+                    const stage = normalizeUberOrderStage(effectiveStatus, true);
+                    const uberOriginalUuid =
+                      getUberTargetOrderId(uberOrder) ||
+                      String(uberOrder._id || order.id || order.invoiceNumber || `ubr-${idx}`);
                     const displayOrderCode = uberOrder.display_id
                       ? String(uberOrder.display_id).replace(/^UBER-/i, '').toUpperCase()
                       : String(uberOrder.order_number || uberOrder.short_display_id || order.invoiceNumber || '')
@@ -1016,11 +1036,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             </span>
                             <span
                               className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                                effectiveUpper === 'READY_FOR_PICKUP' || effectiveUpper === 'READY'
+                                stage === 'READY' || stage === 'COMPLETED'
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300'
-                                  : effectiveUpper === 'CANCELLED'
+                                  : stage === 'CANCELLED'
                                   ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
-                                  : effectiveUpper === 'PROCESSING' || effectiveUpper === 'ACCEPTED'
+                                  : stage === 'ACCEPTED'
                                   ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
                                   : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
                               }`}
@@ -1106,9 +1126,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           {/* Clean Orders Filter Tabs + Search */}
           {(() => {
             const matchesTab = (order: Order, tab: typeof orderFilterTab) => {
-              const s = String((order as any).uberStatus || order.status || '').toUpperCase();
               if (tab === 'ALL') return true;
-              if (tab === 'NEW') return s === 'PENDING_ACCEPTANCE' || s === 'CREATED' || s === 'PENDING' || s === 'NEW';
+              const isUber = isUberItem(order);
+              if (isUber) {
+                const stage = normalizeUberOrderStage(getRawUberOrderStatus(order), true);
+                if (tab === 'NEW') return stage === 'PENDING';
+                if (tab === 'PREPARING') return stage === 'ACCEPTED';
+                if (tab === 'READY') return stage === 'READY';
+                return stage === 'COMPLETED' || stage === 'CANCELLED';
+              }
+              const s = String((order as any).uberStatus || order.status || '').trim().toUpperCase();
+              if (tab === 'NEW') {
+                return (
+                  s === 'PENDING_ACCEPTANCE' ||
+                  s === 'PENDING ACCEPTANCE' ||
+                  s === 'CREATED' ||
+                  s === 'PENDING' ||
+                  s === 'NEW'
+                );
+              }
               if (tab === 'PREPARING') return s === 'PROCESSING' || s === 'ACCEPTED' || s === 'PREPARING';
               if (tab === 'READY') return s === 'READY_FOR_PICKUP' || s === 'READY FOR PICKUP' || s === 'READY';
               return s === 'COMPLETED' || s === 'DELIVERED' || s === 'CANCELLED' || s === 'RETURNED';
@@ -1171,22 +1207,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </div>
                   ) : (
                     filteredTableOrders.slice(0, 20).map((order, idx) => {
+                      const isUber = isUberItem(order);
                       const targetUberId = getUberTargetOrderId(order as any);
                       const idToPass = String((order as any)._id || order.id || order.invoiceNumber);
-                      const rowStatus = String((order as any).uberStatus || order.status || '');
+                      const rowStatus = isUber
+                        ? getRawUberOrderStatus(order) || 'PENDING_ACCEPTANCE'
+                        : String((order as any).uberStatus || order.status || '');
                       const rowStatusUpper = rowStatus.toUpperCase();
-                      const displayOrderNo =
-                        order.channel === 'ubereats'
-                          ? String(
-                              (order as any).display_id ||
-                                (order as any).order_number ||
-                                (order as any).short_display_id ||
-                                order.invoiceNumber ||
-                                ''
-                            )
-                              .replace(/^UBER-/i, '')
-                              .toUpperCase()
-                          : order.invoiceNumber;
+                      const uberStage = isUber ? normalizeUberOrderStage(rowStatus, true) : null;
+                      const displayOrderNo = isUber
+                        ? String(
+                            (order as any).display_id ||
+                              (order as any).order_number ||
+                              (order as any).short_display_id ||
+                              order.invoiceNumber ||
+                              ''
+                          )
+                            .replace(/^UBER-/i, '')
+                            .toUpperCase()
+                        : order.invoiceNumber;
 
                       return (
                         <div
@@ -1201,13 +1240,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                 </span>
                                 <span
                                   className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                                    (uberStage ? uberStage === 'READY' || uberStage === 'COMPLETED' : false) ||
                                     rowStatusUpper === 'COMPLETED' ||
                                     rowStatusUpper === 'DELIVERED' ||
                                     rowStatusUpper === 'READY_FOR_PICKUP' ||
                                     rowStatusUpper === 'READY FOR PICKUP' ||
                                     rowStatusUpper === 'READY'
                                       ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
-                                      : rowStatusUpper === 'RETURNED' || rowStatusUpper === 'CANCELLED'
+                                      : uberStage === 'CANCELLED' ||
+                                        rowStatusUpper === 'RETURNED' ||
+                                        rowStatusUpper === 'CANCELLED'
                                       ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
                                       : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
                                   }`}
@@ -1241,7 +1283,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                   orderActionLoading &&
                                   orderActionLoading.startsWith(`${targetUberId}-`)
                               )}
-                              isUberOrder={order.channel === 'ubereats'}
+                              isUberOrder={isUber}
                               readyLabel="Mark Ready"
                               onAction={(_, actionType: OrderActionType, reason) =>
                                 handleOrderAction(
@@ -1369,18 +1411,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                               </td>
                               <td className="py-3 px-3.5 text-center">
                                 {(() => {
-                                  const rowStatus = String((order as any).uberStatus || order.status || '');
+                                  const isUber = isUberItem(order);
+                                  const rowStatus = isUber
+                                    ? getRawUberOrderStatus(order) || 'PENDING_ACCEPTANCE'
+                                    : String((order as any).uberStatus || order.status || '');
                                   const rowStatusUpper = rowStatus.toUpperCase();
+                                  const uberStage = isUber ? normalizeUberOrderStage(rowStatus, true) : null;
                                   return (
                                     <span
                                       className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold ${
+                                        (uberStage ? uberStage === 'READY' || uberStage === 'COMPLETED' : false) ||
                                         rowStatusUpper === 'COMPLETED' ||
                                         rowStatusUpper === 'DELIVERED' ||
                                         rowStatusUpper === 'READY_FOR_PICKUP' ||
                                         rowStatusUpper === 'READY FOR PICKUP' ||
                                         rowStatusUpper === 'READY'
                                           ? 'bg-[var(--badge-ready-bg)] text-[var(--badge-ready-text)]'
-                                          : rowStatusUpper === 'RETURNED' || rowStatusUpper === 'CANCELLED'
+                                          : uberStage === 'CANCELLED' ||
+                                            rowStatusUpper === 'RETURNED' ||
+                                            rowStatusUpper === 'CANCELLED'
                                           ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
                                           : 'bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]'
                                       }`}
@@ -1402,12 +1451,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                 )}
                               </td>
                               <td className="py-3 px-3.5 text-right">
-                                <OrderActionCell
-                                  orderId={targetUberId || idToPass}
-                                  status={String((order as any).uberStatus || order.status || '')}
-                                  loading={isUberBusy}
-                                  isUberOrder={order.channel === 'ubereats'}
-                                  readyLabel="Mark Ready"
+                                {(() => {
+                                  const isUber = isUberItem(order);
+                                  const rowStatus = isUber
+                                    ? getRawUberOrderStatus(order) || 'PENDING_ACCEPTANCE'
+                                    : String((order as any).uberStatus || order.status || '');
+                                  return (
+                                    <OrderActionCell
+                                      orderId={targetUberId || idToPass}
+                                      status={rowStatus}
+                                      loading={isUberBusy}
+                                      isUberOrder={isUber}
+                                      readyLabel="Mark Ready"
                                   onAction={(_, actionType: OrderActionType, reason) =>
                                     handleOrderAction(
                                       actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
@@ -1415,13 +1470,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                                       reason
                                     )
                                   }
-                                  onPrintInvoice={() => setSelectedOrderForInvoice(order)}
-                                  onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
-                                  onReturnOrder={
-                                    order.status !== 'Returned' ? () => handleReturnOrder(idToPass) : undefined
-                                  }
-                                  returning={isReturning}
-                                />
+                                      onPrintInvoice={() => setSelectedOrderForInvoice(order)}
+                                      onPrintLabel={() => setSelectedOrderForThermalPrint(order)}
+                                      onReturnOrder={
+                                        order.status !== 'Returned' ? () => handleReturnOrder(idToPass) : undefined
+                                      }
+                                      returning={isReturning}
+                                    />
+                                  );
+                                })()}
                               </td>
                             </tr>
                           );
@@ -1489,7 +1546,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Order ID:</span>
                 <span className="font-mono font-bold text-[var(--accent-primary)]">
-                  {selectedUberOrder.channel === 'ubereats'
+                  {isUberItem(selectedUberOrder)
                     ? String(
                         (selectedUberOrder as any).display_id ||
                           (selectedUberOrder as any).order_number ||
@@ -1514,7 +1571,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <div className="flex justify-between">
                 <span className="text-[var(--text-secondary)]">Current Status:</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--badge-pending-bg)] text-[var(--badge-pending-text)]">
-                  {selectedUberOrder.status}
+                  {getRawUberOrderStatus(selectedUberOrder) || 'PENDING_ACCEPTANCE'}
                 </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
@@ -1528,8 +1585,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             {/* Action Button Group */}
             <div className="flex gap-2 mt-4">
               {(() => {
-                const st = String((selectedUberOrder as any).uberStatus || selectedUberOrder.status || '').toUpperCase();
-                if (st === 'PENDING_ACCEPTANCE' || st === 'CREATED' || st === 'PENDING') {
+                const modalStage = normalizeUberOrderStage(
+                  getRawUberOrderStatus(selectedUberOrder),
+                  isUberItem(selectedUberOrder)
+                );
+                if (modalStage === 'PENDING') {
                   return (
                     <>
                       <button
@@ -1559,7 +1619,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </>
                   );
                 }
-                if (st === 'ACCEPTED' || st === 'PROCESSING') {
+                if (modalStage === 'ACCEPTED') {
                   return (
                     <>
                       <button
@@ -1589,14 +1649,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     </>
                   );
                 }
-                if (st === 'READY_FOR_PICKUP' || st === 'READY') {
+                if (modalStage === 'READY') {
                   return (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
                       ✓ Ready for Pickup
                     </span>
                   );
                 }
-                if (st === 'CANCELLED') {
+                if (modalStage === 'CANCELLED') {
                   return (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
                       Cancelled

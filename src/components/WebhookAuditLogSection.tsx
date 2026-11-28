@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { OrderStatus, WebhookEvent } from '@/types';
 import { OrderActionCell, type OrderActionType } from './OrderActionCell';
-import { isWooItem } from '@/lib/orderFilters';
+import { getRawUberOrderStatus, isUberItem, isWooItem } from '@/lib/orderFilters';
 
 interface WebhookAuditLogSectionProps {
   events: WebhookEvent[];
@@ -476,12 +476,9 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
         ) : (
           (filteredEvents || []).slice(0, compact ? 6 : 25).map((evt) => {
             const targetId = getEventTargetOrderId(evt);
-            const uberStatus = String(
-              (evt as any).uberStatus ||
-                evt.orderStatus ||
-                (evt as any).state ||
-                (evt.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
-            );
+            const isUber = isUberItem(evt);
+            const uberStatus =
+              getRawUberOrderStatus(evt) || (isUber ? 'PENDING_ACCEPTANCE' : '');
             return (
               <div key={`mob-${evt.id}`} className="p-3.5 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -505,7 +502,7 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     orderId={targetId || evt.id}
                     status={uberStatus}
                     loading={Boolean(targetId && orderActionLoadingId === targetId)}
-                    isUberOrder={evt.source === 'ubereats'}
+                    isUberOrder={isUber}
                     onAction={(_, actionType: OrderActionType, reason) =>
                       handleOrderAction(
                         actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
@@ -741,18 +738,15 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
                     <td className="py-3 px-4 text-right">
                       {(() => {
                         const targetId = getEventTargetOrderId(item);
-                        const uberStatus = String(
-                          (item as any).uberStatus ||
-                            item.orderStatus ||
-                            (item as any).state ||
-                            (item.source === 'ubereats' ? 'PENDING_ACCEPTANCE' : '')
-                        );
+                        const isUber = isUberItem(item);
+                        const uberStatus =
+                          getRawUberOrderStatus(item) || (isUber ? 'PENDING_ACCEPTANCE' : '');
                         return (
                           <OrderActionCell
                             orderId={targetId || evt.id}
                             status={uberStatus}
                             loading={Boolean(targetId && orderActionLoadingId === targetId)}
-                            isUberOrder={item.source === 'ubereats'}
+                            isUberOrder={isUber}
                             onAction={(_, actionType: OrderActionType, reason) =>
                               handleOrderAction(
                                 actionType.toLowerCase() as 'accept' | 'ready' | 'cancel',
