@@ -1,7 +1,6 @@
 {
+  "/api/ubereats/validation/route": "app/api/ubereats/validation/route.js",
   "/api/sync/live/route": "app/api/sync/live/route.js",
   "/api/webhooks/stream/route": "app/api/webhooks/stream/route.js",
-  "/api/ubereats/validation/route": "app/api/ubereats/validation/route.js",
-  "/api/debug/uber-config/route": "app/api/debug/uber-config/route.js",
   "/api/orders/route": "app/api/orders/route.js"
 }

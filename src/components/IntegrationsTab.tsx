@@ -540,7 +540,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
           ok: false,
           message: data?.reason || data?.error || `Uber authentication failed (HTTP ${statusCode})`,
           details: data?.tokenUrl
-            ? `Env: ${data.environment || 'sandbox'} · Token URL: ${data.tokenUrl} · Source: ${data.credentialPair || data.credentialSource || 'none'}${data.clientIdPreview ? ` · Client ID: ${data.clientIdPreview}` : ''}`
+            ? `Env: ${data.environment || 'sandbox'} · Token URL: ${data.tokenUrl} · Source: ${data.credentialPair || data.credentialSource || 'none'}${data.clientIdPreview ? ` · Client ID: ${data.clientIdPreview}` : ''}${data.conflictWarning ? ` · Note: ${data.conflictWarning}` : ''}`
             : undefined,
         });
       }

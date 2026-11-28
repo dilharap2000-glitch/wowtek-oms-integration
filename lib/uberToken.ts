@@ -452,6 +452,8 @@ export interface UberCredentialState {
   credentialPair?: string;
   clientIdPreview?: string;
   partialWarning?: string;
+  envOverridesMongo?: boolean;
+  conflictWarning?: string;
 }
 
 export async function getUberCredentialState(
@@ -463,15 +465,24 @@ export async function getUberCredentialState(
   const tokenUrl = getUberTokenUrl(targetSandbox);
 
   const envCreds = getUberClientCredentialsFromEnv(targetSandbox);
+  const fromDb = await getCredentialsFromMongo(targetEnv);
+  const hasMongoPair = Boolean(fromDb.clientId && fromDb.clientSecret);
+
   if (envCreds.clientId && envCreds.clientSecret) {
+    const source = envCreds.source || 'env_generic';
+    const conflictWarning = hasMongoPair
+      ? `Vercel environment variables (${envCreds.credentialPair || source}) override Integration UI credentials stored in MongoDB. Update Vercel env vars directly when rotating secrets.`
+      : undefined;
+
     return {
       env: targetEnv,
       baseUrl,
       tokenUrl,
       hasCredentials: true,
-      credentialSource: envCreds.source || 'env_generic',
+      credentialSource: source,
       credentialPair: envCreds.credentialPair,
       clientIdPreview: maskUberClientId(envCreds.clientId),
+      ...(hasMongoPair ? { envOverridesMongo: true, conflictWarning } : {}),
     };
   }
 
@@ -486,7 +497,6 @@ export async function getUberCredentialState(
     };
   }
 
-  const fromDb = await getCredentialsFromMongo(targetEnv);
   if (fromDb.clientId && fromDb.clientSecret) {
     return {
       env: targetEnv,
@@ -496,6 +506,7 @@ export async function getUberCredentialState(
       credentialSource: 'mongo',
       credentialPair: 'mongo:app_settings.apiConfig',
       clientIdPreview: maskUberClientId(fromDb.clientId),
+      envOverridesMongo: false,
     };
   }
 
@@ -593,6 +604,8 @@ type EnvTokenResult = {
   credentialSource?: CredentialSource;
   credentialPair?: string;
   clientIdPreview?: string;
+  envOverridesMongo?: boolean;
+  conflictWarning?: string;
 };
 
 function getTokenUrlCandidatesForEnv(targetSandbox: boolean): string[] {
@@ -620,10 +633,21 @@ async function getTokenForSpecificEnv(
   let credentialSource: CredentialSource = envCreds.source || 'none';
   let credentialPair = envCreds.credentialPair;
   let mongoAccessToken: string | undefined;
+  let envOverridesMongo = false;
+  let conflictWarning: string | undefined;
 
   // Never fall back to MongoDB or another variable if an explicit env pair is only half-configured
   if (!clientId && !clientSecret && envCreds.partialWarning) {
     clearUberAccessTokenCache(targetSandbox);
+    console.info('[Uber OAuth Credential Source]:', {
+      env: targetEnv,
+      activeSource: 'none',
+      clientIdConfigured: false,
+      clientSecretConfigured: false,
+      partialWarning: envCreds.partialWarning,
+      tokenUrl: primaryTokenUrl,
+      baseUrl,
+    });
     return {
       ok: false,
       env: targetEnv,
@@ -636,9 +660,16 @@ async function getTokenForSpecificEnv(
     };
   }
 
-  if (!clientId || !clientSecret) {
-    const fromDb = await getCredentialsFromMongo(targetEnv);
-    if (!clientId && !clientSecret && fromDb.clientId && fromDb.clientSecret) {
+  const fromDb = await getCredentialsFromMongo(targetEnv);
+  const hasMongoPair = Boolean(fromDb.clientId && fromDb.clientSecret);
+
+  if (clientId && clientSecret) {
+    if (hasMongoPair) {
+      envOverridesMongo = true;
+      conflictWarning = `Vercel environment variables (${credentialPair || credentialSource}) override Integration UI credentials stored in MongoDB.`;
+    }
+  } else {
+    if (hasMongoPair) {
       clientId = fromDb.clientId;
       clientSecret = fromDb.clientSecret;
       credentialSource = 'mongo';
@@ -666,15 +697,29 @@ async function getTokenForSpecificEnv(
     }
 
     const existing = cachedTokensByKey.get(cacheKey);
-    if (
+    const cacheHit = Boolean(
       !options?.forceRefresh &&
-      existing &&
-      existing.env === targetEnv &&
-      existing.baseUrl === baseUrl &&
-      existing.credentialsFingerprint === credFingerprint &&
-      Date.now() < existing.expiresAt - 60_000 &&
-      (!reqScope || existing.scope.split(/\s+/).includes(reqScope))
-    ) {
+        existing &&
+        existing.env === targetEnv &&
+        existing.baseUrl === baseUrl &&
+        existing.credentialsFingerprint === credFingerprint &&
+        Date.now() < existing.expiresAt - 60_000 &&
+        (!reqScope || existing.scope.split(/\s+/).includes(reqScope))
+    );
+
+    console.info('[Uber OAuth Credential Source]:', {
+      env: targetEnv,
+      activeSource: credentialSource,
+      credentialPair: credentialPair || null,
+      clientIdConfigured: true,
+      clientSecretConfigured: true,
+      envOverridesMongo,
+      tokenUrl: primaryTokenUrl,
+      baseUrl,
+      cacheHit,
+    });
+
+    if (cacheHit && existing) {
       return {
         ok: true,
         env: targetEnv,
@@ -685,6 +730,8 @@ async function getTokenForSpecificEnv(
         credentialSource,
         credentialPair,
         clientIdPreview,
+        envOverridesMongo,
+        conflictWarning,
       };
     }
 
@@ -738,6 +785,8 @@ async function getTokenForSpecificEnv(
               credentialSource,
               credentialPair,
               clientIdPreview,
+              envOverridesMongo,
+              conflictWarning,
             };
           }
 
@@ -769,11 +818,12 @@ async function getTokenForSpecificEnv(
             tokenUrl,
             baseUrl,
             credentialSource,
-            credentialPair,
-            clientIdPreview,
+            credentialPair: credentialPair || null,
+            envOverridesMongo,
             status: lastOAuthStatus,
             scope: scope || '(default)',
-            error: lastOAuthError,
+            isEnvMismatch,
+            isSecretMismatch,
           });
 
           if (isEnvMismatch || isSecretMismatch) {
@@ -790,6 +840,8 @@ async function getTokenForSpecificEnv(
               credentialSource,
               credentialPair,
               clientIdPreview,
+              envOverridesMongo,
+              conflictWarning,
             };
           }
 
@@ -843,11 +895,22 @@ async function getTokenForSpecificEnv(
       credentialSource,
       credentialPair,
       clientIdPreview,
+      envOverridesMongo,
+      conflictWarning,
     };
   }
 
   const fallbackToken = getStaticFallbackTokenFromEnv(targetSandbox) || mongoAccessToken;
   if (isUsableToken(fallbackToken)) {
+    console.info('[Uber OAuth Credential Source]:', {
+      env: targetEnv,
+      activeSource: 'static_token',
+      clientIdConfigured: false,
+      clientSecretConfigured: false,
+      staticTokenConfigured: true,
+      tokenUrl: primaryTokenUrl,
+      baseUrl,
+    });
     return {
       ok: true,
       env: targetEnv,
@@ -862,6 +925,16 @@ async function getTokenForSpecificEnv(
   const missingVars = targetSandbox
     ? 'UBER_SANDBOX_CLIENT_ID / UBER_SANDBOX_CLIENT_SECRET (or UBER_CLIENT_ID / UBER_CLIENT_SECRET with UBER_ENV=sandbox)'
     : 'UBER_PROD_CLIENT_ID / UBER_PROD_CLIENT_SECRET (or UBER_CLIENT_ID / UBER_CLIENT_SECRET with UBER_ENV=production)';
+
+  console.info('[Uber OAuth Credential Source]:', {
+    env: targetEnv,
+    activeSource: 'none',
+    clientIdConfigured: false,
+    clientSecretConfigured: false,
+    envOverridesMongo: false,
+    tokenUrl: primaryTokenUrl,
+    baseUrl,
+  });
 
   return {
     ok: false,
@@ -888,6 +961,8 @@ export interface UberTokenAttempt {
   credentialSource?: CredentialSource;
   credentialPair?: string;
   clientIdPreview?: string;
+  envOverridesMongo?: boolean;
+  conflictWarning?: string;
 }
 
 export async function getUberAccessTokenAttempt(
@@ -907,6 +982,8 @@ export async function getUberAccessTokenAttempt(
       credentialSource: res.credentialSource,
       credentialPair: res.credentialPair,
       clientIdPreview: res.clientIdPreview,
+      envOverridesMongo: res.envOverridesMongo,
+      conflictWarning: res.conflictWarning,
     };
   }
   return {
@@ -923,6 +1000,8 @@ export async function getUberAccessTokenAttempt(
     credentialSource: res.credentialSource,
     credentialPair: res.credentialPair,
     clientIdPreview: res.clientIdPreview,
+    envOverridesMongo: res.envOverridesMongo,
+    conflictWarning: res.conflictWarning,
   };
 }
 

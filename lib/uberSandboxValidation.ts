@@ -39,6 +39,8 @@ export async function getUberSandboxStatus() {
     credentialPair: sandboxState.credentialPair,
     clientIdPreview: sandboxState.clientIdPreview,
     partialWarning: sandboxState.partialWarning,
+    envOverridesMongo: sandboxState.envOverridesMongo,
+    conflictWarning: sandboxState.conflictWarning,
     defaultStoreIdConfigured: Boolean(defaultStoreId),
     defaultStoreId: defaultStoreId || undefined,
     ...(resolvedEnv !== 'sandbox'
@@ -103,6 +105,8 @@ async function runSingleFeatureValidation(body: {
         credentialSource: auth.credentialSource,
         credentialPair: auth.credentialPair,
         clientIdPreview: auth.clientIdPreview,
+        envOverridesMongo: auth.envOverridesMongo,
+        conflictWarning: auth.conflictWarning,
         details: auth.details,
       },
       { status: errStatus }
@@ -184,6 +188,8 @@ async function runSingleFeatureValidation(body: {
       credentialSource: auth.credentialSource,
       credentialPair: auth.credentialPair,
       clientIdPreview: auth.clientIdPreview,
+      envOverridesMongo: auth.envOverridesMongo,
+      conflictWarning: auth.conflictWarning,
       data,
     });
   } catch (err: unknown) {
