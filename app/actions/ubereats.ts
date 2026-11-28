@@ -16,3 +16,16 @@ export async function acceptUberEatsOrderAction(params: {
 
   return result.body;
 }
+
+export async function markUberEatsOrderReadyAction(params: {
+  orderId: string;
+  storeId?: string;
+}): Promise<ProcessUberActionResponse['body']> {
+  const result = await processUberOrderAction({
+    orderId: params.orderId,
+    action: 'READY',
+    storeId: params.storeId,
+  });
+
+  return result.body;
+}

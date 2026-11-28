@@ -9,6 +9,7 @@ import { connectToMongoDB } from '@/lib/mongodb';
 import {
   acceptUberEatsOrder,
   executeUberOrderAction,
+  markUberEatsOrderReady,
   resolveUberConfigurationAsync,
   type UberOrderAction,
   type UberOrderActionResult,
@@ -36,23 +37,37 @@ const NEXT_STATUS_MAP: Record<UberOrderAction, OrderStatus> = {
 // Prevent duplicate concurrent Uber API requests for the same order + action
 const inFlightOrderActions = new Set<string>();
 
+const UBER_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isSyntheticLocalId(val: string): boolean {
+  const s = val.trim();
+  return !s || /^ord-/i.test(s) || /^evt-/i.test(s) || /^uber-/i.test(s) || /^#/.test(s);
+}
+
 function extractUberUuidFromRecord(doc: Record<string, any> | null | undefined): string {
   if (!doc) return '';
-  const candidates = [
+  const rawCandidates = [
     doc.uberOrderId,
     doc.uber_order_id,
     doc.rawPayload?.meta?.resource_id,
     doc.rawPayload?.order?.id,
-    typeof doc.orderId === 'string' && doc.orderId.length >= 20 ? doc.orderId : '',
-    typeof doc.order_id === 'string' && doc.order_id.length >= 20 ? doc.order_id : '',
-    typeof doc.id === 'string' && doc.id.length >= 20 && !doc.id.startsWith('ord-') ? doc.id : '',
-  ];
-  for (const c of candidates) {
-    if (typeof c === 'string' && c.trim().length > 0) {
-      return c.trim();
-    }
-  }
-  return '';
+    doc.rawPayload?.order_id,
+    doc.rawPayload?.id,
+    doc.orderId,
+    doc.order_id,
+    doc.external_order_id,
+    doc.id,
+  ]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .map((v) => v.trim());
+
+  // 1. Always prefer a genuine Uber UUID (36-char RFC4122 format) over any display/local ID
+  const exactUuid = rawCandidates.find((c) => UBER_UUID_REGEX.test(c));
+  if (exactUuid) return exactUuid;
+
+  // 2. Fallback to non-synthetic long identifier (if sandbox/partner uses non-hyphen UUID/token)
+  const fallbackId = rawCandidates.find((c) => c.length >= 20 && !isSyntheticLocalId(c));
+  return fallbackId || '';
 }
 
 export interface ProcessUberActionResponse {
@@ -63,6 +78,7 @@ export interface ProcessUberActionResponse {
     synced: boolean;
     uberSynced: boolean;
     alreadyAccepted?: boolean;
+    alreadyReady?: boolean;
     duplicate?: boolean;
     orderId?: string;
     uberOrderId?: string;
@@ -236,7 +252,7 @@ export async function processUberOrderAction(params: {
       }
     }
 
-    if (!uberOrderUuid && order_id && !order_id.startsWith('ord-ubr-')) {
+    if (!uberOrderUuid && order_id && !isSyntheticLocalId(order_id)) {
       uberOrderUuid = order_id;
     }
 
@@ -306,7 +322,12 @@ export async function processUberOrderAction(params: {
       (matchedDoc?.uberSynced === true || matchedDoc?.lastUberSync?.synced === true) &&
       (prevUpper === 'ACCEPTED' || prevUpper === 'READY_FOR_PICKUP' || prevUpper === 'READY');
 
-    // 2. Prevent duplicate acceptance requests if already accepted & synced with Uber
+    const alreadySyncedReady =
+      action === 'READY' &&
+      (matchedDoc?.uberSynced === true || matchedDoc?.lastUberSync?.synced === true) &&
+      (prevUpper === 'READY_FOR_PICKUP' || prevUpper === 'READY');
+
+    // 2. Prevent duplicate acceptance/ready requests if already synced with Uber
     if (alreadySyncedAccepted) {
       return {
         httpStatus: 200,
@@ -324,6 +345,27 @@ export async function processUberOrderAction(params: {
           uberStatus: 204,
           uberStatusCode: 204,
           message: 'Order was already accepted and synced with Uber Eats.',
+        },
+      };
+    }
+
+    if (alreadySyncedReady) {
+      return {
+        httpStatus: 200,
+        body: {
+          ok: true,
+          success: true,
+          synced: true,
+          uberSynced: true,
+          alreadyReady: true,
+          orderId: rawOrderId,
+          uberOrderId: uberOrderUuid,
+          action,
+          status: previousStatus,
+          nextStatus: previousStatus,
+          uberStatus: matchedDoc?.lastUberSync?.statusCode ?? 204,
+          uberStatusCode: matchedDoc?.lastUberSync?.statusCode ?? 204,
+          message: 'Order was already marked ready for pickup and synced with Uber Eats.',
         },
       };
     }
@@ -353,6 +395,11 @@ export async function processUberOrderAction(params: {
           ? await acceptUberEatsOrder(uberOrderUuid, {
               reason: reasonCode,
               isSandbox,
+            })
+          : action === 'READY'
+          ? await markUberEatsOrderReady(uberOrderUuid, {
+              isSandbox,
+              currentStatus: previousStatus,
             })
           : await executeUberOrderAction({
               orderId: uberOrderUuid,

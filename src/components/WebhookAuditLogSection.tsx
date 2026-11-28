@@ -95,19 +95,28 @@ export const WebhookAuditLogSection: React.FC<WebhookAuditLogSectionProps> = ({
   const [orderActionLoadingId, setOrderActionLoadingId] = useState<string | null>(null);
   const inFlightActionKeysRef = useRef<Set<string>>(new Set());
 
-  const getEventTargetOrderId = (order: any): string =>
-    String(
-      order?.uber_order_id ||
-        order?.uberOrderId ||
-        order?.orderId ||
-        order?.order_id ||
-        order?.eventId ||
-        order?.orderNumber ||
-        order?.invoiceNumber ||
-        order?.id ||
-        order?._id ||
-        ''
-    ).trim();
+  const getEventTargetOrderId = (order: any): string => {
+    const candidates = [
+      order?.uber_order_id,
+      order?.uberOrderId,
+      order?.rawPayload?.meta?.resource_id,
+      order?.rawPayload?.order?.id,
+      order?.rawPayload?.order_id,
+      order?.orderId,
+      order?.order_id,
+      order?.eventId,
+      order?.orderNumber,
+      order?.invoiceNumber,
+      order?.id,
+      order?._id,
+    ]
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .map((v) => v.trim());
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const exactUuid = candidates.find((c) => uuidRegex.test(c));
+    return exactUuid || candidates[0] || '';
+  };
 
   useEffect(() => {
     const overrides = optimisticEventStatusRef.current;

@@ -1385,7 +1385,7 @@ export async function executeUberOrderAction(params: {
       break;
 
     case 'READY':
-      path = `/v1/eats/orders/${cleanOrderId}/restaurant_order_ready`;
+      path = `/v1/delivery/order/${cleanOrderId}/ready`;
       payload = {};
       nextStatus = 'READY_FOR_PICKUP';
       break;
@@ -1530,12 +1530,16 @@ export async function executeUberOrderAction(params: {
       response.status === 401 &&
       /environment\s+is\s+mismatched|mismatched\s+with\s+the\s+oauth\s+server/i.test(String(rawErr));
 
+    const formattedError = isEnvMismatch
+      ? `${rawErr} (Token from ${initialTokenRes.tokenUrl} sent to ${host} in ${targetEnv} mode).`
+      : response.status === 404
+      ? `${rawErr} [Endpoint: POST ${url}, Order UUID: ${params.orderId.trim()}, Env: ${targetEnv}]`
+      : String(rawErr);
+
     lastFailure = {
       status: response.status,
       url,
-      error: isEnvMismatch
-        ? `${rawErr} (Token from ${initialTokenRes.tokenUrl} sent to ${host} in ${targetEnv} mode).`
-        : String(rawErr),
+      error: formattedError,
       uberResponse: data,
     };
 
@@ -1620,3 +1624,29 @@ export async function acceptUberEatsOrder(
   return result;
 }
 
+/**
+ * Authenticates with Uber Eats OAuth 2.0 (eats.order scope),
+ * sends POST /v1/delivery/order/{order_id}/ready,
+ * and verifies Uber confirms HTTP 200 / 204 before allowing READY_FOR_PICKUP.
+ */
+export async function markUberEatsOrderReady(
+  orderId: string,
+  options?: { isSandbox?: boolean; currentStatus?: string }
+): Promise<UberOrderActionResult> {
+  const cleanOrderId = String(orderId || '').trim();
+  if (!cleanOrderId) {
+    return {
+      ok: false,
+      status: 400,
+      url: '',
+      error: 'Uber Eats orderId UUID is required.',
+    };
+  }
+
+  return executeUberOrderAction({
+    orderId: cleanOrderId,
+    action: 'READY',
+    isSandbox: options?.isSandbox,
+    currentStatus: options?.currentStatus,
+  });
+}

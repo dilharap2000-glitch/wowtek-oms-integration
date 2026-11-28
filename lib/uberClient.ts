@@ -12,6 +12,7 @@ export {
   hasUberCredentialsConfiguredAsync,
   isUberSandboxMode,
   isUsableUberValue,
+  markUberEatsOrderReady,
   maskUberClientId,
   resolveUberConfigurationAsync,
   resolveUberEnvironment,

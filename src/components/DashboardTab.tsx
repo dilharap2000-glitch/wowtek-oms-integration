@@ -138,6 +138,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     display_id?: string;
     storeId?: string;
     externalStoreId?: string;
+    rawPayload?: {
+      meta?: { resource_id?: string };
+      order?: { id?: string };
+      order_id?: string;
+      id?: string;
+    };
   };
 
   const normalizeOrderKey = (val: unknown): string =>
@@ -173,19 +179,30 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   }, []);
 
   const getUberTargetOrderId = React.useCallback(
-    (order?: UberOrderActionTarget | null): string =>
-      String(
-        order?.uber_order_id ||
-          order?.uberOrderId ||
-          order?.orderId ||
-          order?.order_id ||
-          order?.eventId ||
-          order?.orderNumber ||
-          order?.invoiceNumber ||
-          order?.id ||
-          order?._id ||
-          ''
-      ).trim(),
+    (order?: UberOrderActionTarget | null): string => {
+      const candidates = [
+        order?.uber_order_id,
+        order?.uberOrderId,
+        order?.rawPayload?.meta?.resource_id,
+        order?.rawPayload?.order?.id,
+        order?.rawPayload?.order_id,
+        order?.orderId,
+        order?.order_id,
+        order?.eventId,
+        order?.orderNumber,
+        order?.invoiceNumber,
+        order?.id,
+        order?._id,
+      ]
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+        .map((v) => v.trim());
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const exactUuid = candidates.find((c) => uuidRegex.test(c));
+      if (exactUuid) return exactUuid;
+
+      return candidates[0] || '';
+    },
     []
   );
 
@@ -372,7 +389,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           data?.uberError ||
           data?.error ||
           data?.message ||
-          `Uber Eats returned HTTP ${errCode} (expected 204)`;
+          `Uber Eats returned HTTP ${errCode}${normalizedAction === 'ACCEPT' ? ' (expected 204)' : ''}`;
 
         console.error('[Uber Eats Order Action Failed]:', {
           action: normalizedAction,

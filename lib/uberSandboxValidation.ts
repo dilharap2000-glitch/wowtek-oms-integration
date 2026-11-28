@@ -412,7 +412,7 @@ export async function runUberSandboxValidation(req: NextRequest) {
     await callUber(
       'Mark Order Ready',
       'POST',
-      `/v1/eats/orders/${encodeURIComponent(orderId)}/restaurant_order_ready`,
+      `/v1/delivery/order/${encodeURIComponent(orderId)}/ready`,
       {}
     );
 
